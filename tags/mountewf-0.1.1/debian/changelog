@@ -1,0 +1,12 @@
+mountewf (0.1.1) stable; urgency=low
+
+  * Fixed sever bugs in block map calculation.
+  * VDI emulation should now work
+
+ -- Gillen Daniel <Daniel.GILLEN@police.etat.lu> Thu, 03 Feb 2009 17:12:00 +0200
+
+mountewf (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Gillen Daniel <Daniel.GILLEN@police.etat.lu>  Sun, 01 Feb 2009 01:30:50 +0200

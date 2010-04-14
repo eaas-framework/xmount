@@ -1,0 +1,6 @@
+This file lists upcomming changes to xmount.
+
+Upcomming changes for version 0.3.0:
+  - New cache file format (Mandatory to support new virtual formats)
+  - Support for VMWare VMDK files
+  - Support for AFF input images

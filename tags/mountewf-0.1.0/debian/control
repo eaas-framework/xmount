@@ -1,0 +1,15 @@
+Source: mountewf
+Section: unknown
+Priority: extra
+Maintainer: Gillen Daniel <Daniel.GILLEN@police.etat.lu>
+Build-Depends: debhelper (>= 7), autotools-dev
+Standards-Version: 3.7.3
+
+Package: mountewf
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Small tool to mount ewf files
+ mountewf is a small tool to mount ewf (Expert Witness Compression Format)
+ files so that the contained data can be accessed directly by other programs
+ without the need of supporting ewf input files. Data can be represented as
+ dd image or as VirtualBox disk file.

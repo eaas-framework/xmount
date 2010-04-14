@@ -1,0 +1,12 @@
+2009-02-10 Gillen Daniel <Daniel.GILLEN@police.etat.lu>
+  * Added random generator initialisation
+  * Resolved compilation issue by fixing a typo
+  * Fixed some debian specific scripts to be able to build a package
+
+2009-02-03 Gillen Daniel <Daniel.GILLEN@police.etat.lu>
+  * Fixed sever bugs in block map calculation.
+  * VDI emulation should now work
+
+2009-01-31 Gillen Daniel <Daniel.GILLEN@police.etat.lu>
+  * First release
+  * Supports emulated dd and vdi files

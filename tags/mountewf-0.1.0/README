@@ -1,0 +1,112 @@
+MOUNTEWF README FILE
+
+Table of contents
+  0.0 Author and license stuff
+  1.0 What is mountewf? - A short description
+  2.0 A deeper view of things
+    2.1 Emulated dd file
+    2.2 Emulated vdi file
+  3.0 Installation instructions
+    3.1 Prerequisits
+    3.1 Install from a package
+    3.2 Install from source
+  4.0 mountewf command line parameters
+    4.1 mountewf usage examples
+
+0.0 Author and license stuff
+  mountewf (c) 2009 by Gillen Daniel <Daniel.GILLEN@police.etat.lu>
+
+  This program is free software: you can redistribute it and/or modify it under
+  the terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+  FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+  details.
+
+  You should have received a copy of the GNU General Public License along with
+  this program. If not, see <http://www.gnu.org/licenses/>.
+
+1.0 What is mountewf? - A short description
+  mountewf is a small tool to mount ewf (Expert Witness Compression Format)
+  files so that the contained data can be accessed directly by other programs
+  without the need of supporting ewf input files. Data can be represented as
+  dd image or as VirtualBox disk file.
+
+2.0 A deeper view of things
+  mountewf uses fuse (Filesystem in Userspace - http://fuse.sourceforge.net/)
+  to export a filesystem containing an emulated representation of the original
+  data contained in the ewf files. To access this data, mountewf uses libewf
+  (Expert Witness Compression Format - https://www.uitwisselplatform.nl/projects
+  /libewf/). This makes it possible to support all ewf versions supported by
+  libewf. The emulated data representation can be either in raw dd format or it
+  can be a VirtualBox virtual disk file. The two representations are explained
+  in detail in the next two sections.
+
+  2.1 Emulated dd file
+    This is the standard data representation used by mountewf. It is a file
+    containing the raw data contained in the ewf files. This makes it possible
+    to access the raw data without uncompressing the whole ewf file before.
+    Decompression is done on the fly while accessing the emulated dd file.
+
+  2.2 Emulated vdi file
+    When using the --vdi command line parameter, a VirtualBox disk file is
+    emulated. This means that mountewf builds a virtual vdi header and prepends
+    it to the raw data contained in the ewf files. The vdi file can be used in
+    VirtualBox as a virtual disk file. This makes it possible to access the data
+    from ewf files in your virtual machines.
+
+3.0 Installation instructions
+  To install mountewf, you can use a prebuild package for your distribution or
+  you can build mountewf from source. The two methods are described in the two
+  following sections.
+
+  3.1 Prerequisits
+    FUSE:
+      Your linux distribution must support fuse and have the apropiate librarys
+      installed. (See http://fuse.sourceforge.net/ for more informations). To be
+      able to install from source, you also need the fuse header files.
+    LIBEWF:
+      You must have installed libewf. To install from source, you also need the
+      libewf header files. (See https://www.uitwisselplatform.nl/projects/
+      libewf/ for more informations)
+
+  3.2 Install from a package
+    If you are lucky, I provide a prebuild package for your linux distribution.
+    In this case, you only have to fire up your distribution's package manager
+    and install mountewf.
+
+  3.3 Install from source
+    After having checked the prerequisits, you should be able to compile and
+    install mountewf by simply issuing the followng three commands:
+
+    # ./configure
+    # make
+    # make install
+
+4.0 mountewf command line parameters
+  mountewf [[fuse_options] [--vdi] <image> <mountpoint>
+
+  fuse_options:
+    These are options specific to fuse. See the fuse docs for more infos.
+  --vdi:
+    Emulate a VirtualBox vdi file.
+  image:
+    Specifies the ewf file(s). You have to specify ALL ewf parts! Under bash,
+    this can be done using .E?? as file extension.
+  mountpoint:
+    Specifies the mount point under which the emulated files will be located.
+
+  4.1 mountewf usage examples
+    To mount an ewf image from your acquired disk as an dd image under /mnt,
+    you would use a command similiar to this:
+
+    mountewf ./acquired_disk.E?? /mnt
+
+    If you want to mount the same ewf image as vdi file, you would use
+    a command like this:
+
+    mountewf --vdi ./acquired_disk.E?? /mnt
+

@@ -1,0 +1,35 @@
+xmount (0.2.1) stable; urgency=critical
+
+  * Fixed a bug in virtual write support that corrupted cache files
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Fri, 27 Mar 2009 12:00:00 +0200
+
+xmount (0.2.0) stable; urgency=low
+
+  * Changed name from mountewf to xmount
+  * Massive code cleanup
+  * Added support for multiple input image formats
+  * Added support for virtual write access to emulated image files
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Mon, 16 Mar 2009 17:00:00 +0200
+
+mountewf (0.1.2) stable; urgency=low
+
+  * Added random generator initialisation
+  * Resolved compilation issue by fixing a typo
+  * Fixed some debian specific scripts to be able to build a package
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Tue, 10 Feb 2009 16:12:00 +0200
+
+mountewf (0.1.1) stable; urgency=low
+
+  * Fixed sever bugs in block map calculation.
+  * VDI emulation should now work
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Thu, 03 Feb 2009 17:12:00 +0200
+
+mountewf (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Sun, 01 Feb 2009 01:30:50 +0200

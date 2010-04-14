@@ -1,0 +1,5 @@
+libuna.lo libuna.o: libuna.c ../common/common.h ../common/config.h
+
+../common/common.h:
+
+../common/config.h:

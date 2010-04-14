@@ -1,0 +1,20 @@
+mountewf (0.1.2) stable; urgency=low
+
+  * Added random generator initialisation
+  * Resolved compilation issue by fixing a typo
+  * Fixed some debian specific scripts to be able to build a package
+
+ -- Gillen Daniel <Daniel.GILLEN@police.etat.lu>  Tue, 10 Feb 2009 16:12:00 +0200
+
+mountewf (0.1.1) stable; urgency=low
+
+  * Fixed sever bugs in block map calculation.
+  * VDI emulation should now work
+
+ -- Gillen Daniel <Daniel.GILLEN@police.etat.lu>  Thu, 03 Feb 2009 17:12:00 +0200
+
+mountewf (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Gillen Daniel <Daniel.GILLEN@police.etat.lu>  Sun, 01 Feb 2009 01:30:50 +0200

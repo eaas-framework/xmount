@@ -1,0 +1,51 @@
+.TH mountewf 1 "February 1, 2009" "" "mountewf"
+
+.SH NAME
+mountewf \- Small tool to mount ewf files as dd image or vdi file
+
+.SH SYNOPSIS
+.B mountewf
+[[fuse_options] [--vdi]] <ewf_files> <mountpoint>
+.br
+
+.SH DESCRIPTION
+.B mountewf
+is a small tool to mount ewf (Expert Witness Compression Format)
+files so that the contained data can be accessed directly by other programs
+without the need of supporting ewf input files. Data can be represented as
+dd image or as VirtualBox disk file.
+.br
+
+.SH OPTIONS
+.B
+fuse_options:
+  These are options specific to fuse. See the fuse docs for more infos.
+.br
+.B
+--vdi:
+  Emulate a VirtualBox vdi file.
+.br
+.B
+image:
+  Specifies the ewf file(s). You have to specify ALL ewf parts! Under
+  bash, this can be done using .E?? as file extension.
+.br
+.B
+mountpoint:
+  Specifies the mount point under which the emulated files will be
+  located.
+.br
+
+.SH BUGS
+Currently don't know of any. If you find one, please e-mail me.
+
+.SH EXAMPLE
+To mount an ewf image from your acquired disk as an dd image under /mnt,
+you would use a command similiar to this:
+
+  mountewf ./acquired_disk.E?? /mnt
+
+If you want to mount the same ewf image as vdi file, you would use
+a command like this:
+
+  mountewf --vdi ./acquired_disk.E?? /mnt
