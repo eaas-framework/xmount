@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008,2009 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2010 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
 * vdi or vmdk files and enable virtual write access to them.                   *

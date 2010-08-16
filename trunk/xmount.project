@@ -12,6 +12,8 @@
     <File Name="md5.h"/>
     <File Name="xmount.c"/>
     <File Name="xmount.h"/>
+    <File Name="xmount_options.c"/>
+    <File Name="xmount_options.h"/>
   </VirtualDirectory>
   <VirtualDirectory Name="autoconf/automake">
     <File Name="aclocal.m4"/>

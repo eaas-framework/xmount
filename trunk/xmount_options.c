@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008,2009 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2010 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * xmount is a small tool to "fuse mount" various image formats as dd or vdi    *
 * files and enable virtual write access.                                       *
@@ -20,5 +20,14 @@
 
 #include "xmount_options.h"
 
+inline void InitXmountOptions() {
+  memset(&xmount_options,0,sizeof(tXmountOptions));
+}
 
-
+int ParseCommandLine(int argc,
+                     char **pp_argv,
+                     int *p_fuse_argc,
+                     char **pp_fuse_argv)
+{
+  
+}

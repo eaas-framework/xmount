@@ -457,8 +457,8 @@ char **xmcache_ls(pTXMCacheFile pCacheFile, int ListInternal) {
   
   // Iterate over all file index entries
   for(i=0;i<XM_CACHEFILE_FILEINDEX_MAXENTRYS;i++) {
-    if(pCacheFile->pFileIndex.FileIndexEntrys[i].filepath!='\0' ||
-       pCacheFile->pFileIndex.FileIndexEntrys[i].filename!='\0')
+    if(pCacheFile->pFileIndex->FileIndexEntrys[i].filepath!='\0' ||
+       pCacheFile->pFileIndex->FileIndexEntrys[i].filename!='\0')
     {
       // This entry holds data
       
