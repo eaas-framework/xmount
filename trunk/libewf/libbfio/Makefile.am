@@ -1,5 +1,10 @@
 if HAVE_LOCAL_LIBBFIO
-AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/common -I$(top_srcdir)/liberror @LIBUNA_CPPFLAGS@ @MEMWATCH_CPPFLAGS@
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/common \
+	-I$(top_srcdir)/liberror \
+	@LIBUNA_CPPFLAGS@ \
+	@MEMWATCH_CPPFLAGS@
 
 noinst_LTLIBRARIES = libbfio.la
 
@@ -12,6 +17,7 @@ libbfio_la_SOURCES = \
 	libbfio_handle.c libbfio_handle.h \
 	libbfio_libuna.h \
 	libbfio_list_type.c libbfio_list_type.h \
+	libbfio_memory_range.c libbfio_memory_range.h \
 	libbfio_offset_list.c libbfio_offset_list.h \
 	libbfio_pool.c libbfio_pool.h \
 	libbfio_support.c libbfio_support.h \

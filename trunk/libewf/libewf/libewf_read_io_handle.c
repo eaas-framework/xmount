@@ -2,7 +2,7 @@
  * Low level reading functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,17 +21,17 @@
  */
 
 #include <common.h>
-#include <endian.h>
+#include <byte_stream.h>
 #include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_definitions.h"
 #include "libewf_compression.h"
 #include "libewf_chunk_cache.h"
 #include "libewf_libbfio.h"
 #include "libewf_media_values.h"
-#include "libewf_notify.h"
 #include "libewf_offset_table.h"
 #include "libewf_read_io_handle.h"
 #include "libewf_sector_table.h"
@@ -127,6 +127,7 @@ int libewf_read_io_handle_free(
      liberror_error_t **error )
 {
 	static char *function = "libewf_read_io_handle_free";
+	int result            = 1;
 
 	if( read_io_handle == NULL )
 	{
@@ -151,13 +152,15 @@ int libewf_read_io_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free crc errors.",
 			 function );
+
+			result = -1;
 		}
 		memory_free(
 		 *read_io_handle );
 
 		*read_io_handle = NULL;
 	}
-	return( 1 );
+	return( result );
 }
 
 /* Processes the chunk data, applies decompression if necessary and validates the CRC
@@ -227,9 +230,9 @@ ssize_t libewf_read_io_handle_process_chunk(
 			chunk_buffer_size -= sizeof( ewf_crc_t );
 			crc_buffer         = &( chunk_buffer[ chunk_buffer_size ] );
 
-			endian_little_convert_32bit(
-			 chunk_crc,
-			 crc_buffer );
+			byte_stream_copy_to_uint32_little_endian(
+			 crc_buffer,
+			 chunk_crc );
 		}
 		calculated_crc = ewf_crc_calculate(
 		                  chunk_buffer,
@@ -239,7 +242,7 @@ ssize_t libewf_read_io_handle_process_chunk(
 		if( chunk_crc != calculated_crc )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: CRC does not match (in file: %" PRIu32 " calculated: %" PRIu32 ").\n",
 			 function,
 			 chunk_crc,
@@ -501,11 +504,11 @@ ssize_t libewf_read_io_handle_read_chunk(
 	{
 		chunk_type = "compressed";
 	}
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: reading %s chunk %" PRIu32 " of %" PRIu32 " at offset: %" PRIu64 " with size: %" PRIzd ".\n",
 	 function,
 	 chunk_type,
-	 chunk + 1,
+	 chunk,
 	 offset_table->amount_of_chunk_offsets,
 	 offset_table->chunk_offset[ chunk ].file_offset,
 	 offset_table->chunk_offset[ chunk ].size );
@@ -583,9 +586,9 @@ ssize_t libewf_read_io_handle_read_chunk(
 			}
 			total_read_count += read_count;
 		}
-		endian_little_convert_32bit(
-		 *chunk_crc,
-		 crc_buffer );
+		byte_stream_copy_to_uint32_little_endian(
+		 crc_buffer,
+		 *chunk_crc );
 	}
 	return( total_read_count );
 }
@@ -717,7 +720,7 @@ ssize_t libewf_read_io_handle_read_chunk_data(
 		if( chunk_size > chunk_cache->allocated_size )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: reallocating chunk size: %" PRIzu ".\n",
 			 function,
 			 chunk_size );

@@ -2,7 +2,7 @@
  * Definitions for libewf
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -25,11 +25,11 @@
 
 #include "types.h"
 
-#define LIBEWF_VERSION				20090606
+#define LIBEWF_VERSION				20100226
 
 /* The libewf version string
  */
-#define LIBEWF_VERSION_STRING			"20090606"
+#define LIBEWF_VERSION_STRING			"20100226"
 
 /* The libewf file access
  * bit 1	set to 1 for read access

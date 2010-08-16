@@ -2,7 +2,7 @@
  * Media values functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +26,6 @@
 #include <liberror.h>
 
 #include "libewf_media_values.h"
-#include "libewf_notify.h"
 
 #include "ewf_definitions.h"
 

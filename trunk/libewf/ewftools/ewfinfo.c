@@ -3,7 +3,7 @@
  * Shows information stored in an EWF file
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,24 +27,26 @@
 
 #include <liberror.h>
 
-#include <stdio.h>
-
-#if defined( HAVE_STDLIB_H )
+#if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
+#endif
+
+/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
+ * before including libewf.h
+ */
+#if defined( _WIN32 ) && defined( DLL_EXPORT )
+#define LIBEWF_DLL_IMPORT
 #endif
 
 #include <libewf.h>
 
+#include <libsystem.h>
+
 #include "byte_size_string.h"
-#include "ewfgetopt.h"
 #include "ewfinput.h"
 #include "ewfoutput.h"
-#include "ewfsignal.h"
-#include "glob.h"
 #include "guid.h"
 #include "info_handle.h"
-#include "notify.h"
-#include "system_string.h"
 
 info_handle_t *ewfinfo_info_handle = NULL;
 int ewfinfo_abort                  = 0;
@@ -65,8 +67,8 @@ void usage_fprint(
 
 	fprintf( stream, "\tewf_files: the first or the entire set of EWF segment files\n\n" );
 
-	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default), windows-1250,\n"
-	                 "\t           windows-1251, windows-1252, windows-1253, windows-1254,\n"
+	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default), windows-874,\n"
+	                 "\t           windows-1250, windows-1251, windows-1252, windows-1253, windows-1254,\n"
 	                 "\t           windows-1255, windows-1256, windows-1257, windows-1258\n" );
 	fprintf( stream, "\t-d:        specify the date format, options: ctime (default), dm (day/month),\n"
 	                 "\t           md (month/day), iso8601\n" );
@@ -81,7 +83,7 @@ void usage_fprint(
 /* Signal handler for ewfinfo
  */
 void ewfinfo_signal_handler(
-      ewfsignal_t signal )
+      libsystem_signal_t signal )
 {
 	liberror_error_t *error = NULL;
 	static char *function   = "ewfinfo_signal_handler";
@@ -93,11 +95,11 @@ void ewfinfo_signal_handler(
 	       ewfinfo_info_handle,
 	       &error ) != 1 ) )
 	{
-		notify_warning_printf(
+		libsystem_notify_printf(
 		 "%s: unable to signal info handle to abort.\n",
 		 function );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -106,10 +108,10 @@ void ewfinfo_signal_handler(
 	}
 	/* Force stdin to close otherwise any function reading it will remain blocked
 	 */
-	if( file_io_close(
+	if( libsystem_file_io_close(
 	     0 ) != 0 )
 	{
-		notify_warning_printf(
+		libsystem_notify_printf(
 		 "%s: unable to close stdin.\n",
 		 function );
 	}
@@ -117,41 +119,43 @@ void ewfinfo_signal_handler(
 
 /* The main program
  */
-#if defined( HAVE_WIDE_SYSTEM_CHARACTER_T )
+#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
 int wmain( int argc, wchar_t * const argv[] )
 #else
 int main( int argc, char * const argv[] )
 #endif
 {
-	system_character_t * const *argv_filenames = NULL;
+	libsystem_character_t * const *argv_filenames = NULL;
 
-#if !defined( HAVE_GLOB_H )
-	glob_t *glob                               = NULL;
+#if !defined( LIBSYSTEM_HAVE_GLOB )
+	libsystem_glob_t *glob                        = NULL;
 #endif
-	info_handle_t *info_handle                 = NULL;
-	liberror_error_t *error                    = NULL;
+	info_handle_t *info_handle                    = NULL;
+	liberror_error_t *error                       = NULL;
 
-	system_character_t *program                = _SYSTEM_CHARACTER_T_STRING( "ewfinfo" );
-	system_integer_t option                    = 0;
-	uint8_t verbose                            = 0;
-	uint8_t date_format                        = LIBEWF_DATE_FORMAT_CTIME;
-	char info_option                           = 'a';
-	int amount_of_filenames                    = 0;
-	int header_codepage                        = LIBEWF_CODEPAGE_ASCII;
-	int result                                 = 0;
+	libsystem_character_t *program                = _LIBSYSTEM_CHARACTER_T_STRING( "ewfinfo" );
+	libsystem_integer_t option                    = 0;
+	uint8_t verbose                               = 0;
+	uint8_t date_format                           = LIBEWF_DATE_FORMAT_CTIME;
+	char info_option                              = 'a';
+	int amount_of_filenames                       = 0;
+	int header_codepage                           = LIBEWF_CODEPAGE_ASCII;
+	int result                                    = 0;
 
-	notify_set_values(
+	libsystem_notify_set_stream(
 	 stderr,
+	 NULL );
+	libsystem_notify_set_verbose(
 	 1 );
 
-	if( system_string_initialize(
+	if( libsystem_initialize(
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to initialize system string.\n" );
+		 "Unable to initialize system values.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -162,18 +166,18 @@ int main( int argc, char * const argv[] )
 	 stdout,
 	 program );
 
-	while( ( option = ewfgetopt(
+	while( ( option = libsystem_getopt(
 	                   argc,
 	                   argv,
-	                   _SYSTEM_CHARACTER_T_STRING( "A:d:ehimvV" ) ) ) != (system_integer_t) -1 )
+	                   _LIBSYSTEM_CHARACTER_T_STRING( "A:d:ehimvV" ) ) ) != (libsystem_integer_t) -1 )
 	{
 		switch( option )
 		{
-			case (system_integer_t) '?':
+			case (libsystem_integer_t) '?':
 			default:
 				fprintf(
 				 stderr,
-				 "Invalid argument: %" PRIs_SYSTEM "\n",
+				 "Invalid argument: %" PRIs_LIBSYSTEM "\n",
 				 argv[ optind ] );
 
 				usage_fprint(
@@ -181,13 +185,13 @@ int main( int argc, char * const argv[] )
 
 				return( EXIT_FAILURE );
 
-			case (system_integer_t) 'A':
+			case (libsystem_integer_t) 'A':
 				if( ewfinput_determine_header_codepage(
 				     optarg,
 				     &header_codepage,
 				     &error ) != 1 )
 				{
-					notify_error_backtrace(
+					libsystem_notify_print_error_backtrace(
 					 error );
 					liberror_error_free(
 					 &error );
@@ -200,46 +204,46 @@ int main( int argc, char * const argv[] )
 				}
 				break;
 
-			case (system_integer_t) 'd':
-				if( system_string_compare(
+			case (libsystem_integer_t) 'd':
+				if( libsystem_string_compare(
 				     optarg,
-				     _SYSTEM_CHARACTER_T_STRING( "dm" ),
+				     _LIBSYSTEM_CHARACTER_T_STRING( "dm" ),
 				     3 ) == 0 )
 				{
 					date_format = LIBEWF_DATE_FORMAT_DAYMONTH;
 				}
-				else if( system_string_compare(
+				else if( libsystem_string_compare(
 				          optarg,
-				          _SYSTEM_CHARACTER_T_STRING( "md" ),
+				          _LIBSYSTEM_CHARACTER_T_STRING( "md" ),
 				          3 ) == 0 )
 				{
 					date_format = LIBEWF_DATE_FORMAT_MONTHDAY;
 				}
-				else if( system_string_compare(
+				else if( libsystem_string_compare(
 				          optarg,
-				          _SYSTEM_CHARACTER_T_STRING( "iso8601" ),
+				          _LIBSYSTEM_CHARACTER_T_STRING( "iso8601" ),
 				          8 ) == 0 )
 				{
 					date_format = LIBEWF_DATE_FORMAT_ISO8601;
 				}
-				else if( system_string_compare(
+				else if( libsystem_string_compare(
 				          optarg,
-				          _SYSTEM_CHARACTER_T_STRING( "ctime" ),
+				          _LIBSYSTEM_CHARACTER_T_STRING( "ctime" ),
 				          3 ) != 0 )
 				{
 					fprintf(
 					 stderr,
-					 "Unsupported date format: %" PRIs_SYSTEM " using default ctime.\n",
+					 "Unsupported date format: %" PRIs_LIBSYSTEM " using default ctime.\n",
 					 optarg );
 				}
 				break;
 
-			case (system_integer_t) 'e':
+			case (libsystem_integer_t) 'e':
 				if( info_option != 'a' )
 				{
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_SYSTEM " and %c\n",
+					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
 					 option, info_option );
 
 					usage_fprint(
@@ -251,18 +255,18 @@ int main( int argc, char * const argv[] )
 
 				break;
 
-			case (system_integer_t) 'h':
+			case (libsystem_integer_t) 'h':
 				usage_fprint(
 				 stdout );
 
 				return( EXIT_SUCCESS );
 
-			case (system_integer_t) 'i':
+			case (libsystem_integer_t) 'i':
 				if( info_option != 'a' )
 				{
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_SYSTEM " and %c\n",
+					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
 					 option, info_option );
 
 					usage_fprint(
@@ -274,12 +278,12 @@ int main( int argc, char * const argv[] )
 
 				break;
 
-			case (system_integer_t) 'm':
+			case (libsystem_integer_t) 'm':
 				if( info_option != 'a' )
 				{
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_SYSTEM " and %c\n",
+					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
 					 option, info_option );
 
 					usage_fprint(
@@ -291,12 +295,12 @@ int main( int argc, char * const argv[] )
 
 				break;
 
-			case (system_integer_t) 'v':
+			case (libsystem_integer_t) 'v':
 				verbose = 1;
 
 				break;
 
-			case (system_integer_t) 'V':
+			case (libsystem_integer_t) 'V':
 				ewfoutput_copyright_fprint(
 				 stdout );
 
@@ -314,22 +318,35 @@ int main( int argc, char * const argv[] )
 
 		return( EXIT_FAILURE );
 	}
-	notify_set_values(
-	 stderr,
+	libsystem_notify_set_verbose(
 	 verbose );
+#if defined( HAVE_V2_API )
+	libewf_notify_set_verbose(
+	 verbose );
+	libewf_notify_set_stream(
+	 stderr,
+	 NULL );
+#else
 	libewf_set_notify_values(
 	 stderr,
 	 verbose );
+#endif
 
-	if( ewfsignal_attach(
-	     ewfinfo_signal_handler ) != 1 )
+	if( libsystem_signal_attach(
+	     ewfinfo_signal_handler,
+	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
 		 "Unable to attach signal handler.\n" );
+
+		libsystem_notify_print_error_backtrace(
+		 error );
+		liberror_error_free(
+		 &error );
 	}
-#if !defined( HAVE_GLOB_H )
-	if( glob_initialize(
+#if !defined( LIBSYSTEM_HAVE_GLOB )
+	if( libsystem_glob_initialize(
 	     &glob,
 	     &error ) != 1 )
 	{
@@ -337,14 +354,14 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to initialize glob.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
 
 		return( EXIT_FAILURE );
 	}
-	if( glob_resolve(
+	if( libsystem_glob_resolve(
 	     glob,
 	     &argv[ optind ],
 	     argc - optind,
@@ -354,12 +371,12 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to resolve glob.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
 
-		glob_free(
+		libsystem_glob_free(
 		 &glob,
 		 NULL );
 
@@ -381,13 +398,13 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to create info handle.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
 
-#if !defined( HAVE_GLOB_H )
-		glob_free(
+#if !defined( LIBSYSTEM_HAVE_GLOB )
+		libsystem_glob_free(
 		 &glob,
 		 NULL );
 #endif
@@ -404,7 +421,7 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to set header codepage in info handle.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -413,8 +430,8 @@ int main( int argc, char * const argv[] )
 		 &info_handle,
 		 NULL );
 
-#if !defined( HAVE_GLOB_H )
-		glob_free(
+#if !defined( LIBSYSTEM_HAVE_GLOB )
+		libsystem_glob_free(
 		 &glob,
 		 NULL );
 #endif
@@ -428,8 +445,8 @@ int main( int argc, char * const argv[] )
 	          amount_of_filenames,
 	          &error );
 
-#if !defined( HAVE_GLOB_H )
-	if( glob_free(
+#if !defined( LIBSYSTEM_HAVE_GLOB )
+	if( libsystem_glob_free(
 	     &glob,
 	     &error ) != 1 )
 	{
@@ -437,7 +454,7 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to free glob.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -449,11 +466,11 @@ int main( int argc, char * const argv[] )
 	if( ( ewfinfo_abort == 0 )
 	 && ( result != 1 ) )
 	{
-		ewfoutput_error_fprint(
+		fprintf(
 		 stderr,
 		 "Unable to open EWF file(s)" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -474,7 +491,7 @@ int main( int argc, char * const argv[] )
 		     stdout,
 		     &error ) != 1 )
 		{
-			notify_error_backtrace(
+			libsystem_notify_print_error_backtrace(
 			 error );
 			liberror_error_free(
 			 &error );
@@ -493,7 +510,7 @@ int main( int argc, char * const argv[] )
 			 stderr,
 			 "Unable to print media information.\n" );
 
-			notify_error_backtrace(
+			libsystem_notify_print_error_backtrace(
 			 error );
 			liberror_error_free(
 			 &error );
@@ -507,7 +524,7 @@ int main( int argc, char * const argv[] )
 			 stderr,
 			 "Unable to print hash values.\n" );
 
-			notify_error_backtrace(
+			libsystem_notify_print_error_backtrace(
 			 error );
 			liberror_error_free(
 			 &error );
@@ -521,7 +538,7 @@ int main( int argc, char * const argv[] )
 			 stderr,
 			 "Unable to print sessions.\n" );
 
-			notify_error_backtrace(
+			libsystem_notify_print_error_backtrace(
 			 error );
 			liberror_error_free(
 			 &error );
@@ -540,17 +557,23 @@ int main( int argc, char * const argv[] )
 			 stderr,
 			 "Unable to print acquiry errors.\n" );
 
-			notify_error_backtrace(
+			libsystem_notify_print_error_backtrace(
 			 error );
 			liberror_error_free(
 			 &error );
 		}
 	}
-	if( ewfsignal_detach() != 1 )
+	if( libsystem_signal_detach(
+	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
 		 "Unable to detach signal handler.\n" );
+
+		libsystem_notify_print_error_backtrace(
+		 error );
+		liberror_error_free(
+		 &error );
 	}
 	if( info_handle_close(
 	     info_handle,
@@ -560,7 +583,7 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to close EWF file(s).\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -579,7 +602,7 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to free info handle.\n" );
 
-		notify_error_backtrace(
+		libsystem_notify_print_error_backtrace(
 		 error );
 		liberror_error_free(
 		 &error );
@@ -589,7 +612,7 @@ int main( int argc, char * const argv[] )
 	if( ewfinfo_abort != 0 )
 	{
 		fprintf(
-		 stdout, "%s: ABORTED\n",
+		 stdout, "%" PRIs_LIBSYSTEM ": ABORTED\n",
 		 program );
 
 		return( EXIT_FAILURE );

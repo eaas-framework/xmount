@@ -2,7 +2,7 @@
  * Compression handling functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,19 +21,20 @@
  */
 
 #include <common.h>
+#include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
-#if defined( HAVE_STDLIB_H )
+#if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
 #endif
 
-#if defined( HAVE_ZLIB_H )
+#if defined( HAVE_ZLIB_H ) || defined( ZLIB_DLL )
 #include <zlib.h>
 #endif
 
 #include "libewf_compression.h"
-#include "libewf_notify.h"
 
 #include "ewf_definitions.h"
 
@@ -142,7 +143,7 @@ int libewf_compress(
 	else if( result == Z_BUF_ERROR )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: unable to write compressed data: target buffer too small.\n",
 		 function );
 #endif
@@ -259,7 +260,7 @@ int libewf_uncompress(
 	else if( result == Z_DATA_ERROR )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: unable to read compressed data: data error.\n",
 		 function );
 #endif
@@ -271,7 +272,7 @@ int libewf_uncompress(
 	else if( result == Z_BUF_ERROR )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: unable to read compressed data: target buffer too small.\n",
 		 function );
 #endif

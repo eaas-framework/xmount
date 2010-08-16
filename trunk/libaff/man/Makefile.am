@@ -1,1 +1,1 @@
-dist_man_MANS = afcat.1
+dist_man_MANS = affcat.1

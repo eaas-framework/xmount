@@ -2,7 +2,7 @@
  * Low level writing functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,19 +21,20 @@
  */
 
 #include <common.h>
-#include <endian.h>
+#include <byte_stream.h>
 #include <memory.h>
 #include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_chunk_cache.h"
 #include "libewf_compression.h"
 #include "libewf_definitions.h"
+#include "libewf_empty_block.h"
 #include "libewf_header_values.h"
 #include "libewf_libbfio.h"
 #include "libewf_media_values.h"
-#include "libewf_notify.h"
 #include "libewf_read_io_handle.h"
 #include "libewf_section.h"
 #include "libewf_sector_table.h"
@@ -289,7 +290,6 @@ int libewf_write_io_handle_initialize_values(
 	if( media_values->media_size > LIBEWF_2_TIB )
 	{
 		if( ( io_handle->format != LIBEWF_FORMAT_ENCASE6 )
-		 && ( io_handle->format != LIBEWF_FORMAT_LINEN6 )
 		 && ( io_handle->format != LIBEWF_FORMAT_EWFX ) )
 		{
 			liberror_error_set(
@@ -716,11 +716,6 @@ int libewf_write_io_handle_initialize_resume(
 		                                             - write_io_handle->resume_segment_file_offset;
 		write_io_handle->segment_amount_of_chunks    = segment_file_handle->amount_of_chunks; 
 
-		/* TODO set the following write io handle values to the correct value
-		 * currently only required for ENCASE1/SMART
-		 */
-		write_io_handle->chunks_section_number       = 0;
-
 		if( libbfio_pool_reopen(
 		     io_handle->file_io_pool,
 		     segment_file_handle->file_io_pool_entry,
@@ -738,49 +733,6 @@ int libewf_write_io_handle_initialize_resume(
 			return( -1 );
 		}
 		segment_file_handle->write_open = 1;
-	}
-	return( 1 );
-}
-
-/* Check for empty block, a block that contains the same value for every byte
- * Returns 1 if block is empty, 0 if not or -1 on error
- */
-int libewf_write_io_handle_test_empty_block(
-     uint8_t *buffer,
-     size_t size,
-     liberror_error_t **error )
-{
-	static char *function = "libewf_write_io_handle_test_empty_block";
-	size_t iterator       = 0;
-
-	if( buffer == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid buffer.",
-		 function );
-
-		return( -1 );
-	}
-	if( size > (size_t) SSIZE_MAX )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid size value exceeds maximum.",
-		 function );
-
-		return( -1 );
-	}
-	for( iterator = 1; iterator < size; iterator++ )
-	{
-		if( buffer[ 0 ] != buffer[ iterator ] )
-		{
-			return( 0 );
-		}
 	}
 	return( 1 );
 }
@@ -951,13 +903,13 @@ int libewf_write_io_handle_calculate_chunks_per_segment(
 int libewf_write_io_handle_calculate_chunks_per_chunks_section(
      uint32_t *chunks_per_chunks_section,
      uint32_t maximum_section_amount_of_chunks,
+     uint32_t segment_amount_of_chunks,
      uint32_t chunks_per_segment,
-     uint8_t chunks_section_number,
      uint8_t unrestrict_offset_amount,
      liberror_error_t **error )
 {
-	static char *function              = "libewf_write_io_handle_calculate_chunks_per_chunks_section";
-	int64_t remaining_amount_of_chunks = 0;
+	static char *function               = "libewf_write_io_handle_calculate_chunks_per_chunks_section";
+	uint32_t remaining_amount_of_chunks = 0;
 
 	if( chunks_per_chunks_section == NULL )
 	{
@@ -981,41 +933,31 @@ int libewf_write_io_handle_calculate_chunks_per_chunks_section(
 
 		return( -1 );
 	}
-	if( chunks_section_number == 0 )
+	if( segment_amount_of_chunks > chunks_per_segment )
 	{
 		liberror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
-		 "%s: unsupported section number: %" PRIu8 ".",
-		 function,
-		 chunks_section_number );
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_OUT_OF_RANGE,
+		 "%s: segment amount of chunks exceeds chunk per segment.",
+		 function );
 
 		return( -1 );
 	}
-	remaining_amount_of_chunks = (int64_t) chunks_per_segment;
+	remaining_amount_of_chunks = chunks_per_segment - segment_amount_of_chunks;
 
-	if( chunks_section_number > 1 )
-	{
-		remaining_amount_of_chunks -= ( chunks_section_number - 1 )
-		                            * maximum_section_amount_of_chunks;
-	}
-	if( remaining_amount_of_chunks <= 0 )
-	{
-		return( -1 );
-	}
 	if( ( unrestrict_offset_amount == 0 )
-	 && ( remaining_amount_of_chunks > (int64_t) maximum_section_amount_of_chunks ) )
+	 && ( remaining_amount_of_chunks > maximum_section_amount_of_chunks ) )
 	{
-		remaining_amount_of_chunks = (int64_t) maximum_section_amount_of_chunks;
+		remaining_amount_of_chunks = maximum_section_amount_of_chunks;
 	}
 	/* Fail safe no more than 2^31 values are allowed
 	 */
-	if( remaining_amount_of_chunks > (int64_t) INT32_MAX )
+	if( remaining_amount_of_chunks > (uint32_t) INT32_MAX )
 	{
 		remaining_amount_of_chunks = INT32_MAX;
 	}
-	*chunks_per_chunks_section = (uint32_t) remaining_amount_of_chunks;
+	*chunks_per_chunks_section = remaining_amount_of_chunks;
 
 	return( 1 );
 }
@@ -1053,7 +995,7 @@ int libewf_write_io_handle_test_segment_file_full(
 	 && ( media_values->amount_of_chunks == current_amount_of_chunks ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: all required chunks have been written.\n",
 		 function );
 #endif
@@ -1066,7 +1008,7 @@ int libewf_write_io_handle_test_segment_file_full(
 	 && ( input_write_count >= (ssize64_t) media_values->media_size ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: all required data has been written.\n",
 		 function );
 #endif
@@ -1081,7 +1023,7 @@ int libewf_write_io_handle_test_segment_file_full(
 		if( segment_amount_of_chunks >= chunks_per_segment )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: no space left for additional chunk.\n",
 			 function );
 #endif
@@ -1094,7 +1036,7 @@ int libewf_write_io_handle_test_segment_file_full(
 	else if( remaining_segment_file_size < (ssize64_t) ( media_values->chunk_size + sizeof( ewf_crc_t ) ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no space left for additional chunk - file size exceeded.\n",
 		 function );
 #endif
@@ -1102,7 +1044,7 @@ int libewf_write_io_handle_test_segment_file_full(
 		return( 1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: space left for additional chunk.\n",
 	 function );
 #endif
@@ -1168,7 +1110,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	if( chunks_section_offset == 0 )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no chunks section has been created.\n",
 		 function );
 #endif
@@ -1181,7 +1123,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	 && ( media_values->amount_of_chunks == current_amount_of_chunks ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: all required chunks have been written.\n",
 		 function );
 #endif
@@ -1194,7 +1136,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	 && ( input_write_count >= (ssize64_t) media_values->media_size ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: all required data has been written.\n",
 		 function );
 #endif
@@ -1207,7 +1149,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	 && ( section_amount_of_chunks >= maximum_section_amount_of_chunks ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no space left for additional chunk - maximum reached.\n",
 		 function );
 #endif
@@ -1219,7 +1161,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	if( section_amount_of_chunks > (uint32_t) INT32_MAX )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no space left for additional chunk - preventing chunk overflow.\n",
 		 function );
 #endif
@@ -1231,7 +1173,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	if( ( segment_file_offset - chunks_section_offset ) > (off64_t) INT32_MAX )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no space left for additional chunk - preventing offset overflow.\n",
 		 function );
 #endif
@@ -1246,7 +1188,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 		if( section_amount_of_chunks >= chunks_per_chunks_section )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: no space left for additional chunk.\n",
 			 function );
 #endif
@@ -1259,7 +1201,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 	else if( remaining_segment_file_size < (ssize64_t) ( media_values->chunk_size + sizeof( ewf_crc_t ) ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: no space left for additional chunk - file size exceeded.\n",
 		 function );
 #endif
@@ -1267,7 +1209,7 @@ int libewf_write_io_handle_test_chunks_section_full(
 		return( 1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: space left for additional chunk.\n",
 	 function );
 #endif
@@ -1299,6 +1241,7 @@ ssize_t libewf_write_io_handle_process_chunk(
 	size_t data_write_size         = 0;
 	int8_t chunk_compression_level = 0;
 	int chunk_cache_data_used      = 0;
+	int is_empty_block             = 0;
 	int result                     = 0;
 
 	if( chunk_cache == NULL )
@@ -1412,12 +1355,12 @@ ssize_t libewf_write_io_handle_process_chunk(
 	 */
 	if( ( compression_flags & LIBEWF_FLAG_COMPRESS_EMPTY_BLOCK ) == LIBEWF_FLAG_COMPRESS_EMPTY_BLOCK )
 	{
-		result = libewf_write_io_handle_test_empty_block(
-		          chunk_data,
-		          chunk_data_size,
-		          error );
+		is_empty_block = libewf_empty_block_test(
+		                  chunk_data,
+		                  chunk_data_size,
+		                  error );
 
-		if( result == -1 )
+		if( is_empty_block == -1 )
 		{
 			liberror_error_set(
 			 error,
@@ -1428,7 +1371,7 @@ ssize_t libewf_write_io_handle_process_chunk(
 
 			return( -1 );
 		}
-		else if( result == 1 )
+		else if( is_empty_block == 1 )
 		{
 			if( chunk_compression_level == EWF_COMPRESSION_NONE )
 			{
@@ -1489,68 +1432,132 @@ ssize_t libewf_write_io_handle_process_chunk(
 
 			return( -1 );
 		}
-		result = libewf_compress(
-			  (uint8_t *) compressed_chunk_data,
-			  compressed_chunk_data_size,
-			  (uint8_t *) chunk_data,
-			  chunk_data_size,
-			  chunk_compression_level,
-		          error );
-
-		/* Check if the compressed buffer was too small
-		 * and the chunk cache is used to store the compressed chunk
-		 * and a new compressed data size buffer was passed back
+		/* Use the cached version of the zero byte empty block data if available
 		 */
-		if( ( result == -1 )
-		 && ( compressed_chunk_data == chunk_cache->compressed )
-		 && ( *compressed_chunk_data_size > 0 ) )
+		if( ( is_empty_block != 0 )
+		 && ( chunk_data[ 0 ] == 0 )
+		 && ( chunk_cache->zero_byte_empty_block_uncompressed_size == chunk_data_size )
+		 && ( chunk_cache->zero_byte_empty_block_compressed != NULL ) )
 		{
-			liberror_error_free(
-			 error );
-
-			chunk_cache_data_used = (int) ( chunk_data == chunk_cache->data );
-
-			if( libewf_chunk_cache_resize(
-			     chunk_cache,
-			     *compressed_chunk_data_size,
-			     error ) != 1 )
+			if( memory_copy(
+			     compressed_chunk_data,
+			     chunk_cache->zero_byte_empty_block_compressed,
+			     chunk_cache->zero_byte_empty_block_compressed_size ) == NULL )
 			{
 				liberror_error_set(
 				 error,
-				 LIBERROR_ERROR_DOMAIN_RUNTIME,
-				 LIBERROR_RUNTIME_ERROR_RESIZE_FAILED,
-				 "%s: unable to resize chunk cache.",
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_COPY_FAILED,
+				 "%s: unable to set compressed data.",
 				 function );
 
 				return( -1 );
 			}
-			/* Make sure the pointer refers to the reallocated buffer
-			 */
-			compressed_chunk_data = chunk_cache->compressed;
-
-			if( ( chunk_cache_data_used == 1 )
-			 && ( chunk_data != chunk_cache->data ) )
-			{
-				chunk_data = chunk_cache->data;
-			}
+			*compressed_chunk_data_size = chunk_cache->zero_byte_empty_block_compressed_size;
+		}
+		else
+		{
 			result = libewf_compress(
 				  (uint8_t *) compressed_chunk_data,
 				  compressed_chunk_data_size,
 				  (uint8_t *) chunk_data,
 				  chunk_data_size,
 				  chunk_compression_level,
-			          error );
-		}
-		if( result != 1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_COMPRESSION,
-			 LIBERROR_COMPRESSION_ERROR_COMPRESS_FAILED,
-			 "%s: unable to compress chunk.",
-			 function );
+				  error );
 
-			return( -1 );
+			/* Check if the compressed buffer was too small
+			 * and the chunk cache is used to store the compressed chunk
+			 * and a new compressed data size buffer was passed back
+			 */
+			if( ( result == -1 )
+			 && ( compressed_chunk_data == chunk_cache->compressed )
+			 && ( *compressed_chunk_data_size > 0 ) )
+			{
+				liberror_error_free(
+				 error );
+
+				chunk_cache_data_used = (int) ( chunk_data == chunk_cache->data );
+
+				if( libewf_chunk_cache_resize(
+				     chunk_cache,
+				     *compressed_chunk_data_size,
+				     error ) != 1 )
+				{
+					liberror_error_set(
+					 error,
+					 LIBERROR_ERROR_DOMAIN_RUNTIME,
+					 LIBERROR_RUNTIME_ERROR_RESIZE_FAILED,
+					 "%s: unable to resize chunk cache.",
+					 function );
+
+					return( -1 );
+				}
+				/* Make sure the pointer refers to the reallocated buffer
+				 */
+				compressed_chunk_data = chunk_cache->compressed;
+
+				if( ( chunk_cache_data_used == 1 )
+				 && ( chunk_data != chunk_cache->data ) )
+				{
+					chunk_data = chunk_cache->data;
+				}
+				result = libewf_compress(
+					  (uint8_t *) compressed_chunk_data,
+					  compressed_chunk_data_size,
+					  (uint8_t *) chunk_data,
+					  chunk_data_size,
+					  chunk_compression_level,
+					  error );
+			}
+			if( result != 1 )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_COMPRESSION,
+				 LIBERROR_COMPRESSION_ERROR_COMPRESS_FAILED,
+				 "%s: unable to compress chunk.",
+				 function );
+
+				return( -1 );
+			}
+			/* Cache a compressed zero byte empty block
+			 */
+			if( ( is_empty_block != 0 )
+			 && ( chunk_data[ 0 ] == 0 )
+			 && ( chunk_cache->zero_byte_empty_block_compressed == NULL ) )
+			{
+				chunk_cache->zero_byte_empty_block_compressed = (uint8_t *) memory_allocate(
+											     *compressed_chunk_data_size );
+
+				if( chunk_cache->zero_byte_empty_block_compressed == NULL )
+				{	
+					liberror_error_set(
+					 error,
+					 LIBERROR_ERROR_DOMAIN_MEMORY,
+					 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+					 "%s: unable to create zero byte empty block compressed data cache.",
+					 function );
+
+					return( -1 );
+				}
+				chunk_cache->zero_byte_empty_block_compressed_size = *compressed_chunk_data_size;
+
+				if( memory_copy(
+				     chunk_cache->zero_byte_empty_block_compressed,
+				     compressed_chunk_data,
+				     *compressed_chunk_data_size ) == NULL )
+				{
+					liberror_error_set(
+					 error,
+					 LIBERROR_ERROR_DOMAIN_MEMORY,
+					 LIBERROR_MEMORY_ERROR_COPY_FAILED,
+					 "%s: unable to set zero byte empty block compressed data cache.",
+					 function );
+
+					return( -1 );
+				}
+				chunk_cache->zero_byte_empty_block_uncompressed_size = chunk_data_size;
+			}
 		}
 	}
 	if( ( chunk_exists == 0 )
@@ -1595,7 +1602,7 @@ ssize_t libewf_write_io_handle_process_chunk(
 		{
 			chunk_data_crc = &( chunk_data[ chunk_data_size ] );
 
-			endian_little_revert_32bit(
+			byte_stream_copy_from_uint32_little_endian(
 			 chunk_data_crc,
 			 *chunk_crc );
 
@@ -1801,7 +1808,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 		return( 0 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing chunk with size: %" PRIzd " (data size: %" PRIzd ").\n",
 	 function,
 	 chunk_size,
@@ -1847,22 +1854,8 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 		{
 			if( *header_values == NULL )
 			{
-				if( libewf_values_table_initialize(
-				     header_values,
-				     LIBEWF_HEADER_VALUES_DEFAULT_AMOUNT,
-				     error ) != 1 )
-				{
-					liberror_error_set(
-					 error,
-					 LIBERROR_ERROR_DOMAIN_RUNTIME,
-					 LIBERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
-					 "%s: unable to create header values.",
-					 function );
-
-					return( -1 );
-				}
 				if( libewf_header_values_initialize(
-				     *header_values,
+				     header_values,
 				     error ) != 1 )
 				{
 					liberror_error_set(
@@ -1893,14 +1886,13 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 			}
 		}
 		write_io_handle->create_chunks_section     = 1;
-		write_io_handle->chunks_section_number     = 0;
 		write_io_handle->chunks_per_chunks_section = 0;
 		write_io_handle->segment_amount_of_chunks  = 0;
 
 		segment_number += 1;
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: creating segment file with segment number: %" PRIu16 ".\n",
 		 function,
 		 segment_number );
@@ -1985,7 +1977,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 				return( -1 );
 			}
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: calculated amount of chunks for segment: %" PRIu32 ".\n",
 			 function,
 			 write_io_handle->chunks_per_segment );
@@ -2025,7 +2017,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 	if( write_io_handle->create_chunks_section == 1 )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: creating chunks section.\n",
 		 function );
 #endif
@@ -2067,10 +2059,6 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 
 			return( -1 );
 		}
-		/* Start with chunks section number number 1, value is initialized with 0
-		 */
-		write_io_handle->chunks_section_number += 1;
-
 		/* Recalculate the amount of chunks per segment for a better segment file fill when compression is used
 		 */
 		if( segment_table->segment_file_handle[ segment_number ]->amount_of_chunks == 0 )
@@ -2097,7 +2085,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 				return( -1 );
 			}
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: calculated amount of chunks for segment: %" PRIu32 ".\n",
 			 function,
 			 write_io_handle->chunks_per_segment );
@@ -2110,8 +2098,8 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 		if( libewf_write_io_handle_calculate_chunks_per_chunks_section(
 		     &( write_io_handle->chunks_per_chunks_section ),
 		     write_io_handle->maximum_section_amount_of_chunks,
+		     write_io_handle->segment_amount_of_chunks,
 		     write_io_handle->chunks_per_segment,
-		     write_io_handle->chunks_section_number,
 		     write_io_handle->unrestrict_offset_amount,
 		     error ) != 1 )
 		{
@@ -2125,7 +2113,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 			return( -1 );
 		}
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: calculated amount of chunks for chunks section: %" PRIu32 ".\n",
 		 function,
 		 write_io_handle->chunks_per_chunks_section );
@@ -2167,7 +2155,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 		if( write_count == -1 )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: unable to write section start for chunks.\n",
 			 function );
 #endif
@@ -2180,7 +2168,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 	/* Write the chunk data
 	 */
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing %" PRIzd " bytes to segment file: %" PRIu16 ".\n",
 	 function,
 	 chunk_size,
@@ -2278,7 +2266,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 	else if( result == 1 )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: closing chunks section amount of data written: %" PRIi64 ".\n",
 		 function,
 		 write_io_handle->chunks_section_write_count );
@@ -2365,7 +2353,7 @@ ssize_t libewf_write_io_handle_write_new_chunk(
 			 || ( write_io_handle->input_write_count < (ssize64_t) media_values->media_size ) )
 			{
 #if defined( HAVE_VERBOSE_OUTPUT )
-				libewf_notify_verbose_printf(
+				libnotify_verbose_printf(
 				 "%s: closing segment file with segment number: %" PRIu16 ".\n",
 				 function,
 				 segment_number );
@@ -2599,10 +2587,10 @@ ssize_t libewf_write_io_handle_write_existing_chunk(
 	segment_file_type = segment_file_handle->file_type;
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing delta chunk: %" PRIu32 " with size: %" PRIzd " (data size: %" PRIzd ").\n",
 	 function,
-	 ( chunk + 1 ),
+	 chunk,
 	 chunk_size,
 	 chunk_data_size );
 #endif
@@ -2711,7 +2699,7 @@ ssize_t libewf_write_io_handle_write_existing_chunk(
 				 error,
 				 LIBERROR_ERROR_DOMAIN_IO,
 				 LIBERROR_IO_ERROR_SEEK_FAILED,
-				 "%s: cannot find offset: %" PRIjd ".",
+				 "%s: cannot find offset: %" PRIi64 ".",
 				 function,
 				 last_section_start_offset );
 
@@ -2766,7 +2754,8 @@ ssize_t libewf_write_io_handle_write_existing_chunk(
 					return( -1 );
 				}
 				if( libewf_section_list_values_free(
-				     last_list_element->value ) != 1 )
+				     last_list_element->value,
+				     error ) != 1 )
 				{
 					liberror_error_set(
 					 error,
@@ -2883,8 +2872,8 @@ ssize_t libewf_write_io_handle_write_existing_chunk(
 
 		return( -1 );
 	}
-	libewf_notify_verbose_printf(
-	 "%s: writing chunk at offset: %" PRIjd ".\n",
+	libnotify_verbose_printf(
+	 "%s: writing chunk at offset: %" PRIi64 ".\n",
 	 function,
 	 segment_file_offset );
 #endif
@@ -3057,7 +3046,7 @@ ssize_t libewf_write_io_handle_write_new_chunk_data(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing buffer of size: %" PRIzu " with data of size: %" PRIzd ".\n",
 	 function,
 	 buffer_size,
@@ -3110,7 +3099,7 @@ ssize_t libewf_write_io_handle_write_new_chunk_data(
 			read_size = remaining_chunk_size;
 		}
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: reading %" PRIzu " bytes from buffer.\n",
 		 function,
 		 read_size );
@@ -3391,7 +3380,7 @@ ssize_t libewf_write_io_handle_write_existing_chunk_data(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing buffer of size: %" PRIzu " with data of size: %" PRIzd ".\n",
 	 function,
 	 buffer_size,
@@ -3449,10 +3438,10 @@ ssize_t libewf_write_io_handle_write_existing_chunk_data(
 			data_size = remaining_chunk_size;
 		}
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: updating data in chunk: %" PRIu32 " at offset: %" PRIu32 " with size: %" PRIzd ".\n",
 		 function,
-		 ( chunk + 1 ),
+		 chunk,
 		 chunk_offset,
 		 data_size );
 #endif
@@ -3470,7 +3459,7 @@ ssize_t libewf_write_io_handle_write_existing_chunk_data(
 			 LIBERROR_MEMORY_ERROR_COPY_FAILED,
 			 "%s: unable to update data in chunk: %" PRIu32 ".",
 			 function,
-			 (chunk + 1 ) );
+			 chunk );
 
 			return( -1 );
 		}
@@ -3650,7 +3639,7 @@ ssize_t libewf_write_io_handle_finalize(
 	  || ( write_io_handle->input_write_count < (ssize64_t) media_values->media_size ) ) )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: writing chunk remainder at offset: %" PRIu32 " with size: %" PRIu32 "\n",
 		 function,
 		 io_handle->current_chunk_offset,
@@ -3756,7 +3745,7 @@ ssize_t libewf_write_io_handle_finalize(
 			/* Correct the offset, size in the chunks section
 			 */
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: correcting chunks section.\n",
 			 function );
 #endif
@@ -3809,7 +3798,7 @@ ssize_t libewf_write_io_handle_finalize(
 		/* Close the segment file
 		 */
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: closing last segment file.\n",
 		 function );
 #endif

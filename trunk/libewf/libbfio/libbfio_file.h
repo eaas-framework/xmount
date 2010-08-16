@@ -2,7 +2,7 @@
  * File functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,10 +30,6 @@
 
 #include <liberror.h>
 
-#if defined( WINAPI ) && defined( USE_NATIVE_WINAPI_FUNCTIONS )
-#include <windows.h>
-#endif
-
 #include "libbfio_extern.h"
 #include "libbfio_system_string.h"
 #include "libbfio_types.h"
@@ -54,7 +50,7 @@ struct libbfio_file_io_handle
 	 */
 	size_t name_size;
 
-#if defined( WINAPI ) && defined( USE_NATIVE_WINAPI_FUNCTIONS )
+#if defined( WINAPI ) && !defined( USE_CRT_FUNCTIONS )
 	/* The file handle
 	 */
 	HANDLE file_handle;
@@ -64,10 +60,14 @@ struct libbfio_file_io_handle
 	int file_descriptor;
 #endif
 
-	/* The flags
+	/* The access flags
 	 */
-	int flags;
+	int access_flags;
 };
+
+int libbfio_file_io_handle_initialize(
+     libbfio_file_io_handle_t **file_io_handle,
+     liberror_error_t **error );
 
 LIBBFIO_EXTERN int libbfio_file_initialize(
                     libbfio_handle_t **handle,
@@ -75,6 +75,11 @@ LIBBFIO_EXTERN int libbfio_file_initialize(
 
 int libbfio_file_io_handle_free(
      intptr_t *io_handle,
+     liberror_error_t **error );
+
+int libbfio_file_io_handle_clone(
+     intptr_t **destination_io_handle,
+     intptr_t *source_io_handle,
      liberror_error_t **error );
 
 LIBBFIO_EXTERN int libbfio_file_get_name_size(
@@ -134,6 +139,14 @@ ssize_t libbfio_file_write(
          size_t size,
          liberror_error_t **error );
 
+#if defined( WINAPI ) && !defined( HAVE_SETFILEPOINTEREX )
+BOOL SafeSetFilePointerEx(
+      HANDLE file_handle,
+      LARGE_INTEGER distance_to_move_large_integer,
+      LARGE_INTEGER *new_file_pointer_large_integer,
+      DWORD move_method );
+#endif
+
 off64_t libbfio_file_seek_offset(
          intptr_t *io_handle,
          off64_t offset,
@@ -147,6 +160,12 @@ int libbfio_file_exists(
 int libbfio_file_is_open(
      intptr_t *io_handle,
      liberror_error_t **error );
+
+#if defined( WINAPI ) && !defined( HAVE_GETFILESIZEEX )
+BOOL SafeGetFileSizeEx(
+      HANDLE file_handle,
+      LARGE_INTEGER *file_size_large_integer );
+#endif
 
 int libbfio_file_get_size(
      intptr_t *io_handle,

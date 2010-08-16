@@ -2,7 +2,7 @@
  * The internal handle functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -60,6 +60,11 @@ struct libbfio_internal_handle
 	 */
 	uint8_t size_set;
 
+	/* Value to indicate to open and close
+	 * the systems file descriptor or handle on demand
+	 */
+	uint8_t open_on_demand;
+
 	/* Reference to the pool last used list element
 	 */
 	libbfio_list_element_t *pool_last_used_list_element;
@@ -76,6 +81,13 @@ struct libbfio_internal_handle
 	 */
 	int (*free_io_handle)(
 	       intptr_t *io_handle,
+	       liberror_error_t **error );
+
+	/* The clone (duplicate) io handle function
+	 */
+	int (*clone_io_handle)(
+	       intptr_t **destination_io_handle,
+	       intptr_t *source_io_handle,
 	       liberror_error_t **error );
 
 	/* The open function
@@ -140,6 +152,7 @@ LIBBFIO_EXTERN int libbfio_handle_initialize(
                     libbfio_handle_t **handle,
                     intptr_t *io_handle,
                     int (*free_io_handle)( intptr_t *io_handle, liberror_error_t **error ),
+                    int (*clone_io_handle)( intptr_t **destination_io_handle, intptr_t *source_io_handle, liberror_error_t **error ),
                     int (*open)( intptr_t *io_handle, int flags, liberror_error_t **error ),
                     int (*close)( intptr_t *io_handle, liberror_error_t **error ),
                     ssize_t (*read)( intptr_t *io_handle, uint8_t *buffer, size_t size, liberror_error_t **error ),
@@ -152,6 +165,11 @@ LIBBFIO_EXTERN int libbfio_handle_initialize(
 
 LIBBFIO_EXTERN int libbfio_handle_free(
                     libbfio_handle_t **handle,
+                    liberror_error_t **error );
+
+LIBBFIO_EXTERN int libbfio_handle_clone(
+                    libbfio_handle_t **destination_handle,
+                    libbfio_handle_t *source_handle,
                     liberror_error_t **error );
 
 LIBBFIO_EXTERN int libbfio_handle_open(
@@ -212,6 +230,11 @@ LIBBFIO_EXTERN int libbfio_handle_get_size(
 LIBBFIO_EXTERN int libbfio_handle_get_offset(
                     libbfio_handle_t *handle,
                     off64_t *offset,
+                    liberror_error_t **error );
+
+LIBBFIO_EXTERN int libbfio_handle_set_open_on_demand(
+                    libbfio_handle_t *handle,
+                    uint8_t open_on_demand,
                     liberror_error_t **error );
 
 LIBBFIO_EXTERN int libbfio_handle_set_track_offsets_read(

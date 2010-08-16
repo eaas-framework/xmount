@@ -73,11 +73,11 @@
 /* Define to 1 if you have the `err_set_exit' function. */
 #undef HAVE_ERR_SET_EXIT
 
+/* Define to 1 if you have the `EVP_MD_size' function. */
+#undef HAVE_EVP_MD_SIZE
+
 /* Define to 1 if you have the `EVP_read_pw_string' function. */
 #undef HAVE_EVP_READ_PW_STRING
-
-/* Define to 1 if you have the `EVP_sha256' function. */
-#undef HAVE_EVP_SHA256
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
@@ -124,30 +124,6 @@
 /* Define to 1 if you have the `curl' library (-lcurl). */
 #undef HAVE_LIBCURL
 
-/* Define to 1 if you have the `ewf' library (-lewf). */
-#undef HAVE_LIBEWF
-
-/* Define to 1 if you have the libewf_get_bytes_per_sector function. */
-#undef HAVE_LIBEWF_GET_BYTES_PER_SECTOR
-
-/* Define to 1 if libewf_get_bytes_per_sector takes value as an argument. */
-#undef HAVE_LIBEWF_GET_BYTES_PER_SECTOR_ARGUMENT_VALUE
-
-/* Define to 1 if you have the libewf_get_chunk_size function. */
-#undef HAVE_LIBEWF_GET_CHUNK_SIZE
-
-/* Define to 1 if libewf_get_chunk_size takes value as an argument. */
-#undef HAVE_LIBEWF_GET_CHUNK_SIZE_ARGUMENT_VALUE
-
-/* Define to 1 if you have the libewf_get_media_size function. */
-#undef HAVE_LIBEWF_GET_MEDIA_SIZE
-
-/* Define to 1 if libewf_get_media_size takes value as an argument. */
-#undef HAVE_LIBEWF_GET_MEDIA_SIZE_ARGUMENT_VALUE
-
-/* Define to 1 if you have the <libewf.h> header file. */
-#undef HAVE_LIBEWF_H
-
 /* Define to 1 if you have the `expat' library (-lexpat). */
 #undef HAVE_LIBEXPAT
 
@@ -159,6 +135,9 @@
 
 /* Define to 1 if you have the `readline' library (-lreadline). */
 #undef HAVE_LIBREADLINE
+
+/* Define to 1 if you have the `regex' library (-lregex). */
+#undef HAVE_LIBREGEX
 
 /* Define to 1 if you have the `rt' library (-lrt). */
 #undef HAVE_LIBRT
@@ -205,9 +184,6 @@
 /* Define to 1 if you have the <openssl/evp.h> header file. */
 #undef HAVE_OPENSSL_EVP_H
 
-/* Define to 1 if you have the <openssl/fips_sha.h> header file. */
-#undef HAVE_OPENSSL_FIPS_SHA_H
-
 /* Define to 1 if you have the <openssl/hmac.h> header file. */
 #undef HAVE_OPENSSL_HMAC_H
 
@@ -225,6 +201,9 @@
 
 /* Define to 1 if you have the <openssl/sha.h> header file. */
 #undef HAVE_OPENSSL_SHA_H
+
+/* Define to 1 if you have the <openssl/x509.h> header file. */
+#undef HAVE_OPENSSL_X509_H
 
 /* Define to 1 if you have the `PEM_read_bio_RSA_PUBKEY' function. */
 #undef HAVE_PEM_READ_BIO_RSA_PUBKEY
@@ -253,17 +232,14 @@
 /* Define to 1 if you have the `regcomp' function. */
 #undef HAVE_REGCOMP
 
+/* Define to 1 if you have the <regex.h> header file. */
+#undef HAVE_REGEX_H
+
 /* Define to 1 if you have the `setupterm' function. */
 #undef HAVE_SETUPTERM
 
 /* Define to 1 if you have the `SHA1' function. */
 #undef HAVE_SHA1
-
-/* Define to 1 if you have the <sha256.h> header file. */
-#undef HAVE_SHA256_H
-
-/* Define to 1 if you have the `SHA256_Init' function. */
-#undef HAVE_SHA256_INIT
 
 /* Define to 1 if you have the <signal.h> header file. */
 #undef HAVE_SIGNAL_H
@@ -398,6 +374,12 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
+/* Define to 1 if you have the `unsetenv' function. */
+#undef HAVE_UNSETENV
+
+/* Define to 1 if you have the `utimes' function. */
+#undef HAVE_UTIMES
+
 /* Define to 1 if you have the `valloc' function. */
 #undef HAVE_VALLOC
 
@@ -461,9 +443,6 @@
 
 /* Use FUSE to mount AFF images */
 #undef USE_FUSE
-
-/* Use libewf to read EnCase files */
-#undef USE_LIBEWF
 
 /* Use QEMU image drivers */
 #undef USE_QEMU

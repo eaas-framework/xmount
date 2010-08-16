@@ -101,12 +101,12 @@ int af_purge(AFFILE *af)
     return ret;
 }
 
-int af_read(AFFILE *af,unsigned char *buf,size_t count)
+ssize_t af_read(AFFILE *af,unsigned char *buf,ssize_t count)
 {
     int total = 0;
 
     AF_WRLOCK(af);			// wrlock because cache may change
-    if (af_trace) fprintf(af_trace,"af_read(%p,%p,%d) (pos=%"I64d")\n",af,buf,count,af->pos);
+    if (af_trace) fprintf(af_trace,"af_read(%p,%p,%zd) (pos=%"I64d")\n",af,buf,count,af->pos);
     if (af->v->read){			// check for bypass
 	int r = (af->v->read)(af, buf, af->pos, count);
 	if(r>0) af->pos += r;
@@ -157,7 +157,7 @@ int af_read(AFFILE *af,unsigned char *buf,size_t count)
 	}
 	// Compute how many bytes can be copied...
 	// where we were reading from
-	unsigned int page_offset   = (uint)(offset - af->pb->pagenum * af->image_pagesize); 
+	u_int page_offset   = (u_int)(offset - af->pb->pagenum * af->image_pagesize); 
 
 	if(page_offset > af->pb->pagebuf_bytes){
 	    /* Page is short. */
@@ -165,11 +165,11 @@ int af_read(AFFILE *af,unsigned char *buf,size_t count)
 	    break;
 	}
 
-	unsigned int page_left     = af->pb->pagebuf_bytes - page_offset; // number we can get out
-	unsigned int bytes_to_read = count;
+	u_int page_left     = af->pb->pagebuf_bytes - page_offset; // number we can get out
+	u_int bytes_to_read = count;
 
 	if(bytes_to_read > page_left)               bytes_to_read = page_left;
-	if(bytes_to_read > af->image_size - offset) bytes_to_read = (uint)(af->image_size - offset);
+	if(bytes_to_read > af->image_size - offset) bytes_to_read = (u_int)(af->image_size - offset);
 
 	assert(bytes_to_read >= 0);	// 
 	if(bytes_to_read==0) break; // that's all we could get
@@ -200,14 +200,10 @@ int af_write(AFFILE *af,unsigned char *buf,size_t count)
 {
     AF_WRLOCK(af);
     if (af_trace){
-	fprintf(af_trace,"af_write(af=%p,buf=%p,count=%d) pos=%"I64d"\n",
-			  af,buf,count,af->pos);
+	fprintf(af_trace,"af_write(af=%p,buf=%p,count=%zd) pos=%"I64d"\n", af,buf,count,af->pos);
     }
     /* Invalidate caches */
-    if(af->vni_cache){
-	free(af->vni_cache);
-	af->vni_cache = 0;
-    }
+    af_invalidate_vni_cache(af);
 
     /* vnode write bypass:
      * If a write function is defined, use it and avoid the page and cache business. 
@@ -231,7 +227,7 @@ int af_write(AFFILE *af,unsigned char *buf,size_t count)
 	}
     }
 
-    uint64_t offset = af->pos;		// where to start
+    int64_t offset = af->pos;		// where to start
 
     /* If the correct segment is not loaded, purge the current segment */
     int64_t write_page = offset / af->image_pagesize;
@@ -282,11 +278,11 @@ int af_write(AFFILE *af,unsigned char *buf,size_t count)
 	    }
 	}
 	// where writing to
-	unsigned int seg_offset = (uint)(offset - af->pb->pagenum * af->image_pagesize); 
+	u_int seg_offset = (u_int)(offset - af->pb->pagenum * af->image_pagesize); 
 
 	// number we can write into
-	unsigned int seg_left   = af->image_pagesize - seg_offset; 
-	unsigned int bytes_to_write = count;
+	u_int seg_left   = af->image_pagesize - seg_offset; 
+	u_int bytes_to_write = count;
 
 	if(bytes_to_write > seg_left) bytes_to_write = seg_left;
 
@@ -320,7 +316,7 @@ int af_write(AFFILE *af,unsigned char *buf,size_t count)
 	}
 
 	/* If we have written more than the image size, update the image size */
-	if(offset > af->image_size) af->image_size = offset;
+	if((uint64_t)offset > af->image_size) af->image_size = offset;
     }
     /* We have copied all of the user's requested data, so return */
     AF_UNLOCK(af);

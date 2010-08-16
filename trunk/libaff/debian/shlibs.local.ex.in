@@ -1,1 +1,0 @@
-libafflib @VERSION@ afflib (>> @VERSION@-0), afflib (<< @VERSION@-99)

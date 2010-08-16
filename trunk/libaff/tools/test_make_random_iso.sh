@@ -3,6 +3,12 @@
 # Make a random ISO, used by all of the test programs
 # Make sure that it is more than 3 pages in length (at least 48MB)
 
+unset AFFLIB_PASSPHRASE
+
+if test "x" = "x$1" ;
+  then echo usage: $0 filename
+  exit 1
+fi
 
 echo Making the random ISO $1
 /bin/rm -f $1

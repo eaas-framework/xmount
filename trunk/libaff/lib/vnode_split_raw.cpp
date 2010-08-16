@@ -62,7 +62,7 @@ static int isdigit(char ch)
 
 /* split raw file implementation with optional metadata support */
 struct split_raw_private {
-    uint   num_raw_files;	// number of raw files
+    u_int   num_raw_files;	// number of raw files
     int    *fds;		// array of file descriptors for each open raw file
     uint64_t *pos;		// where we are in each file
     char *first_raw_fname;    /* The filename of the first raw file. */
@@ -183,7 +183,7 @@ static int split_raw_open_internal(AFFILE *af, uint64_t *image_size)
     int fd;
     struct stat sb;
 
-    fd = open(srp->first_raw_fname, af->openflags|O_BINARY, 0666);
+    fd = open(srp->first_raw_fname, af->openflags|O_BINARY, af->openmode);
     if (fd < 0) {
       (*af->error_reporter)("split_raw_open_internal: open(%s): ",af->fname);
 	return -1;
@@ -375,7 +375,7 @@ int split_raw_write_internal2(AFFILE *af, unsigned char *buf, uint64_t pos,size_
 	if (af->maxsize) {	// do we need to possibly split into multiple file writes?
 	    /* Figure out which file number we will need to write to... */
 	    if (pos >= (af->maxsize * srp->num_raw_files)) {
-		int fd = open(srp->next_raw_fname, O_RDWR | O_CREAT | O_EXCL | O_BINARY, 0666);
+		int fd = open(srp->next_raw_fname, O_RDWR | O_CREAT | O_EXCL | O_BINARY, af->openmode);
 		if (fd < 0) {
 		  (*af->error_reporter)("split_raw_write: open(%s): ",af->fname);
 		    if (ret) return ret;
@@ -425,7 +425,7 @@ int split_raw_write_internal2(AFFILE *af, unsigned char *buf, uint64_t pos,size_
 	    char z = 0;
 
 	    lseek(srp->fds[i],c3-1,SEEK_CUR);
-	    write(srp->fds[i],&z,1);
+	    if(write(srp->fds[i],&z,1)!=1) return -1; // failure
 	    c4 = c3;
 	}
 
@@ -575,7 +575,7 @@ static int split_raw_update_seg(AFFILE *af, const char *name,
 	
     uint64_t pos = page_num * af->image_pagesize; // where we are to start reading
     int written = split_raw_write(af, (unsigned char *)value, pos,vallen);
-    if(written==vallen) return 0;	// success
+    if(written==(int)vallen) return 0;	// success
     return -1;
 }
 

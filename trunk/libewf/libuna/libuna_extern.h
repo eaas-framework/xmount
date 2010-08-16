@@ -2,7 +2,7 @@
  * The internal extern definition
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -38,9 +38,11 @@
 
 #include <libuna/extern.h>
 
-#else
-
+#elif defined( _MSC_VER )
 #define LIBUNA_EXTERN	extern
+
+#else
+#define LIBUNA_EXTERN	/* extern */
 
 #endif
 

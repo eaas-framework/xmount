@@ -2,7 +2,7 @@
  * The internal inline definition
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -31,8 +31,11 @@
 
 #include <libuna/inline.h>
 
-#elif defined( WINAPI )
+#elif defined( _MSC_VER )
 #define LIBUNA_INLINE _inline
+
+#elif defined( __BORLANDC__ )
+#define LIBUNA_INLINE /* inline */
 
 #else
 #define LIBUNA_INLINE inline

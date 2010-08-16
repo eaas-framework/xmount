@@ -2,7 +2,7 @@
  * Error functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -43,13 +43,23 @@ extern "C" {
 LIBEWF_EXTERN void libewf_error_free(
                     libewf_error_t **error );
 
-LIBEWF_EXTERN void libewf_error_fprint(
-                    libewf_error_t *error,
-                    FILE *stream );
+LIBEWF_EXTERN int libewf_error_fprint(
+                   libewf_error_t *error,
+                   FILE *stream );
 
-LIBEWF_EXTERN void libewf_error_backtrace_fprint(
-                    libewf_error_t *error,
-                    FILE *stream );
+LIBEWF_EXTERN int libewf_error_sprint(
+                   libewf_error_t *error,
+                   char *string,
+                   size_t size );
+
+LIBEWF_EXTERN int libewf_error_backtrace_fprint(
+                   libewf_error_t *error,
+                   FILE *stream );
+
+LIBEWF_EXTERN int libewf_error_backtrace_sprint(
+                   libewf_error_t *error,
+                   char *string,
+                   size_t size );
 
 #endif
 

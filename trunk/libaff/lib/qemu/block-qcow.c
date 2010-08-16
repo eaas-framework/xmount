@@ -776,14 +776,14 @@ static int qcow_create(const char *filename, int64_t total_size,
     }
 
     /* write all the data */
-    write(fd, &header, sizeof(header));
+    if(write(fd, &header, sizeof(header))!=sizeof(header)) return -1;
     if (backing_file) {
-        write(fd, backing_file, backing_filename_len);
+        if(write(fd, backing_file, backing_filename_len)!=backing_filename_len) return -1;
     }
     lseek(fd, header_size, SEEK_SET);
     tmp = 0;
     for(i = 0;i < l1_size; i++) {
-        write(fd, &tmp, sizeof(tmp));
+        if(write(fd, &tmp, sizeof(tmp))!=sizeof(tmp)) return -1;
     }
     close(fd);
     return 0;

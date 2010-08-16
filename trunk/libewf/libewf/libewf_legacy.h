@@ -2,7 +2,7 @@
  * Legacy functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -38,6 +38,14 @@ extern "C" {
 #endif
 
 #if defined( HAVE_V1_API )
+
+#if !defined( HAVE_LOCAL_LIBEWF )
+
+LIBEWF_EXTERN void libewf_set_notify_values(
+                    FILE *stream,
+                    int verbose );
+
+#endif
 
 LIBEWF_EXTERN int libewf_signal_abort(
                    libewf_handle_t *handle );

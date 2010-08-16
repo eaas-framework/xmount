@@ -2,7 +2,7 @@
  * Section list functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -57,7 +57,8 @@ struct libewf_section_list_values
 };
 
 int libewf_section_list_values_free(
-     intptr_t *value );
+     intptr_t *value,
+     liberror_error_t **error );
 
 int libewf_section_list_append(
      libewf_list_t *section_list,

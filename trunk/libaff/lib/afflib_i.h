@@ -115,7 +115,9 @@
 #endif
 
 #ifdef WIN32
+#if !defined(__MINGW_H)
 #pragma warning(disable: 4996)  /* Don't warn on Windows about using POSIX open() instead of _open() */
+#endif
 #include <malloc.h>
 #include <windows.h>
 #include <winsock.h>			// htonl()
@@ -127,10 +129,26 @@
 #define random() rand()
 #define access _access
 #define strdup _strdup
-typedef int mode_t;
+
+#ifndef _MODE_T_
+#define _MODE_T_
+typedef unsigned short mode_t;
+typedef unsigned short _mode_t;
+#endif
+
+typedef unsigned int uint32_t ;
+
+#ifndef S_ISDIR
+#define S_ISDIR(m)(((m) & 0170000) == 0040000)
+#endif
+
+#if !defined(__MINGW_H)
 #define ftruncate(fd,size) _chsize_s(fd,size)
 #define MAXPATHLEN 1024
 #endif
+#endif
+/** END OF WIN32 DEFINES **/
+
 
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
@@ -165,6 +183,10 @@ typedef int mode_t;
 
 #ifndef ENOTSUP
 #define ENOTSUP EOPNOTSUPP
+#endif
+
+#ifndef O_ACCMODE
+#define O_ACCMODE 0x0003
 #endif
 
 /* If these functions do not exist, we need to create our own */
@@ -203,7 +225,7 @@ void	warnx(const char *fmt, ...);
 #endif
 
 
-#ifdef WIN32
+#if defined(WIN32) && !defined(__MINGW_H)
 /****************************************************************
  *** Windows emulation of opendir()/readdir()
  *** From php
@@ -260,7 +282,7 @@ extern "C" {
 }
 #endif
 
-#if defined(HAVE_EVP_SHA256) && defined(HAVE_LIBEXPAT)
+#if defined(HAVE_LIBEXPAT)
 #define USE_AFFSIGS
 #endif
 
@@ -288,18 +310,18 @@ struct _AFFILE {
     char    error_str[64];		// what went wrong
 
     /* Implement a stream abstraction */
-    uint64_t      image_size;		// last mappable byte of disk image
-    uint64_t      image_size_in_file;	// see if it was changed...
-    unsigned long image_pagesize;	// the size of image data segments in this file
-    unsigned long image_sectorsize;
-    uint64_t	  pos;			// location in stream
+    uint64_t    image_size;		// last mappable byte of disk image
+    uint64_t    image_size_in_file;	// see if it was changed...
+    u_long	image_pagesize;	// the size of image data segments in this file
+    u_long	image_sectorsize;
+    uint64_t	pos;			// location in stream; should be signed because of comparisons
 
     /* Page buffer cache */
     struct aff_pagebuf *pb;		// the current page buffer
     struct aff_pagebuf *pbcache;	// array of pagebufs
     int		num_pbufs;	   // number of pagebufs; default is 1
     int		afftime;		// for updating last
-    int64_t	cur_page;		// used by vnode_raw and vnode_ewf to fake pages
+    int64_t	cur_page;		// used by vnode_raw to fake pages must be able to go negative.
 
     int		  debug;		// for debugging, of course
     unsigned int  badflag_set:1;	// is badflag set?
@@ -321,7 +343,7 @@ struct _AFFILE {
     unsigned int write_md5:1;		// automatically write the MD5 for each page
     unsigned int write_sha1:1;
     unsigned int write_sha256:1;
-    /* */
+
 
     /* These are for optimizing updates; really this should go away and we should just
      * exmaine the TOC to find a hole, but currently we don't do that.
@@ -393,12 +415,6 @@ struct af_crypto {
 #endif
 };
     
-#ifdef HAVE_SHA256_INIT
-#define HAVE_AF_SHA256
-int af_SHA256(const unsigned char *d,size_t s,unsigned char *md);
-#endif
-
-
 
 /* The AFF STREAM VNODE */
 struct af_vnode {
@@ -460,10 +476,12 @@ struct af_segment_tail {
 
 
 /* How 64-bit values are stored in a segment */
+#pragma pack(1)
 struct aff_quad {
     unsigned long low:32;
     unsigned long high:32;
 };
+#pragma pack()
 
 
 /* As it is kept in memory */
@@ -499,7 +517,7 @@ const char *af_identify_file_name(const char *filename,int exists); // returns n
 #define AF_IDENTIFY_EVD 4		// file is a .E01 file when there are more files following
 #define AF_IDENTIFY_SPLIT_RAW 5		// file is a split raw file
 #define AF_IDENTIFY_AFM 6               // file is raw file with metadata
-#define AF_IDENTIFY_EWF 7		// libewf
+#define AF_IDENTIFY_EWF 7		// libewf; deprecated
 #define AF_IDENTIFY_S3  8		// is an s3:/// file
 #define AF_IDENTIFY_VMDK 9		// QEMU support for VMDK format
 #define AF_IDENTIFY_DMG 10		// QEMU support for Apple DMG format
@@ -577,12 +595,13 @@ int	af_get_seg(AFFILE *af,const char *name,unsigned long *arg,
  * Note: pagename to string translation happens inside afflib.cpp, not inside
  * the vnode driver. 
  */
+#define af_page_size(af) (af_get_pagesize(af)) /* backwards compatability */
 void	af_read_sizes(AFFILE *af);	// sets up values if we can get them.
-int	af_set_pagesize(AFFILE *af,long pagesize); // sets the pagesize; fails with -1 if imagesize >=0
+int	af_set_pagesize(AFFILE *af,u_long pagesize); // sets the pagesize; fails with -1 if imagesize >=0
 int	af_set_sectorsize(AFFILE *AF,int sectorsize); // fails with -1 if imagesize>=0
 int	af_get_sectorsize(AFFILE *AF);	// returns sector size
 int	af_has_pages(AFFILE *af);	// does the underlying system support pages?
-int	af_page_size(AFFILE *af);	// returns page size, or -1
+int	af_get_pagesize(AFFILE *af);	// returns page size, or -1
 int	af_get_page_raw(AFFILE *af,int64_t pagenum,unsigned long *arg,u_char *data,size_t *bytes);
 int	af_get_page(AFFILE *af,int64_t pagenum,u_char *data,size_t *bytes);
 #define AF_SIGFLAG_NOSIG 0x0001	// do not write signatures with af_update_segf()
@@ -598,6 +617,7 @@ int	af_update_page(AFFILE *af,int64_t pagenum,u_char *data,int datalen);
 int	af_update_segf(AFFILE *af,const char *name,
 		       unsigned long arg,const u_char *value,u_int vallen,u_int sigflag);
 
+void	af_invalidate_vni_cache(AFFILE *af);
 void	af_cache_writethrough(AFFILE *af,int64_t pagenum,
 			      const u_char *buf,int bufflen);
 int	af_cache_flush(AFFILE *af);		// write buffers to disk

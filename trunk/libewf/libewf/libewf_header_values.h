@@ -2,7 +2,7 @@
  * Header values functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -42,28 +42,32 @@
 extern "C" {
 #endif
 
-#define LIBEWF_HEADER_VALUES_DEFAULT_AMOUNT			16
+enum LIBEWF_HEADER_VALUES_INDEXES
+{
+	LIBEWF_HEADER_VALUES_INDEX_CASE_NUMBER,
+	LIBEWF_HEADER_VALUES_INDEX_DESCRIPTION,
+	LIBEWF_HEADER_VALUES_INDEX_EXAMINER_NAME,
+	LIBEWF_HEADER_VALUES_INDEX_EVIDENCE_NUMBER,
+	LIBEWF_HEADER_VALUES_INDEX_NOTES,
+	LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_DATE,
+	LIBEWF_HEADER_VALUES_INDEX_SYSTEM_DATE,
+	LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_OPERATING_SYSTEM,
+	LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_SOFTWARE_VERSION,
+	LIBEWF_HEADER_VALUES_INDEX_PASSWORD,
+	LIBEWF_HEADER_VALUES_INDEX_COMPRESSION_TYPE,
+	LIBEWF_HEADER_VALUES_INDEX_MODEL,
+	LIBEWF_HEADER_VALUES_INDEX_SERIAL_NUMBER,
+	LIBEWF_HEADER_VALUES_INDEX_PROCESS_IDENTIFIER,
+	LIBEWF_HEADER_VALUES_INDEX_UNKNOWN_DC,
+	LIBEWF_HEADER_VALUES_INDEX_EXTENTS,
 
-#define LIBEWF_HEADER_VALUES_INDEX_CASE_NUMBER			0
-#define LIBEWF_HEADER_VALUES_INDEX_DESCRIPTION			1
-#define LIBEWF_HEADER_VALUES_INDEX_EXAMINER_NAME		2
-#define LIBEWF_HEADER_VALUES_INDEX_EVIDENCE_NUMBER		3
-#define LIBEWF_HEADER_VALUES_INDEX_NOTES			4
-#define LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_DATE			5
-#define LIBEWF_HEADER_VALUES_INDEX_SYSTEM_DATE			6
-#define LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_OPERATING_SYSTEM	7
-#define LIBEWF_HEADER_VALUES_INDEX_ACQUIRY_SOFTWARE_VERSION	8
-#define LIBEWF_HEADER_VALUES_INDEX_PASSWORD			9
-#define LIBEWF_HEADER_VALUES_INDEX_COMPRESSION_TYPE		10
-#define LIBEWF_HEADER_VALUES_INDEX_MODEL			11
-#define LIBEWF_HEADER_VALUES_INDEX_SERIAL_NUMBER		12
-
-#define LIBEWF_HEADER_VALUES_INDEX_PROCESS_IDENTIFIER		13
-#define LIBEWF_HEADER_VALUES_INDEX_UNKNOWN_DC			14
-#define LIBEWF_HEADER_VALUES_INDEX_EXTENTS			15
+	/* Value to indicate the amount of header values
+	 */
+	LIBEWF_HEADER_VALUES_DEFAULT_AMOUNT
+};
 
 int libewf_header_values_initialize(
-     libewf_values_table_t *header_values,
+     libewf_values_table_t **header_values,
      liberror_error_t **error );
 
 int libewf_header_values_realloc(
@@ -107,20 +111,20 @@ int libewf_header_values_copy(
      liberror_error_t **error );
 
 int libewf_header_values_parse_header_string(
-     libewf_values_table_t **header_values,
+     libewf_values_table_t *header_values,
      libewf_character_t *header_string,
      size_t header_string_size,
      liberror_error_t **error );
 
 int libewf_header_values_parse_header(
-     libewf_values_table_t **header_values,
+     libewf_values_table_t *header_values,
      uint8_t *header,
      size_t header_size,
      int codepage,
      liberror_error_t **error );
 
 int libewf_header_values_parse_header2(
-     libewf_values_table_t **header_values,
+     libewf_values_table_t *header_values,
      uint8_t *header2,
      size_t header2_size,
      liberror_error_t **error );
@@ -300,13 +304,13 @@ int libewf_generate_date_xheader_value(
      liberror_error_t **error );
 
 int libewf_header_values_parse_header_string_xml(
-     libewf_values_table_t **header_values,
+     libewf_values_table_t *header_values,
      libewf_character_t *header_string_xml,
      size_t header_string_xml_size,
      liberror_error_t **error );
 
 int libewf_header_values_parse_xheader(
-     libewf_values_table_t **header_values,
+     libewf_values_table_t *header_values,
      uint8_t *xheader,
      size_t size,
      liberror_error_t **error );

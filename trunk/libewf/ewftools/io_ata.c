@@ -2,7 +2,7 @@
  * ATA/ATAPI IO functions
  *
  * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,7 +21,6 @@
  */
 
 #include <common.h>
-#include <endian.h>
 #include <memory.h>
 #include <narrow_string.h>
 #include <types.h>
@@ -32,10 +31,6 @@
 #include <sys/ioctl.h>
 #endif
 
-#if defined( WINAPI )
-
-#else
-
 #if defined( HAVE_CYGWIN_HDREG_H )
 #include <cygwin/hdreg.h>
 #endif
@@ -44,15 +39,15 @@
 #include <linux/hdreg.h>
 #endif
 
+#if defined( HAVE_ERRNO_H ) || defined( WINAPI )
+#include <errno.h>
 #endif
 
-#include <errno.h>
+#include <libsystem.h>
 
 #include "io_ata.h"
-#include "notify.h"
-#include "system_string.h"
 
-#if defined( HAVE_IO_ATA )
+#if defined( HDIO_GET_IDENTITY )
 
 /* Sends a ATA DEVICE CONFIGURATION IDENTIFY to the file descriptor
  * Returns 1 if successful or -1 on error
@@ -62,6 +57,8 @@ int io_ata_get_device_configuration(
      struct hd_driveid *device_configuration,
      liberror_error_t **error )
 {
+	libsystem_character_t error_string[ 128 ];
+
 	static char *function = "io_ata_get_device_configuration";
 
 	if( file_descriptor == -1 )
@@ -92,47 +89,61 @@ int io_ata_get_device_configuration(
 	     HDIO_GET_IDENTITY,
 	     device_configuration ) == -1 )
 	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_IO,
-		 LIBERROR_IO_ERROR_IOCTL_FAILED,
-		 "%s: unable to query device for: HDIO_GET_IDENTITY with error: %" PRIs_SYSTEM ".",
-		 function,
-		 system_string_strerror(
-		  errno ) );
-
+		if( libsystem_error_copy_to_string(
+		     errno,
+		     error_string,
+		     128,
+		     error ) == 1 )
+		{
+			liberror_error_set(
+			 error,
+			 LIBERROR_ERROR_DOMAIN_IO,
+			 LIBERROR_IO_ERROR_IOCTL_FAILED,
+			 "%s: unable to query device for: HDIO_GET_IDENTITY with error: %" PRIs_LIBSYSTEM ".",
+			 function,
+			 error_string );
+		}
+		else
+		{
+			liberror_error_set(
+			 error,
+			 LIBERROR_ERROR_DOMAIN_IO,
+			 LIBERROR_IO_ERROR_IOCTL_FAILED,
+			 "%s: unable to query device for: HDIO_GET_IDENTITY.",
+			 function );
+		}
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	notify_verbose_dump_data(
-	 device_configuration,
+	libsystem_notify_verbose_print_data(
+	 (uint8_t *) device_configuration,
 	 sizeof( struct hd_driveid ) );
 
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "Feature sets:\n" );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "SMART:\t\t\t%d\n",
 	 ( device_configuration->command_set_1 & 0x0001 ) );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "Security Mode:\t\t%d (%d)\n",
 	 ( device_configuration->command_set_1 & 0x0002 ) >> 1,
 	 ( device_configuration->dlf & 0x0001 ) );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "Security Mode enabled:\t%d\n",
 	 ( device_configuration->dlf & 0x0002 ) >> 1 );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "Removable Media:\t%d\n",
 	 ( device_configuration->command_set_1 & 0x0004 ) >> 2 );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "HPA:\t\t\t%d\n",
 	 ( device_configuration->command_set_1 & 0x0400 ) >> 10 );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "DCO:\t\t\t%d\n",
 	 ( device_configuration->command_set_2 & 0x0800 ) >> 11 );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "Media serial:\t\t%d\n",
 	 ( device_configuration->cfsse & 0x0004 ) >> 2 );
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "\n" );
 #endif
 #endif

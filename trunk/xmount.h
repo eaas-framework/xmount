@@ -84,7 +84,7 @@ typedef struct TXMountConfData {
   /** Partial MD5 hash of input image */
   uint64_t InputHashLo;
   uint64_t InputHashHi;
-} TXMountConfData;
+} __attribute__ ((packed)) TXMountConfData;
 
 /*
  * VDI Binary File Header structure
@@ -160,7 +160,7 @@ typedef struct TVdiFileHeader {
   uint64_t padding4;
   uint64_t padding5;
   uint64_t padding6;
-} TVdiFileHeader, *pTVdiFileHeader;
+} __attribute__ ((packed)) TVdiFileHeader, *pTVdiFileHeader;
 
 //    /** The way the UUID is declared by the DCE specification. */
 //    struct
@@ -186,7 +186,7 @@ typedef struct TCacheFileBlockIndex {
   uint32_t Assigned;
   /** Offset to data in cache file */
   uint64_t off_data;
-} TCacheFileBlockIndex, *pTCacheFileBlockIndex;
+} __attribute__ ((packed)) TCacheFileBlockIndex, *pTCacheFileBlockIndex;
 
 /*
  * Cache file header structures
@@ -225,7 +225,7 @@ typedef struct TCacheFileHeader {
   uint64_t pVmdkFile;
   /** Padding until offset 512 to ease further additions */
   char HeaderPadding[444];
-} TCacheFileHeader, *pTCacheFileHeader;
+} __attribute__ ((packed)) TCacheFileHeader, *pTCacheFileHeader;
 
 // Old v1 header
 typedef struct TCacheFileHeader_v1 {
@@ -317,4 +317,6 @@ typedef struct TCacheFileHeader_v1 {
   20090814: * Added XMOUNT_MALLOC and XMOUNT_REALLOC macros.
   20090816: * Added XMOUNT_STRSET, XMOUNT_STRNSET, XMOUNT_STRAPP and
               XMOUNT_STRNAPP macros.
+  20100324: * Added "__attribute__ ((packed))" to all header structs to prevent
+              different sizes on i386 and amd64.
 */

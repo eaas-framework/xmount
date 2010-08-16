@@ -164,7 +164,7 @@ static void LogWarnMessage(char *pMessage,...) {
  *   n/a
  */
 static void PrintUsage(char *pProgramName) {
-  printf("\nxmount v%s copyright (c) 2008, 2009 by Gillen Daniel "
+  printf("\nxmount v%s copyright (c) 2008-2010 by Gillen Daniel "
          "<gillen.dan@pinguin.lu>\n",PACKAGE_VERSION);
   printf("\nUsage:\n");
   printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",pProgramName);
@@ -1970,10 +1970,16 @@ static int InitVirtVdiHeader() {
   //*((uint32_t*)(&(pVdiFileHeader->uuidCreate_l))+4)=rand();
   //*((uint32_t*)(&(pVdiFileHeader->uuidCreate_h)))=rand();
   //*((uint32_t*)(&(pVdiFileHeader->uuidCreate_h))+4)=rand();
-  *((uint32_t*)(&(pVdiFileHeader->uuidModify_l)))=rand();
-  *((uint32_t*)(&(pVdiFileHeader->uuidModify_l))+4)=rand();
-  *((uint32_t*)(&(pVdiFileHeader->uuidModify_h)))=rand();
-  *((uint32_t*)(&(pVdiFileHeader->uuidModify_h))+4)=rand();
+
+#define rand64(var) {              \
+  *((uint32_t*)&(var))=rand();     \
+  *(((uint32_t*)&(var))+1)=rand(); \
+}
+
+  rand64(pVdiFileHeader->uuidModify_l);
+  rand64(pVdiFileHeader->uuidModify_h);
+
+#undef rand64
 
   // Generate block map
   i=0;
@@ -2716,4 +2722,11 @@ int main(int argc, char *argv[])
             * Fixed a bug in VMDK descriptor file access. Had to add
               VirtualVmdkFileSize to track the size of this file as strlen was
               a bad idea :).
+  20100324: v0.4.3 released
+            * Changed all header structs to prevent different sizes on i386 and
+              amd64. See xmount.h for more details.
+  20100810: v0.4.4 released
+            * Found a bug in InitVirtVdiHeader(). The 64bit values were
+              addressed incorrectly while filled with rand(). This leads to an
+              error message when trying to add a VDI file to VirtualBox 3.2.8.
 */

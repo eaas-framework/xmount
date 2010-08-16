@@ -19,7 +19,7 @@
 #endif
 
 
-#ifdef WIN32
+#if defined(WIN32) and !defined(__MINGW_H)
 /**********************************************************************
  * Implement dirent-style opendir/readdir/rewinddir/closedir on Win32
  *
@@ -204,6 +204,21 @@ static void aff_filename(AFFILE *afd,char *buf,int buflen,int num)
 static int afd_identify_file(const char *filename,int exists)
 {
     if(filename==0 || strlen(filename)==0) return 0;	// zero-length filenames aren't welcome
+    if(strncmp(filename,"file://",7)==0){
+	/* Move file pointer past file:// then find a '/' and take the next character  */
+	filename += 7;
+	while(*filename && *filename!='/'){
+	    filename++;
+	}
+	/* At this point if *filename==0 then we never found the end of the URL.
+	 * return 0, since it's not an AFF file.
+	 */
+	if(*filename==0) return 0;
+
+	/* So *filename must == '/' */
+	assert(*filename == '/');
+	filename++;
+    }
     if(exists && access(filename,R_OK)!=0) return 0;	// needs to exist and it doesn't
 
     /* If it ends with a '/', remove it */
@@ -269,7 +284,7 @@ static int afd_add_file(AFFILE *af,const char *fname_)
 
     int new_file = access(fname,F_OK)!=0;	// Is this a new file?
 
-    AFFILE *af2 = af_open(fname,af->openflags,af->openmode); 
+    AFFILE *af2 = af_open(fname,af->openflags|AF_NO_CRYPTO,af->openmode); 
     if(af2==0){
 	(*af->error_reporter)("open(%s,%d,%d) failed: %s\n",
 			      fname,af->openflags,af->openmode,strerror(errno));
@@ -288,7 +303,7 @@ static int afd_add_file(AFFILE *af,const char *fname_)
 	af_update_seg(af,AF_AFF_FILE_TYPE,0,(const u_char *)"AFD",3);
 	
 	/* If this is the second file, copy over additional metadata from first... */
-	if(ap->num_afs>0){
+	if(ap->num_afs>1){
 	    AFFILE *af0 = ap->afs[0];
 	    memcpy(af2->badflag,af0->badflag,af->image_sectorsize);
 	    af2->bytes_memcpy += af->image_sectorsize;
@@ -518,7 +533,7 @@ int afd_del_seg(AFFILE *af,const char *segname)
 
 struct af_vnode vnode_afd = {
     AF_IDENTIFY_AFD,		// 
-    AF_VNODE_TYPE_COMPOUND|AF_VNODE_TYPE_RELIABLE|AF_VNODE_NO_SEALING,		// 
+    AF_VNODE_TYPE_COMPOUND|AF_VNODE_TYPE_RELIABLE,		// 
     "AFF Directory",
     afd_identify_file,
     afd_open,			// open

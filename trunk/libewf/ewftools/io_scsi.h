@@ -2,7 +2,7 @@
  * SCSI IO functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -32,13 +32,7 @@
 extern "C" {
 #endif
 
-#if defined( WINAPI )
-
-#elif defined( HAVE_SCSI_SG_H )
-#define HAVE_IO_SCSI
-#endif
-
-#if defined( HAVE_IO_SCSI )
+#if defined( HAVE_SCSI_SG_H )
 
 enum IO_SCSI_OPERATION_CODES
 {
@@ -148,7 +142,7 @@ ssize_t io_scsi_inquiry(
          size_t response_size,
          liberror_error_t **error );
 
-int io_scsi_get_identiier(
+int io_scsi_get_identier(
      int file_descriptor,
      liberror_error_t **error );
 

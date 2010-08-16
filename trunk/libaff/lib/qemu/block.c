@@ -354,7 +354,7 @@ int bdrv_open2(BlockDriverState *bs, const char *filename, int flags,
         bdrv_delete(bs1);
 
         get_tmp_filename(tmp_filename, sizeof(tmp_filename));
-        realpath(filename, backing_filename);
+        if(realpath(filename, backing_filename)==0) return -1;
         if (bdrv_create(&bdrv_qcow2, tmp_filename,
                         total_size, backing_filename, 0) < 0) {
             return -1;

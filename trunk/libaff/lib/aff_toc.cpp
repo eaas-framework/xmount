@@ -27,11 +27,12 @@ void	aff_toc_print(AFFILE *af)
     printf("AF DIRECTORY:\n");
     for(int i=0;i<af->toc_count;i++){
 	if(af->toc[i].name){
-	    printf("%-32s @%" I64u" len: % "I64u" \n",af->toc[i].name, af->toc[i].offset,af->toc[i].segment_len);
+	    printf("%-32s @%"I64u" len: %"I64u" \n",af->toc[i].name, af->toc[i].offset,af->toc[i].segment_len);
 	}
     }
 }
 
+#if 0
 static int toc_sort(const void *a_,const void *b_)
 {
     const aff_toc_mem *a = (const aff_toc_mem *)a_;
@@ -40,6 +41,7 @@ static int toc_sort(const void *a_,const void *b_)
     if(a->offset > b->offset) return 1;
     return 0;
 }
+#endif
 
 static int aff_toc_append(AFFILE *af,const char *segname,uint64_t offset,uint64_t datalen)
 {
@@ -88,7 +90,7 @@ int	aff_toc_build(AFFILE *af)	// build the dir if we couldn't find it
     while(1){
 	char segname[AF_MAX_NAME_LEN];
 	size_t segname_len=sizeof(segname);
-	off_t pos = ftello(af->aseg);
+	uint64_t pos = ftello(af->aseg);
 	size_t datalen=0;
 
 	int r = af_get_next_seg(af,segname,segname_len,0,0,&datalen);

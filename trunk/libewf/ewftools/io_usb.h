@@ -2,7 +2,7 @@
  * USB IO functions
  *
  * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -32,13 +32,7 @@
 extern "C" {
 #endif
 
-#if defined( WINAPI )
-
-#elif defined( HAVE_LINUX_USB_CH9_H )
-#define HAVE_IO_USB
-#endif
-
-#if defined( HAVE_IO_USB )
+#if defined( HAVE_LINUX_USB_CH9_H )
 
 int io_usb_ioctl(
      int file_descriptor,

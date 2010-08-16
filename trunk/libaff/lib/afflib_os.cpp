@@ -20,7 +20,6 @@
 #include <sys/disk.h>
 #endif
 
-
 #ifdef HAVE_LINUX_FS_H
 #include <linux/fs.h>
 #endif
@@ -33,7 +32,9 @@
  *** Extra code for Windows...
  ****************************************************************/
 
-#ifdef WIN32
+/* No longer needed with VC2008 */
+#if 0					
+#if defined(WIN32) and !defined(__MINGW_H)
 #pragma warning(disable: 4996)
 int64 ftello(FILE *stream)
 {
@@ -46,8 +47,6 @@ int64 ftello(FILE *stream)
 
 int fseeko(FILE *stream,int64 offset,int whence)
 {
-    
-
     switch(whence){
     case SEEK_SET:
 	break;				// jump down to fsetpos()
@@ -62,8 +61,8 @@ int fseeko(FILE *stream,int64 offset,int whence)
 	return -1;
     }
     return fsetpos(stream,&offset);
-	
 }
+#endif
 #endif
 
 

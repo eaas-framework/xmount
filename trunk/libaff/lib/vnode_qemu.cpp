@@ -83,15 +83,6 @@ static int qemu_rewind_seg(AFFILE *af)
 }
 
 
-/* return the length of a string up to a max */
-static int strlenp(const unsigned char *data,int max)
-{
-    for(int i=0;i<max;i++){
-	if(data[i]==0) return i;
-    }
-    return max;
-}
-
 static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
 		       unsigned char *data,size_t *datalen)
 {
@@ -101,12 +92,14 @@ static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
 	/* Get the segment number */
 	if(data==0){
 	    /* Need to make sure that the segment exists */
-	    if(segnum*(af->image_pagesize+1) > af->image_size ) return -1; // this segment does not exist
+	    if(segnum * (af->image_pagesize+1) > (uint64_t) af->image_size ){
+		return -1; // this segment does not exist
+	    }
 	    if(datalen) *datalen =af->image_pagesize;	// just return the chunk size
 	    return 0;
 	}
 	int64_t sector_start = segnum * af->image_pagesize / 512;
-	int     sector_count = af->image_pagesize/512;
+	u_int   sector_count = af->image_pagesize/512;
 	if(datalen==0) return -1;
 	if(sector_count*512 > *datalen) return -1; // no room
 	return bdrv_read(QEMU_HANDLE(af),sector_start,data,sector_count);
@@ -119,7 +112,11 @@ static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
     }
     if(strcmp(name,AF_IMAGESIZE)==0){
 	if(arg) *arg = 0;
-	if(datalen==0 || *datalen==0) return 0;
+	if(datalen==0) return 0;
+	if(*datalen==0){
+	    *datalen = 8;	// the structure is 8 bytes long
+	    return 0;
+	}
 	if(*datalen<8) return -2;
 	
 	struct aff_quad  q;
@@ -179,7 +176,7 @@ static int qemu_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigne
     }
 
  get_next_data_seg:
-    if(af->cur_page * af->image_pagesize >= af->image_size) return -1; // end of list
+    if(af->cur_page * af->image_pagesize >= (uint64_t)af->image_size) return -1; // end of list
     /* Make the segment name */
     char pagename[AF_MAX_NAME_LEN];		//
     memset(pagename,0,sizeof(pagename));

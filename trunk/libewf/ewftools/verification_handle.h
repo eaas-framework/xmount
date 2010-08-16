@@ -2,12 +2,12 @@
  * Verification handle
  *
  * Copyright (C) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
  * This software is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -16,7 +16,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -28,16 +28,22 @@
 
 #include <liberror.h>
 
-#include <stdio.h>
+/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
+ * before including libewf.h
+ */
+#if defined( _WIN32 ) && defined( DLL_EXPORT )
+#define LIBEWF_DLL_IMPORT
+#endif
 
 #include <libewf.h>
+
+#include <libsystem.h>
 
 #include "digest_context.h"
 #include "digest_hash.h"
 #include "md5.h"
 #include "sha1.h"
 #include "storage_media_buffer.h"
-#include "system_string.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -100,7 +106,7 @@ int verification_handle_signal_abort(
 
 int verification_handle_open_input(
      verification_handle_t *verification_handle,
-     system_character_t * const * filenames,
+     libsystem_character_t * const * filenames,
      int amount_of_filenames,
      liberror_error_t **error );
 
@@ -140,7 +146,7 @@ int verification_handle_get_hash_value(
      verification_handle_t *verification_handle,
      char *hash_value_identifier,
      size_t hash_value_identifier_length,
-     system_character_t *hash_value,
+     libsystem_character_t *hash_value,
      size_t hash_value_size,
      liberror_error_t **error );
 
@@ -162,14 +168,14 @@ int verification_handle_add_read_error(
 
 int verification_handle_finalize(
      verification_handle_t *verification_handle,
-     system_character_t *calculated_md5_hash_string,
+     libsystem_character_t *calculated_md5_hash_string,
      size_t calculated_md5_hash_string_size,
-     system_character_t *stored_md5_hash_string,
+     libsystem_character_t *stored_md5_hash_string,
      size_t stored_md5_hash_string_size,
      int *stored_md5_hash_available,
-     system_character_t *calculated_sha1_hash_string,
+     libsystem_character_t *calculated_sha1_hash_string,
      size_t calculated_sha1_hash_string_size,
-     system_character_t *stored_sha1_hash_string,
+     libsystem_character_t *stored_sha1_hash_string,
      size_t stored_sha1_hash_string_size,
      int *stored_sha1_hash_available,
      liberror_error_t **error );

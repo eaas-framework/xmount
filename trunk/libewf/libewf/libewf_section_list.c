@@ -2,7 +2,7 @@
  * Section list functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,16 +24,17 @@
 #include <memory.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_list_type.h"
-#include "libewf_notify.h"
 #include "libewf_section_list.h"
 
 /* Frees the section list values
  * Returns 1 if successful or -1 on error
  */
 int libewf_section_list_values_free(
-     intptr_t *value )
+     intptr_t *value,
+     liberror_error_t **error )
 {
 	if( value != NULL )
 	{

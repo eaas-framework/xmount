@@ -2,7 +2,7 @@
  * Features of libewf
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -23,8 +23,16 @@
 #if !defined( _LIBEWF_FEATURES_H )
 #define _LIBEWF_FEATURES_H
 
-#if defined( WINAPI ) ||  0
-#define LIBEWF_WIDE_CHARACTER_TYPE      1
+#if defined( WINAPI ) || 0
+#define LIBEWF_HAVE_WIDE_CHARACTER_TYPE		1
+
+/* Old definition kept for compatibility (for now)
+ */
+#define LIBEWF_WIDE_CHARACTER_TYPE		1
+#endif
+
+#if defined( HAVE_LIBBFIO ) || ( !defined( WINAPI ) && 0 )
+#define LIBEWF_HAVE_BFIO			1
 #endif
 
 #endif

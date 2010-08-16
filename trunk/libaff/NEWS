@@ -1,3 +1,28 @@
+April 18, 2010
+Version 3.6.0 
+
+I am pleased to announce the release of AFFLIB 3.6.0.
+
+With this release, AFFLIB now compiles under "mingw" allowing us to
+directly produce statically linked executables on Windows. The AFFLIB
+release has been significantly shurnk as it no longer needs to include
+libewf, openssl, and zlib.
+
+You can now create your own AFFLIB Windows release on a Macintosh using
+mingw and the script in bootstrap_mingw.sh. Or you can download our 
+precompiled Windows version from http://afflib.org/download/afflib_windows.zip
+ 
+
+
+
+
+September 30, 2009
+Version 3.5.0 Released.
+Major features:
+      - Simultaneous release of AFFLIB, Bloom, and bulk_extractor for MacOS, Linux and Windows
+      - bulk_extractor ported to Java.
+      - Single ZIP file for Windows Release
+
 May 20, 2008
 Version 3.2.1: Cleanup release of 3.2.0; important new features:
 	- Detects truncated files and does not allow them to be opened. 

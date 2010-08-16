@@ -2,7 +2,7 @@
  * Error functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -22,8 +22,9 @@
 
 #include <common.h>
 #include <memory.h>
+#include <narrow_string.h>
 
-#if defined( HAVE_STDARG_H )
+#if defined( HAVE_STDARG_H ) || defined( WINAPI )
 #include <stdarg.h>
 #elif defined( HAVE_VARARGS_H )
 #include <varargs.h>
@@ -35,7 +36,7 @@
 #include "liberror_error.h"
 #include "liberror_types.h"
 
-#if defined( HAVE_STDARG_H )
+#if defined( HAVE_STDARG_H ) || defined( WINAPI )
 #define VARARGS( function, error, error_domain, error_code, type, argument ) \
         function( error, error_domain, error_code, type argument, ... )
 #define VASTART( argument_list, type, name ) \
@@ -66,9 +67,10 @@ void VARARGS(
 {
 	va_list argument_list;
 
-	void *reallocation  = NULL;
-	size_t message_size = 64;
-	int print_count     = 0;
+	liberror_internal_error_t *internal_error = NULL;
+	void *reallocation                        = NULL;
+	size_t message_size                       = 64;
+	int print_count                           = 0;
 
 	if( error == NULL )
 	{
@@ -77,7 +79,7 @@ void VARARGS(
 	if( *error == NULL )
 	{
 		*error = (liberror_error_t *) memory_allocate(
-		                             sizeof( liberror_internal_error_t ) );
+		                               sizeof( liberror_internal_error_t ) );
 
 		if( *error == NULL )
 		{
@@ -88,42 +90,44 @@ void VARARGS(
 		( (liberror_internal_error_t *) *error )->domain             = error_domain;
 		( (liberror_internal_error_t *) *error )->code               = error_code;
 	}
+	internal_error = (liberror_internal_error_t *) *error;
+
 	reallocation = memory_reallocate(
-	                ( (liberror_internal_error_t *) *error )->message,
-	                sizeof( char * ) * ( ( (liberror_internal_error_t *) *error )->amount_of_messages + 1 ) );
+	                internal_error->message,
+	                sizeof( char * ) * ( internal_error->amount_of_messages + 1 ) );
 
 	if( reallocation == NULL )
 	{
 		return;
 	}
-	( (liberror_internal_error_t *) *error )->amount_of_messages                                                       += 1;
-	( (liberror_internal_error_t *) *error )->message                                                                   = (char **) reallocation;
-	( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ] = NULL;
+	internal_error->amount_of_messages                               += 1;
+	internal_error->message                                           = (char **) reallocation;
+	internal_error->message[ internal_error->amount_of_messages - 1 ] = NULL;
 
 	do
 	{
 		reallocation = memory_reallocate(
-		                ( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ],
+		                internal_error->message[ internal_error->amount_of_messages - 1 ],
 		                sizeof( char ) * message_size );
 
 		if( reallocation == NULL )
 		{
 			memory_free(
-			 ( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ] );
+			 internal_error->message[ internal_error->amount_of_messages - 1 ] );
 
-			( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ] = NULL;
+			internal_error->message[ internal_error->amount_of_messages - 1 ] = NULL;
 
 			return;
 		}
-		( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ] = reallocation;
+		internal_error->message[ internal_error->amount_of_messages - 1 ] = reallocation;
 
 		VASTART(
 		 argument_list,
 		 const char *,
 		 format );
 
-		print_count = liberror_error_vsnprintf(
-		               ( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ],
+		print_count = narrow_string_vsnprintf(
+		               internal_error->message[ internal_error->amount_of_messages - 1 ],
 		               message_size,
 		               format,
 		               argument_list );
@@ -136,7 +140,7 @@ void VARARGS(
 			message_size += 64;
 		}
 		else if( ( (size_t) print_count > message_size )
-		      || ( ( (liberror_internal_error_t *) *error )->message[ ( (liberror_internal_error_t *) *error )->amount_of_messages - 1 ][ print_count ] != 0 ) )
+		      || ( internal_error->message[ internal_error->amount_of_messages - 1 ][ print_count ] != 0 ) )
 		{
 			message_size = (size_t) ( print_count + 1 );
 			print_count  = -1;
@@ -154,7 +158,8 @@ void VARARGS(
 void liberror_error_free(
       liberror_error_t **error )
 {
-	int message_iterator = 0;
+	liberror_internal_error_t *internal_error = NULL;
+	int message_iterator                      = 0;
 
 	if( error == NULL )
 	{
@@ -162,18 +167,22 @@ void liberror_error_free(
 	}
 	if( *error != NULL )
 	{
-		if( ( (liberror_internal_error_t *) *error )->message != NULL )
+		internal_error = (liberror_internal_error_t *) *error;
+
+		if( internal_error->message != NULL )
 		{
-			for( message_iterator = 0; message_iterator < ( (liberror_internal_error_t *) *error )->amount_of_messages; message_iterator++ )
+			for( message_iterator = 0;
+			     message_iterator < internal_error->amount_of_messages;
+			     message_iterator++ )
 			{
-				if( ( (liberror_internal_error_t *) *error )->message[ message_iterator ] != NULL )
+				if( internal_error->message[ message_iterator ] != NULL )
 				{
 					memory_free(
-					 ( (liberror_internal_error_t *) *error )->message[ message_iterator ] );
+					 internal_error->message[ message_iterator ] );
 				}
 			}
 			memory_free(
-			 ( (liberror_internal_error_t *) *error )->message );
+			 internal_error->message );
 		}
 		memory_free(
 		 *error );
@@ -203,65 +212,174 @@ int liberror_error_matches(
 }
 
 /* Prints a descriptive string of the error to the stream
+ * Returns the amount of printed characters if successful or -1 on error
  */
-void liberror_error_fprint(
+int liberror_error_fprint(
      liberror_error_t *error,
      FILE *stream )
 {
-	int message_iterator = 0;
+	liberror_internal_error_t *internal_error = NULL;
+	int message_iterator                      = 0;
+	int print_count                           = 0;
 
 	if( error == NULL )
 	{
-		return;
+		return( -1 );
 	}
 	if( stream == NULL )
 	{
-		return;
+		return( -1 );
 	}
 	if( ( (liberror_internal_error_t *) error )->message == NULL )
 	{
-		return;
+		return( -1 );
 	}
-	message_iterator = ( (liberror_internal_error_t *) error )->amount_of_messages - 1;
+	internal_error = (liberror_internal_error_t *) error;
 
-	if( ( (liberror_internal_error_t *) error )->message[ message_iterator ] != NULL )
+	message_iterator = internal_error->amount_of_messages - 1;
+
+	if( internal_error->message[ message_iterator ] != NULL )
 	{
-		fprintf(
-		 stream,
-		 "%s\n",
-		 ( (liberror_internal_error_t *) error )->message[ message_iterator ] );
+		print_count = fprintf(
+		               stream,
+		               "%s\n",
+		               internal_error->message[ message_iterator ] );
+
+		/* TODO check return value */
 	}
+	return( print_count );
+}
+
+/* Prints a descriptive string of the error to the string
+ * Returns the amount of printed characters if successful or -1 on error
+ */
+int liberror_error_sprint(
+     liberror_error_t *error,
+     char *string,
+     size_t size )
+{
+	liberror_internal_error_t *internal_error = NULL;
+	int message_iterator                      = 0;
+	int print_count                           = 0;
+
+	if( error == NULL )
+	{
+		return( -1 );
+	}
+	if( string == NULL )
+	{
+		return( -1 );
+	}
+	if( ( (liberror_internal_error_t *) error )->message == NULL )
+	{
+		return( -1 );
+	}
+	internal_error = (liberror_internal_error_t *) error;
+
+	message_iterator = internal_error->amount_of_messages - 1;
+
+	if( internal_error->message[ message_iterator ] != NULL )
+	{
+		print_count = narrow_string_snprintf(
+		               string,
+		               size,
+		               "%s\n",
+		               internal_error->message[ message_iterator ] );
+
+		/* TODO check return value */
+	}
+	return( print_count );
 }
 
 /* Prints a backtrace of the error to the stream
+ * Returns the amount of printed characters if successful or -1 on error
  */
-void liberror_error_backtrace_fprint(
+int liberror_error_backtrace_fprint(
      liberror_error_t *error,
      FILE *stream )
 {
-	int message_iterator = 0;
+	liberror_internal_error_t *internal_error = NULL;
+	int message_iterator                      = 0;
+	int print_count                           = 0;
+	int total_print_count                     = 0;
 
 	if( error == NULL )
 	{
-		return;
+		return( -1 );
 	}
 	if( stream == NULL )
 	{
-		return;
+		return( -1 );
 	}
-	if( ( (liberror_internal_error_t *) error )->message == NULL )
+	internal_error = (liberror_internal_error_t *) error;
+
+	if( internal_error->message == NULL )
 	{
-		return;
+		return( -1 );
 	}
-	for( message_iterator = 0; message_iterator < ( (liberror_internal_error_t *) error )->amount_of_messages; message_iterator++ )
+	for( message_iterator = 0;
+	     message_iterator < internal_error->amount_of_messages;
+	     message_iterator++ )
 	{
-		if( ( (liberror_internal_error_t *) error )->message[ message_iterator ] != NULL )
+		if( internal_error->message[ message_iterator ] != NULL )
 		{
-			fprintf(
-			 stream,
-			 "%s\n",
-			 ( (liberror_internal_error_t *) error )->message[ message_iterator ] );
+			print_count = fprintf(
+			               stream,
+			               "%s\n",
+			               internal_error->message[ message_iterator ] );
+
+			/* TODO check return value */
+
+			total_print_count += print_count;
 		}
 	}
+	return( total_print_count );
+}
+
+/* Prints a backtrace of the error to the string
+ * Returns the amount of printed characters if successful or -1 on error
+ */
+int liberror_error_backtrace_sprint(
+     liberror_error_t *error,
+     char *string,
+     size_t size )
+{
+	liberror_internal_error_t *internal_error = NULL;
+	int message_iterator                      = 0;
+	int print_count                           = 0;
+	int total_print_count                     = 0;
+
+	if( error == NULL )
+	{
+		return( -1 );
+	}
+	if( string == NULL )
+	{
+		return( -1 );
+	}
+	internal_error = (liberror_internal_error_t *) error;
+
+	if( internal_error->message == NULL )
+	{
+		return( -1 );
+	}
+	for( message_iterator = 0;
+	     message_iterator < internal_error->amount_of_messages;
+	     message_iterator++ )
+	{
+		if( internal_error->message[ message_iterator ] != NULL )
+		{
+			print_count = narrow_string_snprintf(
+			               string,
+			               size,
+			               "%s\n",
+			               internal_error->message[ message_iterator ] );
+
+			/* TODO check return value */
+
+			total_print_count += print_count;
+		}
+	}
+	return( total_print_count );
 }
 

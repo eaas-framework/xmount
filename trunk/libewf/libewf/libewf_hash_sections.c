@@ -2,7 +2,7 @@
  * Hash sections functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,7 +24,6 @@
 #include <memory.h>
 
 #include "libewf_hash_sections.h"
-#include "libewf_notify.h"
 
 /* Initialize the hash sections
  * Returns 1 if successful or -1 on error

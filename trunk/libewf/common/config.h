@@ -4,10 +4,13 @@
 /* Define to 1 if you have the `atoll' function. */
 /* #undef HAVE_ATOLL */
 
+/* Define to 1 if you have the `chdir' function. */
+#define HAVE_CHDIR 1
+
 /* Define to 1 if you have the `close' function. */
 #define HAVE_CLOSE 1
 
-/* Defines if compressBound funtion is present in zlib. */
+/* Define to 1 if compressBound funtion is available in zlib. */
 #define HAVE_COMPRESS_BOUND 1
 
 /* Define to 1 if you have the `ctime' function. */
@@ -25,7 +28,7 @@
 /* Define to 1 if you have the <cygwin/hdreg.h> header file. */
 /* #undef HAVE_CYGWIN_HDREG_H */
 
-/* Defines if debug output should be used */
+/* Define to 1 if debug output should be used. */
 /* #undef HAVE_DEBUG_OUTPUT */
 
 /* Define to 1 if you have the declaration of `memrchr', and to 0 if you
@@ -66,6 +69,9 @@
 /* Define to 1 if you have the `free' function. */
 #define HAVE_FREE 1
 
+/* Define to 1 if you have the `fseeko' function. */
+#define HAVE_FSEEKO 1
+
 /* Define to 1 if you have the `fstat' function. */
 #define HAVE_FSTAT 1
 
@@ -102,7 +108,7 @@
 /* Define to 1 if you have the <libbfio.h> header file. */
 /* #undef HAVE_LIBBFIO_H */
 
-/* Define to 1 if you have the `crypto' library (-lcrypto). */
+/* Define to 1 if you have the 'crypto' library (-lcrypto). */
 #define HAVE_LIBCRYPTO 1
 
 /* Define to 1 if you have the `una' library (-luna). */
@@ -111,7 +117,7 @@
 /* Define to 1 if you have the <libuna.h> header file. */
 /* #undef HAVE_LIBUNA_H */
 
-/* Define to 1 if you have the `uuid' library (-luuid). */
+/* Define to 1 if you have the 'uuid' library (-luuid). */
 #define HAVE_LIBUUID 1
 
 /* Define to 1 if you have the `z' library (-lz). */
@@ -150,8 +156,8 @@
 /* Define to 1 if the local version of libuna is used. */
 #define HAVE_LOCAL_LIBUNA 1
 
-/* Defines if libewf's low level read and write functions should be used in
-   the ewf tools */
+/* Define to 1 if libewfs low level read and write functions should be used in
+   the ewf tools. */
 /* #undef HAVE_LOW_LEVEL_FUNCTIONS */
 
 /* Define to 1 if you have the `lseek' function. */
@@ -178,6 +184,9 @@
 /* Define to 1 if you have the `memset' function. */
 #define HAVE_MEMSET 1
 
+/* Define to 1 if you have the `mkdir' function. */
+#define HAVE_MKDIR 1
+
 /* Define to 1 if you have the `mktime' function. */
 #define HAVE_MKTIME 1
 
@@ -198,6 +207,9 @@
 
 /* Define to 1 if you have the <openssl/sha.h> header file. */
 /* #undef HAVE_OPENSSL_SHA_H */
+
+/* Define to 1 if you have the posix_fadvise unction. */
+#define HAVE_POSIX_FADVISE 1
 
 /* Define to 1 whether printf supports the conversion specifier "%jd". */
 #define HAVE_PRINTF_JD 1
@@ -234,6 +246,9 @@
 
 /* Define to 1 if you have the `sprintf' function. */
 /* #undef HAVE_SPRINTF */
+
+/* Define to 1 if you have the `sscanf' function. */
+#define HAVE_SSCANF 1
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #define HAVE_STDARG_H 1
@@ -313,29 +328,32 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
 
-/* Defines if uuid_generate_random funtion is present. */
+/* Define to 1 if uuid_generate_random funtion is available. */
 #define HAVE_UUID_GENERATE_RANDOM 1
 
-/* Defines if uuid_generate_time funtion is present. */
+/* Define to 1 if uuid_generate_time funtion is available. */
 #define HAVE_UUID_GENERATE_TIME 1
 
 /* Define to 1 if you have the <uuid/uuid.h> header file. */
 #define HAVE_UUID_UUID_H 1
 
-/* Defines if experimental version 1 API should be used */
+/* Define to 1 if experimental version 1 API should be used. */
 #define HAVE_V1_API 1
 
-/* Defines if experimental version 2 API should be used */
+/* Define to 1 if experimental version 2 API should be used. */
 /* #undef HAVE_V2_API */
 
 /* Define to 1 if you have the <varargs.h> header file. */
 /* #undef HAVE_VARARGS_H */
 
-/* Defines if verbose output should be used */
+/* Define to 1 if verbose output should be used. */
 /* #undef HAVE_VERBOSE_OUTPUT */
 
 /* Define to 1 if you have the `vfprintf' function. */
 #define HAVE_VFPRINTF 1
+
+/* Define to 1 if you have the `vsnprintf' function. */
+#define HAVE_VSNPRINTF 1
 
 /* Define to 1 if you have the <wchar.h> header file. */
 /* #undef HAVE_WCHAR_H */
@@ -367,7 +385,7 @@
 /* Define to 1 if you have the `wcstoull' function. */
 /* #undef HAVE_WCSTOULL */
 
-/* Defines if wide character type should be used */
+/* Define to 1 if wide character type should be used. */
 /* #undef HAVE_WIDE_CHARACTER_TYPE */
 
 /* Define to 1 if you have the `wmemchr' function. */
@@ -391,6 +409,10 @@
 /* Defines the fallback operating system string. */
 #define LIBEWF_OPERATING_SYSTEM "Linux"
 
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#define LT_OBJDIR ".libs/"
+
 /* Name of package */
 #define PACKAGE "libewf"
 
@@ -401,13 +423,13 @@
 #define PACKAGE_NAME "libewf"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libewf 20090606"
+#define PACKAGE_STRING "libewf 20100226"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libewf"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "20090606"
+#define PACKAGE_VERSION "20100226"
 
 /* The size of `off_t', as computed by sizeof. */
 #define SIZEOF_OFF_T 8
@@ -431,7 +453,7 @@
 /* #undef TM_IN_SYS_TIME */
 
 /* Version number of package */
-#define VERSION "20090606"
+#define VERSION "20100226"
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */

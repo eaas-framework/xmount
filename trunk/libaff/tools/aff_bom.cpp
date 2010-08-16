@@ -3,7 +3,7 @@
  *
  * PUBLIC DOMAIN SOFTWARE.
  *
- * The software provided here is released by the Naval Postgradaute
+ * The software provided here is released by the Naval Postgraduate
  * School (NPS), an agency of the US Department of the Navy, USA.  The
  * software bears no warranty, either expressed or implied. NPS does
  * not assume legal liability nor responsibility for a User's use of
@@ -13,12 +13,7 @@
  * United States Government and/or for any works created by United
  * States Government employees. User acknowledges that this software
  * contains work which was created by NPS employee(s) and is therefore
- * in the public domain and not subject to copyright.  The User may
- * use, distribute, or incorporate this software provided the User
- * acknowledges this via an explicit acknowledgment of NPS-related
- * contributions to the User's work. User also agrees to acknowledge,
- * via an explicit acknowledgment, that any modifications or
- * alterations have been made to this software before redistribution.
+ * in the public domain and not subject to copyright.  
  * --------------------------------------------------------------------
  *
  * Change History:
@@ -29,7 +24,6 @@
 #include "affconfig.h"
 #include "afflib.h"
 #include "afflib_i.h"
-#include "afflib_sha256.h"
 #include "utils.h"
 #ifdef HAVE_ERR_H
 #include "err.h"
@@ -140,6 +134,7 @@ int aff_bom::read_files(const char *cert_file,const char *key_file)
 	return -1;
     }
 	
+    bom_open = true;
     xml = BIO_new(BIO_s_mem());	// where we are writing
     time_t clock = time(0);
     struct tm *tm = localtime(&clock);
@@ -166,48 +161,51 @@ void aff_bom::add(const char *segname,int sigmode,const u_char *seghash,size_t s
 {
     BIO_printf(xml,"<%s segname='%s' sigmode='%d' alg='sha256'>\n",
 	       AF_XML_SEGMENT_HASH,segname,sigmode);
-    BIO_flush(xml);
+    if(BIO_flush(xml)!=1) return;	// something is wrong
     BIO *b64 = BIO_new(BIO_f_base64());
     xml = BIO_push(b64,xml);
     BIO_write(xml,seghash,seghash_len);
-    BIO_flush(xml);
+    if(BIO_flush(xml)!=1) return;	// another error...
     xml = BIO_pop(b64);
     BIO_printf(xml,"</%s>\n",AF_XML_SEGMENT_HASH);
 }
 
 void aff_bom::close()
 {
-#ifdef HAVE_EVP_SHA256
     /* Terminate the XML block*/
     BIO_printf(xml,"</affsegments>\n");
     BIO_printf(xml,"</%s>\n",AF_XML_AFFBOM);
 
-    /* now sign the XML */
-    char *xbuf=0;
-    size_t xlen = BIO_get_mem_data(xml,&xbuf);
-    unsigned char sig[1024];
-    u_int  siglen = sizeof(sig);
-    
-    EVP_MD_CTX md;
-    EVP_SignInit(&md,EVP_sha256());
-    EVP_SignUpdate(&md,xbuf,xlen);
-    EVP_SignFinal(&md,sig,&siglen,privkey);
-    
-    /* Write the signature in base64 encoding... */
-    BIO *b64 = BIO_new(BIO_f_base64());
-    xml = BIO_push(b64,xml);
-    BIO_write(xml,sig,siglen);
-    BIO_flush(xml);
+    OpenSSL_add_all_digests();
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+
+    if(sha256){
+	/* now sign the XML */
+	char *xbuf=0;
+	size_t xlen = BIO_get_mem_data(xml,&xbuf);
+	unsigned char sig[1024];
+	u_int  siglen = sizeof(sig);
 	
-    /* Remove the base64 bio */
-    xml = BIO_pop(b64);
-#else
-    errx(1,"Cannot sign BoM; EVP_sha256 not available");
-#endif    
+	EVP_MD_CTX md;
+	EVP_SignInit(&md,sha256);
+	EVP_SignUpdate(&md,xbuf,xlen);
+	EVP_SignFinal(&md,sig,&siglen,privkey);
+    
+	/* Write the signature in base64 encoding... */
+	BIO *b64 = BIO_new(BIO_f_base64());
+	xml = BIO_push(b64,xml);
+	BIO_write(xml,sig,siglen);
+	if(BIO_flush(xml)!=1) return;	// something wrong
+	
+	/* Remove the base64 bio */
+	xml = BIO_pop(b64);
+    }
+    bom_open = false;
 }
 
 int  aff_bom::write(AFFILE *af,aff::seglist &segments)
 {
+    assert(!bom_open);
     char segname[AF_MAX_NAME_LEN];
     snprintf(segname,sizeof(segname),AF_BOM_SEG,highest_chain(segments)+1);
     return af_update_seg_frombio(af,segname,0,xml);
@@ -217,14 +215,19 @@ int  aff_bom::write(AFFILE *af,aff::seglist &segments)
 void aff_bom::make_hash(u_char seghash[32], unsigned long arg,const char *segname,
 			const u_char *segbuf, unsigned long segsize)
 {
-    unsigned int seghash_len = sizeof(seghash);
-    unsigned long arg_net = htonl(arg);
-    EVP_MD_CTX md;		/* EVP message digest */
-    EVP_DigestInit(&md,EVP_sha256());
-    EVP_DigestUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
-    EVP_DigestUpdate(&md,(const unsigned char *)&arg_net,sizeof(arg_net));
-    EVP_DigestUpdate(&md,segbuf,segsize);
-    EVP_DigestFinal(&md,seghash,&seghash_len);
+    OpenSSL_add_all_digests();		// probably a good idea
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+
+    if(sha256){
+	unsigned int seghash_len = sizeof(seghash);
+	unsigned long arg_net = htonl(arg);
+	EVP_MD_CTX md;		/* EVP message digest */
+	EVP_DigestInit(&md,sha256);
+	EVP_DigestUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
+	EVP_DigestUpdate(&md,(const unsigned char *)&arg_net,sizeof(arg_net));
+	EVP_DigestUpdate(&md,segbuf,segsize);
+	EVP_DigestFinal(&md,seghash,&seghash_len);
+    }
 }
 
 int aff_bom::add(AFFILE *af,const char *segname)

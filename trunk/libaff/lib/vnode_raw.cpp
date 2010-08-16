@@ -30,11 +30,20 @@ static int64_t raw_filesize(AFFILE *af)
     struct raw_private *rp = RAW_PRIVATE(af);
 
     struct stat sb;
-    if(fstat(fileno(rp->raw),&sb)){
-	(*af->error_reporter)("raw_open: stat(%s): ",af->fname);
-	return -1;			// kind of odd...
+    if(fstat(fileno(rp->raw),&sb)==0){
+	if(sb.st_mode & S_IFREG){	// only do this for regular files
+	    return sb.st_size;
+	}
+
+	/* See if this is a device that we can figure */
+	struct af_figure_media_buf afb;
+	if(af_figure_media(fileno(rp->raw),&afb)==0){
+	    if(afb.total_sectors>0 && afb.sector_size>0){
+		return afb.total_sectors * afb.sector_size;
+	    }
+	}
     }
-    return sb.st_size;
+    return 0;				// no clue
 }
 
 static int raw_open(AFFILE *af)
@@ -50,9 +59,9 @@ static int raw_open(AFFILE *af)
 
     if(af->fname) rp->raw=fopen(af->fname,mode);
     if(rp->raw==0) return -1;		// raw open failed
-    af->image_size = raw_filesize(af);
-    af->image_pagesize = RAW_PAGESIZE;
-    af->cur_page = 0;
+    af->image_size	= raw_filesize(af);
+    af->image_pagesize	= RAW_PAGESIZE;
+    af->cur_page	= 0;
     return 0;
 }
 
@@ -120,14 +129,38 @@ static int raw_get_seg(AFFILE *af,const char *name,
     int64_t segnum = af_segname_page_number(name);
     if(segnum<0){
 	/* See if PAGESIZE or IMAGESIZE is being requested; we can fake those */
-	if(strcmp(name,AF_PAGESIZE)==0 && arg){*arg = af->image_pagesize;return 0;}
-	if(strcmp(name,AF_IMAGESIZE)==0 && data && *datalen>=8){
-	    struct aff_quad q;
-	    q.low = htonl((unsigned long)(af->image_size & 0xffffffff));
-	    q.high = htonl((unsigned long)(af->image_size >> 32));
-	    memcpy(data,&q,8);
+	if(strcmp(name,AF_PAGESIZE)==0){
+	    if(arg) *arg = af->image_pagesize;
+	    if(datalen) *datalen = 0;
 	    return 0;
 	}
+	if(strcmp(name,AF_IMAGESIZE)==0){
+	    struct aff_quad q;
+	    if(data && *datalen>=0){
+		q.low = htonl((unsigned long)(af->image_size & 0xffffffff));
+		q.high = htonl((unsigned long)(af->image_size >> 32));
+		memcpy(data,&q,8);
+		*datalen = 8;
+	    }
+	    return 0;
+	}
+	if(strcmp(name,AF_SECTORSIZE)==0){
+	    if(arg) *arg = af->image_sectorsize;
+	    if(datalen) *datalen = 0;
+	    return 0;
+	}
+	if(strcmp(name,AF_DEVICE_SECTORS)==0){
+	    int64_t devicesectors = af->image_size / af->image_sectorsize;
+	    struct aff_quad q;
+	    if(data && *datalen>=0){
+		q.low = htonl((unsigned long)(devicesectors & 0xffffffff));
+		q.high = htonl((unsigned long)(devicesectors >> 32));
+		memcpy(data,&q,8);
+		*datalen = 8;
+	    }
+	    return 0;
+	}
+
 	return -1;		// don't know how to fake this
     }
 
@@ -135,6 +168,8 @@ static int raw_get_seg(AFFILE *af,const char *name,
 
     int64_t pos = (int64_t)segnum * af->image_pagesize; // where we are to start reading
     int64_t bytes_left = af->image_size - pos;	// how many bytes left in the file
+
+    if(bytes_left<0) bytes_left = 0;
 
     int bytes_to_read = af->image_pagesize; // copy this many bytes, unless
     if(bytes_to_read > bytes_left) bytes_to_read = bytes_left; // only this much is left
@@ -197,22 +232,7 @@ static int raw_vstat(AFFILE *af,struct af_vnode_info *vni)
 
     /* If we can stat the file, use that. */
     fflush(rp->raw);
-    struct stat sb;
-    if(fstat(fileno(rp->raw),&sb)==0){
-	if(sb.st_mode & S_IFREG){	// only do this for regular files
-	    vni->imagesize = sb.st_size;
-	}
-    }
-
-    if(vni->imagesize==-1){
-	/* See if this is a device that we can figure */
-	struct af_figure_media_buf afb;
-	if(af_figure_media(fileno(rp->raw),&afb)==0){
-	    if(afb.total_sectors>0 && afb.sector_size>0){
-		vni->imagesize = afb.total_sectors * afb.sector_size;
-	    }
-	}
-    }
+    vni->imagesize = raw_filesize(af);
     vni->supports_compression = 0;
     vni->has_pages = 1;			
 
@@ -237,7 +257,7 @@ static int raw_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned
 {
     
     /* See if we are at the end of the "virtual" segment list */
-    if(af->cur_page * af->image_pagesize >= af->image_size) return -1;
+    if((uint64_t)af->cur_page * af->image_pagesize >= af->image_size) return -1;
 
     /* Make the segment name */
     char pagename[AF_MAX_NAME_LEN];		//

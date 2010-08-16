@@ -2,7 +2,7 @@
  * libewf main handle
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -43,10 +43,13 @@
 #include "libewf_values_table.h"
 #include "libewf_write_io_handle.h"
 
-/* For some reason MSVSCPP requires this include
- * to not mess up the exported functions
+#if defined( _MSC_VER ) || defined( __BORLANDC__ )
+
+/* This inclusion is needed otherwise some linkers
+ * mess up exporting the legacy functions
  */
 #include "libewf_legacy.h"
+#endif
 
 #if defined( __cplusplus )
 extern "C" {
@@ -105,9 +108,17 @@ struct libewf_internal_handle
 	 */
 	libewf_values_table_t *header_values;
 
+	/* Value to indicate the header values were parsed
+	 */
+	uint8_t header_values_parsed;
+
 	/* The hash values
 	 */
 	libewf_values_table_t *hash_values;
+
+	/* Value to indicate the hash values were parsed
+	 */
+	uint8_t hash_values_parsed;
 
 	/* The stored sessions information
 	 */

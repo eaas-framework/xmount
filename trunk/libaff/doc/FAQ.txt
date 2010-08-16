@@ -1,4 +1,5 @@
 Q: Why a new file format? What's wrong with block-by-block?
+
 A: Raw image files take up a lot of space. In many cases this space
    can be dramatically reduced by using compression.
    Unfortunately, if you just use "gzip" or "bzip2" for compression,
@@ -11,7 +12,9 @@ A: Raw image files take up a lot of space. In many cases this space
    publicly available. Also, EnCase does not allow the storage of
    arbitrary name/value pairs.
 
+
 Q: Why not put meta information into log files?
+
 A: In many cases it is advantageous to store meta information (such as
    case numbers, acquisition times, the name of the investigator,
    etc.) directly in the image file. For example, storing this
@@ -20,20 +23,23 @@ A: In many cases it is advantageous to store meta information (such as
    being used with an image.
 
 Q: Will AFF support hashes other than MD5 and SHA-1?
+
 A: Yes. The MD5 hash is stored in a segment named "md5". The SHA-1
    hash is stored in a segment named "sha1". As support for other hash
    functions are added to the OpenSSL library, the "aconvert" and
    "aimage" programs will be updated to automatically calculate and
    store the other hashes in the AFF files.
 
+
 Q: Are the images directly  mountable so that they can be used with 
    today's forensic tools, or must they be uncompressed for host-based tools to
    work with them?
+
 A: If you have source code for a scanner, you can modify it to use
    af_open() and af_read() instead of fopen() and fread(). You can
    then read the AFF files directly. If you don't have source code,
    but have a scanner that can read from standard input, you can
-   use the "afcat" program to copy the contents of an AFF file to
+   use the "affcat" program to copy the contents of an AFF file to
    standard output.
 
    Eventually, we plan to have a version of samba that is modified to
@@ -51,11 +57,11 @@ A: I'm currently modifying some of the Open Source tools to handle
    with AFF: you simply replace the fopen() call with af_open(), fseek()
    with af_seek(), and fclose() with af_close().  
 
-    I've had no contact with the authors of EnCase, ProDiscover, and
-    FTK. I imagine that if AFF becomes popular they will modify their
-    tools to handle the format. But even if they don't, we plan to
-    support those tools through the use of a samba loopback
-    filesystem.
+   I've had no contact with the authors of EnCase, ProDiscover, and
+   FTK. I imagine that if AFF becomes popular they will modify their
+   tools to handle the format. But even if they don't, we plan to
+   support those tools through the use of a samba loopback
+   filesystem.
 
 
 Q: Will it be possible to mount an AFF image as a "virtual file

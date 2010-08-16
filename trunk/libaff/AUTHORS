@@ -11,6 +11,7 @@ Timothy Lyons
 Nicolas (kwizart)
 Joachim Metz
 David Collett (PyFlag), for the PyAFF integration
+Phillip Hellewell (AccessData) for port to VC2008 and catching a few bugs.
 
 The AFF Project has received substantial financial support from 
 Basis Technology Corporation. 
@@ -22,4 +23,6 @@ National Institutes of Standards and Technology
 I.D.E.A.L. Technology Corporation 
 Naval Postgraduate School
 US Department of Defense
+AccessData
+
 

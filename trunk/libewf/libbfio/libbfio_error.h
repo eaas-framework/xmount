@@ -2,7 +2,7 @@
  * Error functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -43,13 +43,23 @@ extern "C" {
 LIBBFIO_EXTERN void libbfio_error_free(
                      libbfio_error_t **error );
 
-LIBBFIO_EXTERN void libbfio_error_fprint(
-                     libbfio_error_t *error,
-                     FILE *stream );
+LIBBFIO_EXTERN int libbfio_error_fprint(
+                    libbfio_error_t *error,
+                    FILE *stream );
 
-LIBBFIO_EXTERN void libbfio_error_backtrace_fprint(
-                     libbfio_error_t *error,
-                     FILE *stream );
+LIBBFIO_EXTERN int libbfio_error_sprint(
+                    libbfio_error_t *error,
+                    char *string,
+                    size_t size );
+
+LIBBFIO_EXTERN int libbfio_error_backtrace_fprint(
+                    libbfio_error_t *error,
+                    FILE *stream );
+
+LIBBFIO_EXTERN int libbfio_error_backtrace_sprint(
+                    libbfio_error_t *error,
+                    char *string,
+                    size_t size );
 
 #endif
 

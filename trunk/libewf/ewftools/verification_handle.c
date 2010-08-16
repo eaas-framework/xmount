@@ -2,12 +2,12 @@
  * Verification handle
  *
  * Copyright (C) 2007-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
  * This software is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -16,7 +16,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -26,15 +26,22 @@
 
 #include <liberror.h>
 
+/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
+ * before including libewf.h
+ */
+#if defined( _WIN32 ) && defined( DLL_EXPORT )
+#define LIBEWF_DLL_IMPORT
+#endif
+
 #include <libewf.h>
+
+#include <libsystem.h>
 
 #include "digest_context.h"
 #include "digest_hash.h"
-#include "file_io.h"
 #include "md5.h"
 #include "sha1.h"
 #include "storage_media_buffer.h"
-#include "system_string.h"
 #include "verification_handle.h"
 
 #define VERIFICATION_HANDLE_VALUE_SIZE			64
@@ -184,6 +191,7 @@ int verification_handle_free(
      liberror_error_t **error )
 {
 	static char *function = "verification_handle_free";
+	int result            = 1;
 
 	if( verification_handle == NULL )
 	{
@@ -210,6 +218,8 @@ int verification_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free input handle.",
 			 function );
+
+			result = -1;
 		}
 #endif
 		memory_free(
@@ -217,7 +227,7 @@ int verification_handle_free(
 
 		*verification_handle = NULL;
 	}
-	return( 1 );
+	return( result );
 }
 
 /* Signals the verification handle to abort
@@ -242,32 +252,24 @@ int verification_handle_signal_abort(
 	}
 	if( verification_handle->input_handle != NULL )
 	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_ALREADY_SET,
-		 "%s: invalid verification handle - input handle already set.",
-		 function );
-
-		return( -1 );
-	}
 #if defined( HAVE_V2_API )
-	if( libewf_handle_signal_abort(
-	     verification_handle->input_handle,
-	     error ) != 1 )
+		if( libewf_handle_signal_abort(
+		     verification_handle->input_handle,
+		     error ) != 1 )
 #else
-	if( libewf_signal_abort(
-	     verification_handle->input_handle ) != 1 )
+		if( libewf_signal_abort(
+		     verification_handle->input_handle ) != 1 )
 #endif
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_SET_FAILED,
-		 "%s: unable to signal input handle to abort.",
-		 function );
+		{
+			liberror_error_set(
+			 error,
+			 LIBERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBERROR_RUNTIME_ERROR_SET_FAILED,
+			 "%s: unable to signal input handle to abort.",
+			 function );
 
-		return( -1 );
+			return( -1 );
+		}
 	}
 	return( 1 );
 }
@@ -277,13 +279,14 @@ int verification_handle_signal_abort(
  */
 int verification_handle_open_input(
      verification_handle_t *verification_handle,
-     system_character_t * const * filenames,
+     libsystem_character_t * const * filenames,
      int amount_of_filenames,
      liberror_error_t **error )
 {
-	system_character_t **libewf_filenames = NULL;
-	static char *function                 = "verification_handle_open_input";
-	int result                            = 1;
+	libsystem_character_t **libewf_filenames = NULL;
+	static char *function                    = "verification_handle_open_input";
+	size_t first_filename_length             = 0;
+	int result                               = 1;
 
 	if( verification_handle == NULL )
 	{
@@ -345,12 +348,14 @@ int verification_handle_open_input(
 	}
 	if( amount_of_filenames == 1 )
 	{
-#if defined( HAVE_WIDE_SYSTEM_CHARACTER_T )
+		first_filename_length = libsystem_string_length(
+		                         filenames[ 0 ] );
+
+#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
 #if defined( HAVE_V2_API )
 		if( libewf_glob_wide(
 		     filenames[ 0 ],
-		     system_string_length(
-		     filenames[ 0 ] ),
+		     first_filename_length,
 		     LIBEWF_FORMAT_UNKNOWN,
 		     &libewf_filenames,
 		     &amount_of_filenames,
@@ -358,8 +363,7 @@ int verification_handle_open_input(
 #else
 		amount_of_filenames = libewf_glob_wide(
 		                       filenames[ 0 ],
-		                       system_string_length(
-		                        filenames[ 0 ] ),
+		                       first_filename_length,
 		                       LIBEWF_FORMAT_UNKNOWN,
 		                       &libewf_filenames );
 
@@ -369,8 +373,7 @@ int verification_handle_open_input(
 #if defined( HAVE_V2_API )
 		if( libewf_glob(
 		     filenames[ 0 ],
-		     system_string_length(
-		     filenames[ 0 ] ),
+		     first_filename_length,
 		     LIBEWF_FORMAT_UNKNOWN,
 		     &libewf_filenames,
 		     &amount_of_filenames,
@@ -378,8 +381,7 @@ int verification_handle_open_input(
 #else
 		amount_of_filenames = libewf_glob(
 		                       filenames[ 0 ],
-		                       system_string_length(
-		                        filenames[ 0 ] ),
+		                       first_filename_length,
 		                       LIBEWF_FORMAT_UNKNOWN,
 		                       &libewf_filenames );
 
@@ -396,9 +398,9 @@ int verification_handle_open_input(
 
 			return( -1 );
 		}
-		filenames = (system_character_t * const *) libewf_filenames;
+		filenames = (libsystem_character_t * const *) libewf_filenames;
 	}
-#if defined( HAVE_WIDE_SYSTEM_CHARACTER_T )
+#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
 #if defined( HAVE_V2_API )
 	if( libewf_handle_open_wide(
 	     verification_handle->input_handle,
@@ -1046,7 +1048,7 @@ int verification_handle_get_hash_value(
      verification_handle_t *verification_handle,
      char *hash_value_identifier,
      size_t hash_value_identifier_length,
-     system_character_t *hash_value,
+     libsystem_character_t *hash_value,
      size_t hash_value_size,
      liberror_error_t **error )
 {
@@ -1114,7 +1116,7 @@ int verification_handle_get_hash_value(
 		utf8_hash_value_size = 1 + narrow_string_length(
 		                            (char *) utf8_hash_value );
 
-		if( system_string_size_from_utf8_string(
+		if( libsystem_string_size_from_utf8_string(
 		     utf8_hash_value,
 		     utf8_hash_value_size,
 		     &calculated_hash_value_size,
@@ -1140,7 +1142,7 @@ int verification_handle_get_hash_value(
 
 			return( -1 );
 		}
-		if( system_string_copy_from_utf8_string(
+		if( libsystem_string_copy_from_utf8_string(
 		     hash_value,
 		     hash_value_size,
 		     utf8_hash_value,
@@ -1354,14 +1356,14 @@ int verification_handle_add_read_error(
  */
 int verification_handle_finalize(
      verification_handle_t *verification_handle,
-     system_character_t *calculated_md5_hash_string,
+     libsystem_character_t *calculated_md5_hash_string,
      size_t calculated_md5_hash_string_size,
-     system_character_t *stored_md5_hash_string,
+     libsystem_character_t *stored_md5_hash_string,
      size_t stored_md5_hash_string_size,
      int *stored_md5_hash_available,
-     system_character_t *calculated_sha1_hash_string,
+     libsystem_character_t *calculated_sha1_hash_string,
      size_t calculated_sha1_hash_string_size,
-     system_character_t *stored_sha1_hash_string,
+     libsystem_character_t *stored_sha1_hash_string,
      size_t stored_sha1_hash_string_size,
      int *stored_sha1_hash_available,
      liberror_error_t **error )
@@ -1399,17 +1401,12 @@ int verification_handle_finalize(
 
 		return( -1 );
 	}
+#if !defined( HAVE_V2_API )
 #if defined( USE_LIBEWF_GET_MD5_HASH )
 	if( verification_handle->calculate_sha1 != 0 )
 	{
-#if defined( HAVE_V2_API )
-		if( libewf_handle_parse_hash_values(
-		     verification_handle->input_handle,
-		     error ) == -1 )
-#else
 		if( libewf_parse_hash_values(
 		     verification_handle->input_handle ) == -1 )
-#endif
 		{
 			liberror_error_set(
 			 error,
@@ -1422,14 +1419,8 @@ int verification_handle_finalize(
 		}
 	}
 #elif defined( USE_LIBEWF_GET_HASH_VALUE_MD5 )
-#if defined( HAVE_V2_API )
-	if( libewf_handle_parse_hash_values(
-	     verification_handle->input_handle,
-	     error ) == -1 )
-#else
 	if( libewf_parse_hash_values(
 	     verification_handle->input_handle ) == -1 )
-#endif
 	{
 		liberror_error_set(
 		 error,
@@ -1440,6 +1431,7 @@ int verification_handle_finalize(
 
 		return( -1 );
 	}
+#endif
 #endif
 	if( verification_handle->calculate_md5 != 0 )
 	{
@@ -1627,7 +1619,7 @@ int verification_handle_additional_hash_values_fprint(
      liberror_error_t **error )
 {
 	char hash_identifier[ VERIFICATION_HANDLE_VALUE_IDENTIFIER_SIZE ];
-	system_character_t hash_value[ VERIFICATION_HANDLE_VALUE_SIZE ];
+	libsystem_character_t hash_value[ VERIFICATION_HANDLE_VALUE_SIZE ];
 
 	static char *function             = "verification_handle_additional_hash_values_fprint";
 	size_t hash_value_identifier_size = VERIFICATION_HANDLE_VALUE_IDENTIFIER_SIZE;
@@ -1670,14 +1662,9 @@ int verification_handle_additional_hash_values_fprint(
 
 		return( -1 );
 	}
-#if defined( HAVE_V2_API )
-	if( libewf_handle_parse_hash_values(
-	     verification_handle->input_handle,
-	     error ) == -1 )
-#else
+#if !defined( HAVE_V2_API )
 	if( libewf_parse_hash_values(
 	     verification_handle->input_handle ) == -1 )
-#endif
 	{
 		liberror_error_set(
 		 error,
@@ -1688,6 +1675,7 @@ int verification_handle_additional_hash_values_fprint(
 
 		return( -1 );
 	}
+#endif
 #if defined( HAVE_V2_API )
 	if( libewf_handle_get_amount_of_hash_values(
 	     verification_handle->input_handle,
@@ -1817,7 +1805,7 @@ int verification_handle_additional_hash_values_fprint(
 			}
 			fprintf(
 			 stream,
-			 "%s:\t%" PRIs_SYSTEM "\n",
+			 "%s:\t%" PRIs_LIBSYSTEM "\n",
 			 hash_identifier,
 			 hash_value );
 		}
@@ -1833,23 +1821,23 @@ int verification_handle_crc_errors_fprint(
      FILE *stream,
      liberror_error_t **error )
 {
-	static char *function             = "verification_handle_crc_errors_fprint";
-	uint64_t start_sector             = 0;
-	uint64_t last_sector              = 0;
+	static char *function                = "verification_handle_crc_errors_fprint";
+	uint64_t start_sector                = 0;
+	uint64_t last_sector                 = 0;
 #if defined( HAVE_V2_API )
-	uint64_t amount_of_sectors        = 0;
+	uint64_t amount_of_sectors           = 0;
 #else
-	uint32_t amount_of_sectors        = 0;
+	uint32_t amount_of_sectors           = 0;
 #endif
-	uint32_t amount_of_errors         = 0;
-	uint32_t error_iterator           = 0;
-	int result                        = 1;
+	uint32_t amount_of_errors            = 0;
+	uint32_t error_iterator              = 0;
+	int result                           = 1;
 
 #if defined( HAVE_V2_API )
-	system_character_t *filename      = NULL;
-	system_character_t *last_filename = NULL;
-	size_t filename_size              = 0;
-	size_t last_filename_size         = 0;
+	libsystem_character_t *filename      = NULL;
+	libsystem_character_t *last_filename = NULL;
+	size_t filename_size                 = 0;
+	size_t last_filename_size            = 0;
 #endif
 
 	if( verification_handle == NULL )
@@ -1996,7 +1984,7 @@ int verification_handle_crc_errors_fprint(
 					}
 					return( -1 );
 				}
-#if defined( HAVE_WIDE_SYSTEM_CHARACTER_T )
+#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
 				if( libewf_handle_get_filename_size_wide(
 				     verification_handle->input_handle,
 				     &filename_size,
@@ -2022,8 +2010,8 @@ int verification_handle_crc_errors_fprint(
 					}
 					return( -1 );
 				}
-				filename = (system_character_t *) memory_allocate(
-				                                   sizeof( system_character_t ) * filename_size ); 
+				filename = (libsystem_character_t *) memory_allocate(
+				                                      sizeof( libsystem_character_t ) * filename_size ); 
 
 
 				if( filename == NULL )
@@ -2042,7 +2030,7 @@ int verification_handle_crc_errors_fprint(
 					}
 					return( -1 );
 				}
-#if defined( HAVE_WIDE_SYSTEM_CHARACTER_T )
+#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
 				if( libewf_handle_get_filename_wide(
 				     verification_handle->input_handle,
 				     filename,

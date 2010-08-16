@@ -1,8 +1,0 @@
-usr/include/afflib/afflib.h
-usr/include/afflib/afflib_i.h
-usr/include/afflib/afflib_sha256.h
-usr/include/afflib/aftimer.h
-usr/include/afflib/utils.h
-usr/lib/lib*.a
-usr/lib/lib*.so
-usr/lib/*.la

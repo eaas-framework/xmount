@@ -202,7 +202,7 @@ static int s3_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned ch
 static int s3_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
 			unsigned char *data,size_t *datalen)
 {
-    memset(segname,segname_len,0);
+    memset(segname,0,segname_len);
 
     struct s3_private *sp =S3_PRIVATE(af);
 

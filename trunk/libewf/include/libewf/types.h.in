@@ -2,7 +2,7 @@
  * Type definitions for libewf
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -32,20 +32,22 @@
 #error Missing system type definitions (sys/types.h)
 #endif
 
-#if defined( WINAPI ) && !defined( HAVE_INTTYPES_H ) && !defined( HAVE_STDINT_H )
+/* Type definitions for the Microsoft Visual Studio C++ compiler
+ */
+#if defined( _MSC_VER )
 
-/* Define LIBEWF_DEFINITION_INTEGER_TYPES to avoid conflict if types are already defined
+/* Define LIBEWF_DEFINITION_INTEGER_TYPES to avoid conflict
  */
 #if !defined( LIBEWF_DEFINITION_INTEGER_TYPES )
-
 #define LIBEWF_DEFINITION_INTEGER_TYPES
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Windows does not have <inttypes.h> or <stdint.h> and therefore does not support the
- * (u)int#_t type definitions it has __int# defintions instead
+/* The Microsoft Visual Studio C++ compiler does not have <inttypes.h> or <stdint.h>
+ * therefore it does not support the (u)int#_t type definitions
+ * it has __int# defintions instead
  */
 typedef __int8			int8_t;
 typedef unsigned __int8		uint8_t;
@@ -55,7 +57,12 @@ typedef __int32			int32_t;
 typedef unsigned __int32	uint32_t;
 typedef __int64			int64_t;
 typedef unsigned __int64	uint64_t;
-typedef int			ssize_t;
+
+#if defined( _WIN64 )
+typedef __int64			ssize_t;
+#else
+typedef __int32			ssize_t;
+#endif
 
 #ifdef __cplusplus
 }
@@ -63,6 +70,42 @@ typedef int			ssize_t;
 
 #endif
 
+#elif defined( __BORLANDC__ )
+
+#if __BORLANDC__ >= 0x0560
+#include <stdint.h>
+
+#else
+
+/* Define LIBEWF_DEFINITION_INTEGER_TYPES to avoid conflict
+ */
+#if !defined( LIBEWF_DEFINITION_INTEGER_TYPES )
+#define LIBEWF_DEFINITION_INTEGER_TYPES
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Earlier versions of the Borland/CodeGear C++ Builder compiler
+ * do not have the intptr_t
+ */
+#if defined( _WIN64 )
+typedef unsigned __int64	intptr_t;
+#else
+typedef unsigned __int32	intptr_t;
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* LIBEWF_DEFINITION_INTEGER_TYPES */
+
+#endif /* __BORLANDC__ >= 0x0560 */
+
+/* Type definitions for compilers that have access to
+ * <inttypes.h> or <stdint.h>
+ */
 #elif @HAVE_INTTYPES_H@ || defined( HAVE_INTTYPES_H )
 #include <inttypes.h>
 
@@ -73,7 +116,7 @@ typedef int			ssize_t;
 #error Missing integer type definitions (inttypes.h, stdint.h)
 #endif
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 
 #if @HAVE_WCHAR_H@ || defined( HAVE_WCHAR_H )
 

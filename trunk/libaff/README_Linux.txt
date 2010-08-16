@@ -1,28 +1,36 @@
-INSTALLING ON Ubuntu/Kbuntu/Debian LINUX
+#!/bin/sh
+# INSTALLING ON Ubuntu/Kbuntu/Debian LINUX
+#
 
-(I'm sorry that this is so complicated.)
+if [ -r /usr/bin/apt-get ] ; 
+then
 
-1. Edit /etc/apt/sources and uncomment the lines with "universe"
-2. apt-get update
+  echo you are running on a system with apt-get.
 
-General build tools:
-3. apt-get -y install make gcc g++ 
+  # Edit /etc/apt/sources.list and uncomment the lines with "universe"
+  apt-get update
 
-Libraries required for AFFLIB:
-4. apt-get -y install zlib1g-dev libssl-dev libncurses5-dev 
-5. apt-get -y install libcurl3-dev libexpat1-dev libreadline5-dev
+  # General build tools:
+  apt-get -y install make gcc g++ 
 
-Libraries if you want to make a release:
-6. apt-get -y install automake1.9  autoconf libtool
+  # Libraries required for AFFLIB:
+  apt-get -y install zlib1g-dev libssl-dev libncurses5-dev 
+  apt-get -y install libcurl4-openssl-dev libexpat1-dev libreadline5-dev
 
-If you want a generally usable system (e.g., for EC2)
-7. apt-get -y install dbootstrap openssh-client openssh-server subversion emacs
+  # Libraries if you want to make a release:
+  apt-get -y install automake1.9  autoconf libtool
+  exit 0
+fi
 
+if [ -r /usr/bin/yum ] ; 
+then
+  #================================================================
+  #INSTALLOING ON FEDORA CORE 6:
+  #
+  # When you build Linux, tell it that you want developer tools.
+  #
+  yum upgrade all
+  yum install libssl-dev libncurses5-dev 
+  exit 0
+fi
 
-================================================================
-INSTALLOING ON FEDORA CORE 6:
-
-1. When you build Linux, tell it that you want developer tools.
-
-   yum upgrade all
-   yum install libssl-dev libncurses5-dev 

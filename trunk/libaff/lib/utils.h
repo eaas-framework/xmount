@@ -52,6 +52,7 @@ namespace aff {
 	std::string name;
 	size_t len;
 	u_long arg;
+	/** pagenumber returns <0 for invalid pages, >= for a page */
 	int64_t pagenumber() const {return af_segname_page_number(name.c_str());}
 	bool inline operator==(const class seginfo &b) const {
 	    return name == b.name;

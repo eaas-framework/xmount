@@ -2,7 +2,7 @@
  * Platform functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -28,14 +28,14 @@
 
 #include <liberror.h>
 
-#include "system_string.h"
+#include <libsystem.h>
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
 int platform_get_operating_system(
-     system_character_t *operating_system_string,
+     libsystem_character_t *operating_system_string,
      size_t operating_system_string_size,
      liberror_error_t **error );
 

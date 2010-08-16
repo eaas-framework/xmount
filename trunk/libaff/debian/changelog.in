@@ -1,7 +1,0 @@
-afflib (@VERSION@-1) unstable; urgency=low
-
-  * Initial release build for afflib-3.1.3
-  * First version of afflib debian package based on libewf debian package
-
- -- Joachim Metz <forensics@hoffmannbv.nl>  Sat, 29 Mar 2008 09:56:00 +0100
-

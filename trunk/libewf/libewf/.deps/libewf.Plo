@@ -1,5 +1,0 @@
-libewf.lo: libewf.c ../common/common.h ../common/config.h
-
-../common/common.h:
-
-../common/config.h:

@@ -2,7 +2,7 @@
  * The internal definitions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,25 +24,24 @@
 #define _LIBEWF_INTERNAL_DEFINITIONS_H
 
 #include <common.h>
-#include <endian.h>
+#include <byte_stream.h>
 
-#define LIBEWF_ENDIAN_BIG	_ENDIAN_BIG
-#define LIBEWF_ENDIAN_LITTLE	_ENDIAN_LITTLE
+#define LIBEWF_ENDIAN_BIG			_BYTE_STREAM_ENDIAN_BIG
+#define LIBEWF_ENDIAN_LITTLE			_BYTE_STREAM_ENDIAN_LITTLE
 
-#define LIBEWF_2_TIB		2199023255552LL
+#define LIBEWF_2_TIB				0x20000000000ULL
 
 /* Define HAVE_LOCAL_LIBEWF for local use of libewf
  */
 #if !defined( HAVE_LOCAL_LIBEWF )
-#include <libewf/codepage.h>
 #include <libewf/definitions.h>
 
 #else
-#define LIBEWF_VERSION				20090606
+#define LIBEWF_VERSION				20100226
 
 /* The libewf version string
  */
-#define LIBEWF_VERSION_STRING			"20090606"
+#define LIBEWF_VERSION_STRING			"20100226"
 
 /* The libewf file access
  * bit 1	set to 1 for read access
@@ -126,7 +125,7 @@ enum LIBEWF_MEDIA_FLAGS
 	LIBEWF_MEDIA_FLAG_TABLEAU		= 0x08
 };
 
-#if 1
+#if defined( HAVE_V1_API )
 /* The volume type definitions
  */
 enum LIBEWF_VOLUME_TYPES
@@ -159,22 +158,6 @@ enum LIBEWF_SEGMENT_FILE_TYPES
 	LIBEWF_SEGMENT_FILE_TYPE_DWF		= (int) 'd',
 	LIBEWF_SEGMENT_FILE_TYPE_EWF		= (int) 'E',
 	LIBEWF_SEGMENT_FILE_TYPE_LWF		= (int) 'L'
-};
-
-/* The codepages
- */
-enum LIBEWF_CODEPAGES
-{
-	LIBEWF_CODEPAGE_ASCII			= 0x41,
-	LIBEWF_CODEPAGE_WINDOWS_1250		= 1250,
-	LIBEWF_CODEPAGE_WINDOWS_1251		= 1251,
-	LIBEWF_CODEPAGE_WINDOWS_1252		= 1252,
-	LIBEWF_CODEPAGE_WINDOWS_1253		= 1253,
-	LIBEWF_CODEPAGE_WINDOWS_1254		= 1254,
-	LIBEWF_CODEPAGE_WINDOWS_1255		= 1255,
-	LIBEWF_CODEPAGE_WINDOWS_1256		= 1256,
-	LIBEWF_CODEPAGE_WINDOWS_1257		= 1257,
-	LIBEWF_CODEPAGE_WINDOWS_1258		= 1258
 };
 
 #endif

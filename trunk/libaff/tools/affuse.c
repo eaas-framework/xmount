@@ -237,6 +237,7 @@ int main(int argc,char **argv)
 #else
     fprintf(stderr,"affuse was compiled on a Linux system that did not\n");
     fprintf(stderr,"have the FUSE developer libraries installed\n");
+    fprintf(stderr,"You need to install the fuse-devl package.\n");
 #endif
     exit(1);
 }

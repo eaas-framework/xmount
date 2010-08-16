@@ -19,9 +19,11 @@
 
 
 
-static int      aff_write_ignore(AFFILE *af,unsigned long bytes);
-static int	aff_write_seg(AFFILE *af,const char *name,unsigned long arg, const u_char *value,unsigned int vallen); 
-static int	aff_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned char *data,size_t *datalen);
+static int      aff_write_ignore(AFFILE *af,size_t bytes);
+static int	aff_write_seg(AFFILE *af,const char *name,unsigned long arg,
+			      const u_char *value,size_t vallen); 
+static int	aff_get_seg(AFFILE *af,const char *name,unsigned long *arg,
+			    unsigned char *data,size_t *datalen);
 static int	aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,
 				 unsigned long *arg, unsigned char *data, size_t *datalen);
 
@@ -35,22 +37,21 @@ int aff_segment_overhead(const char *segname)
     return sizeof(struct af_segment_head)+sizeof(struct af_segment_tail)+(segname?strlen(segname):0);
 }
 
-static int aff_write_ignore2(AFFILE *af,unsigned long bytes)
+static int aff_write_ignore2(AFFILE *af,size_t bytes)
 {
-    if(af_trace) fprintf(af_trace,"aff_write_ignore2(%p,%d)\n",af,bytes);
-
+    if(af_trace) fprintf(af_trace,"aff_write_ignore2(%p,%zd)\n",af,bytes);
     unsigned char *invalidate_data = (unsigned char *)calloc(bytes,1);
     aff_write_seg(af,AF_IGNORE,0,invalidate_data,bytes); // overwrite with NULLs
     free(invalidate_data);
     return 0;
 }
 
-static int aff_write_ignore(AFFILE *af,unsigned long bytes)
+static int aff_write_ignore(AFFILE *af,size_t bytes)
 {
     int64_t startpos = ftello(af->aseg);	// remember start position
     int r = 0;
 
-    if(af_trace) fprintf(af_trace,"aff_write_ignore(%p,%d)\n",af,bytes);
+    if(af_trace) fprintf(af_trace,"aff_write_ignore(%p,%zd)\n",af,bytes);
 
     /* First write the ignore */
     r = aff_write_ignore2(af,bytes);
@@ -100,9 +101,9 @@ static int aff_write_ignore(AFFILE *af,unsigned long bytes)
  * This is the only place where a segment actually gets written
  */
 
-int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char *data,unsigned int datalen)
+int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char *data,size_t datalen)
 {
-    if(af_trace) fprintf(af_trace,"aff_write_seg(%p,%s,%d,%x,len=%d)\n",af,segname,arg,data,datalen);
+    if(af_trace) fprintf(af_trace,"aff_write_seg(%p,%s,%lu,%p,len=%zu)\n",af,segname,arg,data,datalen);
 
     struct af_segment_head segh;
     struct af_segment_tail segt;
@@ -131,7 +132,7 @@ int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char
     aff_toc_update(af,segname,ftello(af->aseg),datalen);
 
     
-    if(af_trace) fprintf(af_trace,"aff_write_seg: putting segment %s (datalen=%d) offset=%qd\n",
+    if(af_trace) fprintf(af_trace,"aff_write_seg: putting segment %s (datalen=%zd) offset=%"PRId64"\n",
 			 segname,datalen,ftello(af->aseg));
 
     if(fwrite(&segh,sizeof(segh),1,af->aseg)!=1) return -10;
@@ -157,8 +158,6 @@ static int aff_get_seg(AFFILE *af,const char *name,
     if(af_trace) fprintf(af_trace,"aff_get_seg(%p,%s,arg=%p,data=%p,datalen=%p)\n",af,name,arg,data,datalen);
 
     char next[AF_MAX_NAME_LEN];
-    int first = 1;
-    size_t segsize = 0;
 
     /* If the segment is in the directory, then seek the file to that location.
      * Otherwise, we'll probe the next segment, and if it is not there,
@@ -169,7 +168,7 @@ static int aff_get_seg(AFFILE *af,const char *name,
 
     fseeko(af->aseg,adm->offset,SEEK_SET);
     int ret = aff_get_next_seg(af,next,sizeof(next),arg,data,datalen);
-    assert(strcmp(next,name)==0);	// hopefully this is what they asked for
+    assert(ret!=0 || strcmp(next,name)==0);	// hopefully this is what they asked for
     return ret;
 }
 
@@ -199,7 +198,7 @@ static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned
 	return AF_ERROR_INVALID_ARG;
     }
 
-    off_t start = ftello(af->aseg);
+    uint64_t start = ftello(af->aseg);
     size_t data_len;
 
     int r = af_probe_next_seg(af,segname,segname_len,arg,&data_len,0,0);
@@ -244,8 +243,6 @@ static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned
 	+ strlen(segname)
 	+ data_len + sizeof(struct af_segment_tail);
 
-    off_t newpos = ftello(af->aseg);
-
     if(strcmp(segt.magic,AF_SEGTAIL)!=0){
 	snprintf(af->error_str,sizeof(af->error_str),"af_get_next_segv: AF file is truncated (AF_ERROR_TAIL).");
 	fseeko(af->aseg,start,SEEK_SET); // go back to last good position
@@ -269,7 +266,8 @@ static int aff_rewind_seg(AFFILE *af)
 }
 
 
-/* Removes the last segment of an AFF file if it is blank */
+/* Removes the last segment of an AFF file if it is blank.
+ * @return 0 for success, -1 for error */
 int af_truncate_blank(AFFILE *af)
 {
     uint64_t last_loc = ftello(af->aseg);	// remember where we are
@@ -280,7 +278,7 @@ int af_truncate_blank(AFFILE *af)
 	    if(next_segment_name[0]==0){
 		/* Remove it */
 		fflush(af->aseg);
-		ftruncate(fileno(af->aseg),backspace_loc);
+		if(ftruncate(fileno(af->aseg),backspace_loc)<0) return -1;
 		return 0;
 	    }
 	}
@@ -388,7 +386,7 @@ static int aff_update_seg(AFFILE *af, const char *name,
 	fseeko(af->aseg,loc_closest,SEEK_SET); // move to the location
 	aff_write_seg(af,name,arg,value,vallen); // write the new segment
 	
-	int newsize = size_closest - vallen - aff_segment_overhead(0) - strlen(name);
+	size_t newsize = size_closest - vallen - aff_segment_overhead(0) - strlen(name);
 	aff_write_ignore(af,newsize); // write the smaller ignore
 	return 0;
     }
@@ -427,7 +425,7 @@ static int aff_del_seg(AFFILE *af,const char *segname)
     af_last_seg(af,last_segname,sizeof(last_segname),&last_pos);
     if(strcmp(segname,last_segname)==0){
 	fflush(af->aseg);		// flush any ouput
-	ftruncate(fileno(af->aseg),last_pos); // make the file shorter
+	if(ftruncate(fileno(af->aseg),last_pos)) return -1; // make the file shorter
 	return 0;
     }
 
@@ -532,13 +530,14 @@ static int aff_open(AFFILE *af)
 	return -1;			
     }
 
-    /* Lock the file */
+    /* Lock the file if writing */
 #ifdef HAVE_FLOCK
-    int lockmode = LOCK_SH;		// default
-    if((af->openflags & O_ACCMODE)==O_RDWR) lockmode = LOCK_EX; // there can be only one
-    if(flock(fd,lockmode)){
-	close(fd);
-	return -1;			// couldn't get lock
+    if(af->openflags & O_RDWR){
+	int lockmode = LOCK_SH;		// default
+	if((af->openflags & O_ACCMODE)==O_RDWR) lockmode = LOCK_EX; // there can be only one
+	if(flock(fd,lockmode)){
+	    warn("Cannot exclusively lock %s:",af->fname);
+	}
     }
 #endif
 
@@ -600,6 +599,7 @@ static int aff_open(AFFILE *af)
  */
 static int aff_close(AFFILE *af)
 {
+    aff_toc_free(af);
     fclose(af->aseg);
     return 0;
 }
@@ -613,17 +613,21 @@ static int aff_vstat(AFFILE *af,struct af_vnode_info *vni)
     vni->supports_compression = 1;
     vni->has_pages            = 1;
     vni->supports_metadata    = 1;
+    vni->cannot_decrypt       = af_cannot_decrypt(af) ? 1 : 0;
 
     /* Check for an encrypted page */
     if(af->toc){
 	for(int i=0;i<af->toc_count;i++){
 	    if(af->toc[i].name){
+		bool is_page = false;
 		vni->segment_count_total++;
 		if(af_segname_page_number(af->toc[i].name)>=0){
 		    vni->page_count_total++;
+		    is_page = true;
 		}
 		if(af_is_encrypted_segment(af->toc[i].name)){
 		    vni->segment_count_encrypted++;
+		    if(is_page) vni->page_count_encrypted++;
 		}
 		if(af_is_signature_segment(af->toc[i].name)){
 		    vni->segment_count_signed++;

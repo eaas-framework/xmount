@@ -2,7 +2,7 @@
  * Support functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -74,9 +74,9 @@ LIBEWF_EXTERN int libewf_check_file_signature_wide(
 #endif
 #endif
 
-int libewf_check_file_signature_file_io_handle(
-     libbfio_handle_t *bfio_handle,
-     liberror_error_t **error );
+LIBEWF_EXTERN int libewf_check_file_signature_file_io_handle(
+                   libbfio_handle_t *file_io_handle,
+                   liberror_error_t **error );
 
 #if defined( HAVE_V2_API )
 LIBEWF_EXTERN int libewf_glob(
@@ -94,11 +94,20 @@ LIBEWF_EXTERN int libewf_glob(
                    char **filenames[] );
 #endif
 
+#if defined( HAVE_V2_API )
+LIBEWF_EXTERN int libewf_glob_free(
+                   char *filenames[],
+                   int amount_of_filenames,
+                   liberror_error_t **error );
+#endif
+
+/* TODO
 LIBEWF_EXTERN int libewf_glob_file_io_handle(
                    libbfio_handle_t *file_io_handle,
                    uint8_t format,
                    libbfio_pool_t *file_io_pool,
                    liberror_error_t **error );
+*/
 
 #if defined( HAVE_WIDE_CHARACTER_TYPE )
 #if defined( HAVE_V2_API )
@@ -115,6 +124,13 @@ LIBEWF_EXTERN int libewf_glob_wide(
                    size_t length,
                    uint8_t format,
                    wchar_t **filenames[] );
+#endif
+
+#if defined( HAVE_V2_API )
+LIBEWF_EXTERN int libewf_glob_free_wide(
+                   wchar_t *filenames[],
+                   int amount_of_filenames,
+                   liberror_error_t **error );
 #endif
 #endif
 

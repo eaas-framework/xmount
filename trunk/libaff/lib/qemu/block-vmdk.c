@@ -234,7 +234,7 @@ static int vmdk_snapshot_create(const char *filename, const char *backing_file)
     memset(&header, 0, sizeof(header));
     memcpy(&header,&hdr[4], sizeof(header)); // skip the VMDK4_MAGIC
 
-    ftruncate(snp_fd, header.grain_offset << 9);
+    if(ftruncate(snp_fd, header.grain_offset << 9)<0) return -1;
     /* the descriptor offset = 0x200 */
     if (lseek(p_fd, 0x200, SEEK_SET) == -1)
         goto fail;
@@ -768,22 +768,22 @@ static int vmdk_create(const char *filename, int64_t total_size,
     header.check_bytes[3] = 0xa;
 
     /* write all the data */
-    write(fd, &magic, sizeof(magic));
-    write(fd, &header, sizeof(header));
+    if(write(fd, &magic, sizeof(magic))!=sizeof(magic)) return -1;
+    if(write(fd, &header, sizeof(header))!=sizeof(header)) return -1;
 
-    ftruncate(fd, header.grain_offset << 9);
+    if(ftruncate(fd, header.grain_offset << 9)<0) return -1;
 
     /* write grain directory */
     lseek(fd, le64_to_cpu(header.rgd_offset) << 9, SEEK_SET);
     for (i = 0, tmp = header.rgd_offset + gd_size;
          i < gt_count; i++, tmp += gt_size)
-        write(fd, &tmp, sizeof(tmp));
+        if(write(fd, &tmp, sizeof(tmp))!=sizeof(tmp)) return -1;
 
     /* write backup grain directory */
     lseek(fd, le64_to_cpu(header.gd_offset) << 9, SEEK_SET);
     for (i = 0, tmp = header.gd_offset + gd_size;
          i < gt_count; i++, tmp += gt_size)
-        write(fd, &tmp, sizeof(tmp));
+        if(write(fd, &tmp, sizeof(tmp))!=sizeof(tmp)) return -1;
 
     /* compose the descriptor */
     real_filename = filename;
@@ -798,7 +798,7 @@ static int vmdk_create(const char *filename, int64_t total_size,
 
     /* write the descriptor */
     lseek(fd, le64_to_cpu(header.desc_offset) << 9, SEEK_SET);
-    write(fd, desc, strlen(desc));
+    if(write(fd, desc, strlen(desc))!=strlen(desc)) return -1;
 
     close(fd);
     return 0;

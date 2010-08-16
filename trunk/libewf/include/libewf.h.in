@@ -2,7 +2,7 @@
  * Library for the Expert Witness Compression Format Support (EWF)
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,11 +30,15 @@
 #include "libewf/features.h"
 #include "libewf/types.h"
 
-#if @HAVE_V1_API@
+#if @HAVE_V1_API@ || defined( HAVE_V1_API )
 #include "libewf/handle.h"
 #endif
 
 #include <stdio.h>
+
+#if defined( LIBEWF_HAVE_BFIO )
+#include <libbfio.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,7 +76,7 @@ LIBEWF_EXTERN uint8_t libewf_get_flags_write_resume(
 /* Determines if a file is an EWF file (check for the EWF file signature)
  * Returns 1 if true, 0 if not or -1 on error
  */
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 LIBEWF_EXTERN int libewf_check_file_signature(
                    const char *filename,
                    libewf_error_t **error );
@@ -81,11 +85,11 @@ LIBEWF_EXTERN int libewf_check_file_signature(
                    const char *filename );
 #endif
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Determines if a file is an EWF file (check for the EWF file signature)
  * Returns 1 if true, 0 if not or -1 on error
  */
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 LIBEWF_EXTERN int libewf_check_file_signature_wide(
                    const wchar_t *filename,
                    libewf_error_t **error );
@@ -95,12 +99,23 @@ LIBEWF_EXTERN int libewf_check_file_signature_wide(
 #endif
 #endif
 
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
+#if defined( LIBEWF_HAVE_BFIO )
+/* Determines if a file is an EWF file (check for the EWF file signature) using a Basic File IO (bfio) handle
+ * Returns 1 if true, 0 if not or -1 on error
+ */
+LIBEWF_EXTERN int libewf_check_file_signature_file_io_handle(
+                   libbfio_handle_t *file_io_handle,
+                   libewf_error_t **error );
+#endif
+#endif
+
 /* Globs the segment files according to the EWF naming schema
  * if the format is known the filename should contain the base of the filename
  * otherwise the function will try to determine the format based on the extension
  * Returns 1 if successful or -1 on error
  */
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 LIBEWF_EXTERN int libewf_glob(
                    const char *filename,
                    size_t filename_length,
@@ -121,13 +136,23 @@ LIBEWF_EXTERN int libewf_glob(
                    char **filenames[] );
 #endif
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
+/* Frees the globbed filenames
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_glob_free(
+                   char *filenames[],
+                   int amount_of_filenames,
+                   libewf_error_t **error );
+#endif
+
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Globs the segment files according to the EWF naming schema
  * if the format is known the filename should contain the base of the filename
  * otherwise the function will try to determine the format based on the extension
  * Returns 1 if successful or -1 on error
  */
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 LIBEWF_EXTERN int libewf_glob_wide(
                    const wchar_t *filename,
                    size_t filename_length,
@@ -147,11 +172,23 @@ LIBEWF_EXTERN int libewf_glob_wide(
                    uint8_t format,
                    wchar_t **filenames[] );
 #endif
+
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
+/* Frees the globbed filenames
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_glob_free(
+                   char *filenames[],
+                   int amount_of_filenames,
+                   libewf_error_t **error );
+#endif
 #endif
 
 /* -------------------------------------------------------------------------
- * Notify functions
+ * Notify functions (APIv1)
  * ------------------------------------------------------------------------- */
+
+#if @HAVE_V1_API@ || defined( HAVE_V1_API )
 
 /* Set the notify values
  */
@@ -159,11 +196,47 @@ LIBEWF_EXTERN void libewf_set_notify_values(
                     FILE *stream,
                     uint8_t verbose );
 
+#endif
+
+/* -------------------------------------------------------------------------
+ * Notify functions (APIv2)
+ * ------------------------------------------------------------------------- */
+
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
+
+/* Set the verbose notification
+ */
+LIBEWF_EXTERN void libewf_notify_set_verbose(
+                    int verbose );
+
+/* Set the notification stream
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_notify_set_stream(
+                   FILE *stream,
+                   libewf_error_t **error );
+
+/* Opens the notification stream using a filename
+ * The stream is opened in append mode
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_notify_stream_open(
+                   const char *filename,
+                   libewf_error_t **error );
+
+/* Closes the notification stream if opened using a filename
+ * Returns 0 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_notify_stream_close(
+                   libewf_error_t **error );
+
+#endif
+
 /* -------------------------------------------------------------------------
  * Error functions (APIv2)
  * ------------------------------------------------------------------------- */
 
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 
 /* Frees the error including elements
  */
@@ -171,16 +244,34 @@ LIBEWF_EXTERN void libewf_error_free(
                     libewf_error_t **error );
 
 /* Prints a descriptive string of the error to the stream
+ * Returns the amount of printed characters if successful or -1 on error
  */
-LIBEWF_EXTERN void libewf_error_fprint(
-                    libewf_error_t *error,
-                    FILE *stream );
+LIBEWF_EXTERN int libewf_error_fprint(
+                   libewf_error_t *error,
+                   FILE *stream );
+
+/* Prints a descriptive string of the error to the string
+ * Returns the amount of printed characters if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_error_sprint(
+                   libewf_error_t *error,
+                   char *string,
+                   size_t size );
 
 /* Prints a backtrace of the error to the stream
+ * Returns the amount of printed characters if successful or -1 on error
  */
-LIBEWF_EXTERN void libewf_error_backtrace_fprint(
-                    libewf_error_t *error,
-                    FILE *stream );
+LIBEWF_EXTERN int libewf_error_backtrace_fprint(
+                   libewf_error_t *error,
+                   FILE *stream );
+
+/* Prints a backtrace of the error to the string
+ * Returns the amount of printed characters if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_error_backtrace_sprint(
+                   libewf_error_t *error,
+                   char *string,
+                   size_t size );
 
 #endif
 
@@ -188,7 +279,7 @@ LIBEWF_EXTERN void libewf_error_backtrace_fprint(
  * File/Handle functions (APIv1)
  * ------------------------------------------------------------------------- */
 
-#if @HAVE_V1_API@
+#if @HAVE_V1_API@ || defined( HAVE_V1_API )
 
 /* Signals the libewf handle to abort its current activity
  * Returns 1 if successful or -1 on error
@@ -206,7 +297,7 @@ LIBEWF_EXTERN libewf_handle_t *libewf_open(
                                 int amount_of_filenames,
                                 uint8_t flags );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Opens a set of EWF file(s)
  * For reading files should contain all filenames that make up an EWF image
  * For writing files should contain the base of the filename, extentions like .e01 will be automatically added
@@ -360,7 +451,7 @@ LIBEWF_EXTERN int libewf_set_segment_filename(
                    const char *filename,
                    size_t filename_length );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Retrieves the segment filename
  * The filename size should include the end of string character
  * Returns 1 if successful, 0 if value not present or -1 on error
@@ -410,7 +501,7 @@ LIBEWF_EXTERN int libewf_set_delta_segment_filename(
                    const char *filename,
                    size_t filename_length );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Retrieves the delta segment filename
  * The filename size should include the end of string character
  * Returns 1 if successful, 0 if value not present or -1 on error
@@ -449,7 +540,7 @@ LIBEWF_EXTERN int libewf_set_delta_segment_file_size(
  * File/Handle functions (APIv2)
  * ------------------------------------------------------------------------- */
 
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 
 /* Initialize the handle
  * Returns 1 if successful or -1 on error
@@ -484,7 +575,7 @@ LIBEWF_EXTERN int libewf_handle_open(
                    uint8_t flags,
                    libewf_error_t **error );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Opens a set of EWF file(s)
  * For reading files should contain all filenames that make up an EWF image
  * For writing files should contain the base of the filename, extentions like .e01 will be automatically added
@@ -494,6 +585,17 @@ LIBEWF_EXTERN int libewf_handle_open_wide(
                    libewf_handle_t *handle,
                    wchar_t * const filenames[],
                    int amount_of_filenames,
+                   uint8_t flags,
+                   libewf_error_t **error );
+#endif
+
+#if defined( LIBEWF_HAVE_BFIO )
+/* Opens a set of EWF file(s) using a Basic File IO (bfio) pool
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_handle_open_file_io_pool(
+                   libewf_handle_t *handle,
+                   libbfio_pool_t *file_io_pool,
                    uint8_t flags,
                    libewf_error_t **error );
 #endif
@@ -667,7 +769,7 @@ LIBEWF_EXTERN int libewf_handle_set_segment_filename(
                    size_t filename_length,
                    libewf_error_t **error );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Retrieves the segment filename size
  * The filename size includes the end of string character
  * Returns 1 if successful, 0 if value not present or -1 on error
@@ -741,7 +843,7 @@ LIBEWF_EXTERN int libewf_handle_set_delta_segment_filename(
                    size_t filename_length,
                    libewf_error_t **error );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Retrieves the delta segment filename size
  * The filename size includes the end of string character
  * Returns 1 if successful, 0 if value not present or -1 on error
@@ -806,7 +908,7 @@ LIBEWF_EXTERN int libewf_handle_get_filename(
                    size_t filename_size,
                    libewf_error_t **error );
 
-#if defined( LIBEWF_WIDE_CHARACTER_TYPE )
+#if defined( LIBEWF_HAVE_WIDE_CHARACTER_TYPE )
 /* Retrieves the filename size of the (delta) segment file of the current chunk
  * The filename size includes the end of string character
  * Returns 1 if successful or -1 on error
@@ -827,13 +929,23 @@ LIBEWF_EXTERN int libewf_handle_get_filename_wide(
                    libewf_error_t **error );
 #endif
 
+#if defined( LIBEWF_HAVE_BFIO )
+/* Retrieves the file io handle of the (delta) segment file of the current chunk
+ * Returns 1 if successful or -1 on error
+ */
+LIBEWF_EXTERN int libewf_handle_get_file_io_handle(
+                   libewf_handle_t *handle,
+                   libbfio_handle_t **file_io_handle,
+                   libewf_error_t **error );
+#endif
+
 #endif
 
 /* -------------------------------------------------------------------------
  * Meta data functions (APIv1)
  * ------------------------------------------------------------------------- */
 
-#if @HAVE_V1_API@
+#if @HAVE_V1_API@ || defined( HAVE_V1_API )
 
 /* Retrieves the amount of sectors per chunk from the media information
  * Returns 1 if successful or -1 on error
@@ -1456,7 +1568,7 @@ LIBEWF_EXTERN int libewf_parse_hash_values(
  * Meta data functions (APIv2)
  * ------------------------------------------------------------------------- */
 
-#if @HAVE_V2_API@
+#if @HAVE_V2_API@ || defined( HAVE_V2_API )
 
 /* Retrieves the amount of sectors per chunk from the media information
  * Returns 1 if successful or -1 on error
@@ -2020,14 +2132,6 @@ LIBEWF_EXTERN int libewf_handle_set_header_value(
 #define libewf_handle_set_header_value_serial_number( handle, value, value_length, error ) \
         libewf_handle_set_header_value( handle, (uint8_t *) "serial_number", 13, value, value_length, error )
 
-/* Parses the header values from the xheader, header2 or header section
- * Will parse the first available header in order mentioned above
- * Returns 1 if successful, 0 if already parsed or -1 on error
- */
-LIBEWF_EXTERN int libewf_handle_parse_header_values(
-                   libewf_handle_t *handle,
-                   libewf_error_t **error );
-
 /* Copies the header values from the source to the destination handle
  * Returns 1 if successful or -1 on error
  */
@@ -2125,13 +2229,6 @@ LIBEWF_EXTERN int libewf_handle_set_hash_value(
  */
 #define libewf_handle_set_hash_value_sha1( handle, value, value_length, error ) \
         libewf_handle_set_hash_value( handle, "SHA1", 4, value, value_length, error )
-
-/* Parses the hash values from the xhash section
- * Returns 1 if successful, 0 if already parsed or -1 on error
- */
-LIBEWF_EXTERN int libewf_handle_parse_hash_values(
-                   libewf_handle_t *handle,
-                   libewf_error_t **error );
 
 #endif
 

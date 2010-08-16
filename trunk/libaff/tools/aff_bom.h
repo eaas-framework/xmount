@@ -3,7 +3,7 @@
  *
  * PUBLIC DOMAIN SOFTWARE.
  *
- * The software provided here is released by the Naval Postgradaute
+ * The software provided here is released by the Naval Postgraduate
  * School (NPS), an agency of the US Department of the Navy, USA.  The
  * software bears no warranty, either expressed or implied. NPS does
  * not assume legal liability nor responsibility for a User's use of
@@ -13,12 +13,7 @@
  * United States Government and/or for any works created by United
  * States Government employees. User acknowledges that this software
  * contains work which was created by NPS employee(s) and is therefore
- * in the public domain and not subject to copyright.  The User may
- * use, distribute, or incorporate this software provided the User
- * acknowledges this via an explicit acknowledgment of NPS-related
- * contributions to the User's work. User also agrees to acknowledge,
- * via an explicit acknowledgment, that any modifications or
- * alterations have been made to this software before redistribution.
+ * in the public domain and not subject to copyright.  
  * --------------------------------------------------------------------
  *
  * Change History:
@@ -36,6 +31,7 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <assert.h>
 #ifdef HAVE_OPENSSL_PEM_H
 #include <openssl/x509.h>
 #include <openssl/pem.h>
@@ -64,13 +60,15 @@ class aff_bom {
     X509 *cert;
     EVP_PKEY *privkey;
     char *notes;
+    bool bom_open;
 public:
     static void make_hash(u_char seghash[32], unsigned long arg,const char *segname,
 		     const u_char *pagebuf, unsigned long pagesize);
     bool opt_note;
     BIO *xml;
-    aff_bom(bool flag):xml(0),cert(0),privkey(0),notes(0),opt_note(flag) { }
+    aff_bom(bool flag):cert(0),privkey(0),notes(0),bom_open(false),opt_note(flag),xml(0) { }
     ~aff_bom(){
+	assert(!bom_open);
 	if(notes) free(notes);
 	if(xml) BIO_free(xml);
     }

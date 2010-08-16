@@ -1,4 +1,7 @@
-AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/common @MEMWATCH_CPPFLAGS@
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/common \
+	@MEMWATCH_CPPFLAGS@
 
 noinst_LTLIBRARIES = liberror.la
 

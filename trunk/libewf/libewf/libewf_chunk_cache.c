@@ -2,7 +2,7 @@
  * Chunk cache functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,7 +27,6 @@
 #include <liberror.h>
 
 #include "libewf_chunk_cache.h"
-#include "libewf_notify.h"
 
 /* Initialize the chunk cache
  * Returns 1 if successful or -1 on error
@@ -172,6 +171,11 @@ int libewf_chunk_cache_free(
 		{
 			memory_free(
 			 ( *chunk_cache )->data );
+		}
+		if( ( *chunk_cache )->zero_byte_empty_block_compressed != NULL )
+		{
+			memory_free(
+			 ( *chunk_cache )->zero_byte_empty_block_compressed );
 		}
 		memory_free(
 		 *chunk_cache );

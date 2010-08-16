@@ -2,7 +2,7 @@
  * Values table functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -105,173 +105,211 @@ int libewf_values_table_initialize(
 
 			return( -1 );
 		}
-		( *values_table )->identifier = (uint8_t **) memory_allocate(
-		                                              values_table_string_size );
-
-		if( ( *values_table )->identifier == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
-			 "%s: unable to create identifiers.",
-			 function );
-
-			memory_free(
-			 *values_table );
-
-			return( -1 );
-		}
 		if( memory_set(
-		     ( *values_table )->identifier,
+		     *values_table,
 		     0,
-		     values_table_string_size ) == NULL )
+		     sizeof( libewf_values_table_t ) ) == NULL )
 		{
 			liberror_error_set(
 			 error,
 			 LIBERROR_ERROR_DOMAIN_MEMORY,
 			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to clear identifiers.",
+			 "%s: unable to clear values table.",
 			 function );
 
 			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
 			 *values_table );
+
+			*values_table = NULL;
 
 			return( -1 );
 		}
-		( *values_table )->identifier_length = (size_t *) memory_allocate(
-		                                                   values_table_size );
-
-		if( ( *values_table )->identifier_length == NULL )
+		if( amount_of_values > 0 )
 		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
-			 "%s: unable to create identifier lengths.",
-			 function );
+			( *values_table )->identifier = (uint8_t **) memory_allocate(
+								      values_table_string_size );
 
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+			if( ( *values_table )->identifier == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+				 "%s: unable to create identifiers.",
+				 function );
 
-			return( -1 );
-		}
-		if( memory_set(
-		     ( *values_table )->identifier_length,
-		     0,
-		     values_table_size ) == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to clear identifier lengths.",
-			 function );
+				memory_free(
+				 *values_table );
 
-			memory_free(
-			 ( *values_table )->identifier_length );
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+				*values_table = NULL;
 
-			return( -1 );
-		}
-		( *values_table )->value = (uint8_t **) memory_allocate(
-		                                         values_table_string_size );
+				return( -1 );
+			}
+			if( memory_set(
+			     ( *values_table )->identifier,
+			     0,
+			     values_table_string_size ) == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_SET_FAILED,
+				 "%s: unable to clear identifiers.",
+				 function );
 
-		if( ( *values_table )->value == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
-			 "%s: unable to create values.",
-			 function );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
 
-			memory_free(
-			 ( *values_table )->identifier_length );
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+				*values_table = NULL;
 
-			return( -1 );
-		}
-		if( memory_set(
-		     ( *values_table )->value,
-		     0,
-		     values_table_string_size ) == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to clear values.",
-			 function );
+				return( -1 );
+			}
+			( *values_table )->identifier_length = (size_t *) memory_allocate(
+									   values_table_size );
 
-			memory_free(
-			 ( *values_table )->value );
-			memory_free(
-			 ( *values_table )->identifier_length );
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+			if( ( *values_table )->identifier_length == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+				 "%s: unable to create identifier lengths.",
+				 function );
 
-			return( -1 );
-		}
-		( *values_table )->value_length = (size_t *) memory_allocate(
-		                                            values_table_size );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
 
-		if( ( *values_table )->value_length == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
-			 "%s: unable to create value lengths.",
-			 function );
+				*values_table = NULL;
 
-			memory_free(
-			 ( *values_table )->value );
-			memory_free(
-			 ( *values_table )->identifier_length );
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+				return( -1 );
+			}
+			if( memory_set(
+			     ( *values_table )->identifier_length,
+			     0,
+			     values_table_size ) == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_SET_FAILED,
+				 "%s: unable to clear identifier lengths.",
+				 function );
 
-			return( -1 );
-		}
-		if( memory_set(
-		     ( *values_table )->value_length,
-		     0,
-		     values_table_size ) == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to clear value lengths.",
-			 function );
+				memory_free(
+				 ( *values_table )->identifier_length );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
 
-			memory_free(
-			 ( *values_table )->value_length );
-			memory_free(
-			 ( *values_table )->value );
-			memory_free(
-			 ( *values_table )->identifier_length );
-			memory_free(
-			 ( *values_table )->identifier );
-			memory_free(
-			 *values_table );
+				*values_table = NULL;
 
-			return( -1 );
+				return( -1 );
+			}
+			( *values_table )->value = (uint8_t **) memory_allocate(
+								 values_table_string_size );
+
+			if( ( *values_table )->value == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+				 "%s: unable to create values.",
+				 function );
+
+				memory_free(
+				 ( *values_table )->identifier_length );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
+
+				*values_table = NULL;
+
+				return( -1 );
+			}
+			if( memory_set(
+			     ( *values_table )->value,
+			     0,
+			     values_table_string_size ) == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_SET_FAILED,
+				 "%s: unable to clear values.",
+				 function );
+
+				memory_free(
+				 ( *values_table )->value );
+				memory_free(
+				 ( *values_table )->identifier_length );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
+
+				*values_table = NULL;
+
+				return( -1 );
+			}
+			( *values_table )->value_length = (size_t *) memory_allocate(
+			                                              values_table_size );
+
+			if( ( *values_table )->value_length == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+				 "%s: unable to create value lengths.",
+				 function );
+
+				memory_free(
+				 ( *values_table )->value );
+				memory_free(
+				 ( *values_table )->identifier_length );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
+
+				*values_table = NULL;
+
+				return( -1 );
+			}
+			if( memory_set(
+			     ( *values_table )->value_length,
+			     0,
+			     values_table_size ) == NULL )
+			{
+				liberror_error_set(
+				 error,
+				 LIBERROR_ERROR_DOMAIN_MEMORY,
+				 LIBERROR_MEMORY_ERROR_SET_FAILED,
+				 "%s: unable to clear value lengths.",
+				 function );
+
+				memory_free(
+				 ( *values_table )->value_length );
+				memory_free(
+				 ( *values_table )->value );
+				memory_free(
+				 ( *values_table )->identifier_length );
+				memory_free(
+				 ( *values_table )->identifier );
+				memory_free(
+				 *values_table );
+
+				*values_table = NULL;
+
+				return( -1 );
+			}
 		}
 		( *values_table )->amount_of_values = amount_of_values;
 	}
@@ -301,7 +339,9 @@ int libewf_values_table_free(
 	}
 	if( *values_table != NULL )
 	{
-		for( values_table_iterator = 0; values_table_iterator < ( *values_table )->amount_of_values; values_table_iterator++ )
+		for( values_table_iterator = 0;
+		     values_table_iterator < ( *values_table )->amount_of_values;
+		     values_table_iterator++ )
 		{
 			if( ( *values_table )->identifier[ values_table_iterator ] != NULL )
 			{
@@ -534,6 +574,43 @@ int libewf_values_table_resize(
 	return( 1 );
 }
 
+/* Retrieves the amount of values
+ * Returns 1 if successful or -1 on error
+ */
+int libewf_values_table_get_amount_of_values(
+     libewf_values_table_t *values_table,
+     int *amount_of_values,
+     liberror_error_t **error )
+{
+	static char *function = "libewf_values_table_get_amount_of_values";
+
+	if( values_table == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid values table.",
+		 function );
+
+		return( -1 );
+	}
+	if( amount_of_values == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid amount of values.",
+		 function );
+
+		return( -1 );
+	}
+	*amount_of_values = values_table->amount_of_values;
+
+	return( 1 );
+}
+
 /* Retrieves the index for a certain identifier
  * Returns 1 if successful, 0 if no index was found or -1 on error
  */
@@ -613,7 +690,9 @@ int libewf_values_table_get_index(
 
 		return( -1 );
 	}
-	for( values_table_iterator = 0; values_table_iterator < values_table->amount_of_values; values_table_iterator++ )
+	for( values_table_iterator = 0;
+	     values_table_iterator < values_table->amount_of_values;
+	     values_table_iterator++ )
 	{
 		if( values_table->identifier[ values_table_iterator ] == NULL )
 		{

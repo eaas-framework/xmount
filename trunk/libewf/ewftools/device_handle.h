@@ -2,12 +2,12 @@
  * Device handle
  *
  * Copyright (C) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
  * This software is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -16,7 +16,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -28,11 +28,12 @@
 
 #include <liberror.h>
 
+#include <libsystem.h>
+
 #if defined( WINAPI )
 #include <windows.h>
 #endif
 
-#include "system_string.h"
 #include "storage_media_buffer.h"
 
 #if defined( __cplusplus )
@@ -99,15 +100,19 @@ struct device_handle
 
 	/* The vendor string
 	 */
-	system_character_t vendor[ 64 ];
+	uint8_t vendor[ 64 ];
 
 	/* The model string
 	 */
-	system_character_t model[ 64 ];
+	uint8_t model[ 64 ];
 
 	/* The serial number string
 	 */
-	system_character_t serial_number[ 64 ];
+	uint8_t serial_number[ 64 ];
+
+	/* The amount of sessions for an optical disc
+	 */
+	uint16_t amount_of_sessions;
 
 	/* Value to indicate the media information values were set
 	 */
@@ -137,7 +142,7 @@ int device_handle_free(
 
 int device_handle_open_input(
      device_handle_t *device_handle,
-     const system_character_t *filename,
+     const libsystem_character_t *filename,
      liberror_error_t **error );
 
 int device_handle_close(
@@ -161,9 +166,21 @@ int device_handle_get_media_size(
      size64_t *media_size,
      liberror_error_t **error );
 
+int device_handle_get_media_type(
+     device_handle_t *device_handle,
+     uint8_t *media_type,
+     liberror_error_t **error );
+
 int device_handle_get_bytes_per_sector(
      device_handle_t *device_handle,
      uint32_t *bytes_per_sector,
+     liberror_error_t **error );
+
+int device_handle_trim_copy_from_byte_stream(
+     uint8_t *string,
+     size_t string_size,
+     const uint8_t *byte_stream,
+     size_t byte_stream_size,
      liberror_error_t **error );
 
 int device_handle_determine_media_information(
@@ -174,7 +191,7 @@ int device_handle_get_media_information_value(
      device_handle_t *device_handle,
      char *media_information_value_identifier,
      size_t media_information_value_identifier_length,
-     system_character_t *media_information_value,
+     libsystem_character_t *media_information_value,
      size_t media_information_value_size,
      liberror_error_t **error );
 

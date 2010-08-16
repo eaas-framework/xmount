@@ -39,7 +39,14 @@ void MyFree(void *address) throw()
   ::free(address);
 }
 
-#ifdef _WIN32
+#ifdef __MINGW_H
+void *MidAlloc(size_t size ) throw() { return MyAlloc(size);}
+void  MidFree(void *address) throw(){ return MyFree(address);}
+void *BigAlloc(size_t size ) throw() { return MyAlloc(size);}
+void  BigFree(void *address) throw(){ return MyFree(address);}
+#endif
+
+#if defined(_WIN32) && !defined(__MINGW_H)
 
 void *MidAlloc(size_t size) throw()
 {

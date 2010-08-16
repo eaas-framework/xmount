@@ -47,14 +47,11 @@
 #include <openssl/bio.h>
 #endif
 
-#include "afflib_sha256.h"
-
 #include "vnode_raw.h"
 #include "vnode_split_raw.h"
 #include "vnode_afm.h"
 #include "vnode_aff.h"
 #include "vnode_afd.h"
-#include "vnode_ewf.h"
 
 #ifdef USE_QEMU
 #include "vnode_qemu.h"
@@ -81,9 +78,6 @@ struct af_vnode *af_vnode_array[] = {
     &vnode_afd, 
     &vnode_afm,				// must be before aff
     &vnode_aff,
-#ifdef USE_LIBEWF
-    &vnode_ewf,				// libewf
-#endif
 #ifdef USE_QEMU
     &vnode_vmdk,
     &vnode_dmg,
@@ -101,18 +95,9 @@ struct af_vnode *af_vnode_array[] = {
  *** Support functions that don't use the "af"
  ****************************************************************/
 
-#if defined(HAVE_SHA256_INIT) 
-int af_SHA256(const unsigned char *d,size_t s,unsigned char *md);
-#endif
-
-
 static int aff_initialized = 0;
 int af_cache_debug = 0;
 FILE *af_trace = 0;
-static unsigned char buf4k_sha256[] = 
-    {0x90,0x18,0xbb,0xab,0x39,0x27,0x49,0xb2,0x83,0x1f,0xba,
-     0x33,0xc3,0xf7,0xdf,0xed,0x67,0xae,0x11,0x8d,0x88,0x3f,
-     0xe9,0x2a,0xe4,0x21,0xf7,0xfa,0x7d,0xa7,0x24,0x8c};
 
 void af_initialize()
 {
@@ -122,27 +107,10 @@ void af_initialize()
     assert(sizeof(struct af_head)==8);
     assert(sizeof(struct af_segment_head)==16);
     assert(sizeof(struct af_segment_tail)==8);
-
     assert(sizeof(struct affkey)==AFFKEY_SIZE);
 
-#ifdef HAVE_SHA256_INIT
-    /* Validate SHA256 */
-    unsigned char buf4k[4096];
-    unsigned char md256[SHA256_DIGEST_LENGTH];
-    memset(buf4k,0,sizeof(buf4k));
-    buf4k[1] = 1;
-    SHA256_CTX cc;
-    SHA256_Init(&cc);
-    SHA256_Update(&cc,buf4k,sizeof(buf4k));
-    SHA256_Final(md256,&cc);
-    for(int i=0;i<SHA256_DIGEST_LENGTH;i++){
-	assert(md256[i]==buf4k_sha256[i]);
-    }
-    af_SHA256(buf4k,sizeof(buf4k),md256);
-    for(int i=0;i<SHA256_DIGEST_LENGTH;i++){
-	assert(md256[i]==buf4k_sha256[i]);
-    }
-#endif
+    /* Make sure OpenSSL is working */
+    OpenSSL_add_all_algorithms();
 
     const char *val = getenv(AFFLIB_CACHE_DEBUG);
     if(val) af_cache_debug = atoi(val);
@@ -378,12 +346,13 @@ AFFILE *af_open_with(const char *url,int flags,int mode, struct af_vnode *v)
     }
 
     /* If there is no AFFKEY and the file is read-only, don't use a password */
-    if(af->password && (af_get_seg(af,AF_AFFKEY,0,0,0)!=0) && ((af->openflags&O_ACCMODE)==O_RDONLY)){
+    if(af->password && (af_get_seg(af,AF_AFFKEY,0,0,0)!=0) && ((af->openflags & O_ACCMODE)==O_RDONLY)){
 	af_sanitize_password(af);
     }
 
     /* Set up the encryption if requested and if this support metadata */
-    if(AF_SEALING_VNODE(af)){
+    if(AF_SEALING_VNODE(af) && ((flags & AF_NO_CRYPTO)==0)){
+	bool can_decrypt = false;
 	if(af->password){
 	    struct af_vnode_info vni;
 	    memset(&vni,0,sizeof(vni));
@@ -394,20 +363,22 @@ AFFILE *af_open_with(const char *url,int flags,int mode, struct af_vnode *v)
 		}
 		if(r==0){
 		    r = af_use_aes_passphrase(af,af->password);
-		    if(r) (*af->error_reporter)("af_open: invalid passphrase: '%s'",af->password);
+		    if(r==0) {
+			can_decrypt = true;
+		    } else {
+			(*af->error_reporter)("af_open: invalid passphrase: '%s'",af->password);
+		    }
 		}
 		af_sanitize_password(af);
-		if(r!=0){
-		    af_deallocate(af);
-		    return 0;
-		}
 	    }
 	}
 	
 	/* Try public key... */
-	const char *kf = getenv(AFFLIB_DECRYPTING_PRIVATE_KEYFILE);
-	if(kf){
-	    af_set_unseal_keyfile(af,kf);
+	if(can_decrypt==false){
+	    const char *kf = getenv(AFFLIB_DECRYPTING_PRIVATE_KEYFILE);
+	    if(kf){
+		af_set_unseal_keyfile(af,kf);
+	    }
 	}
     }
 	
@@ -441,11 +412,19 @@ AFFILE *af_open(const char *filename,int flags,int mode)
     return 0;				// can't figure it out; must be an invalid extension
 }
 
+/** Set an option and return the previous value */
 int af_set_option(AFFILE *af,int option,int value)
 {
+    int prev = 0;
     switch(option){
-    case AF_OPTION_AUTO_ENCRYPT: af->crypto->auto_encrypt = value;return 0;
-    case AF_OPTION_AUTO_DECRYPT: af->crypto->auto_decrypt =  value;return 0;
+    case AF_OPTION_AUTO_ENCRYPT:
+	prev = af->crypto->auto_encrypt;
+	af->crypto->auto_encrypt = value;
+	return prev;
+    case AF_OPTION_AUTO_DECRYPT:
+	prev = af->crypto->auto_decrypt;
+	af->crypto->auto_decrypt = value;
+	return prev;
     }
     return -1;
 }
@@ -508,19 +487,20 @@ uint64_t af_seek(AFFILE *af,int64_t pos,int whence)
 {
     AF_WRLOCK(af);
     if(af_trace) fprintf(af_trace,"af_seek(%p,%"I64d",%d)\n",af,pos,whence);
-    int64_t new_pos=0;
+    uint64_t new_pos=0;
     switch(whence){
     case SEEK_SET:
 	new_pos = pos;
 	break;
     case SEEK_CUR:
-	new_pos = af->pos + pos;
+	if(pos<0 && ((uint64_t)(-pos)) > af->pos) new_pos=0;
+	else new_pos = af->pos + pos;
 	break;
     case SEEK_END:
-	new_pos = af->image_size - pos;
+	if((uint64_t)pos > af->image_size) new_pos=0;
+	else new_pos = af->image_size - pos;
 	break;
     }
-    if(new_pos < 0) new_pos = 0;	// can't be less than 0
 
     /* Note if the direction has changed */
     int direction = (new_pos > af->pos)  ? 1 : ((new_pos < af->pos) ? -1 : 0);
@@ -572,7 +552,7 @@ int af_eof(AFFILE *af)
 	errno = EINVAL;
 	return -1;		// this is bad
     }
-    int ret = ((int64_t)af->pos >= vni.imagesize);
+    int ret = (int64_t)af->pos >= (int64_t)vni.imagesize;
     AF_UNLOCK(af);
     return ret;
 }
@@ -622,6 +602,7 @@ int64_t af_get_imagesize(AFFILE *af)
 {
     int64_t ret = -1;
     struct af_vnode_info vni;
+    memset(&vni,0,sizeof(vni));
     if(af_vstat(af,&vni)==0){
 	/* If vni.imagesize is 0 and if there are encrypted segments and if there
 	 * is no imagesize segment but there is an encrypted one, then we can't read this encrypted file...
@@ -692,8 +673,6 @@ int af_make_gid(AFFILE *af)
 }
 
 
-
-/*TK: Here for locking */
 
 /* Decrypt data and perform unblocking if necessary.
  * This could eliminate a memory copy by doing the decryption for everything
@@ -848,7 +827,7 @@ int af_rewind_seg(AFFILE *af)
 int af_update_segf(AFFILE *af, const char *segname,
 		  unsigned long arg,const u_char *data,unsigned int datalen,u_int flag)
 {
-    if(af_trace) fprintf(af_trace,"af_update_segf(%x,segname=%s,arg=%d,datalen=%d)\n",af,segname,arg,datalen);
+    if(af_trace) fprintf(af_trace,"af_update_segf(%p,segname=%s,arg=%lu,datalen=%d)\n",af,segname,arg,datalen);
     AF_WRLOCK(af);
     if(af->v->update_seg==0){
 	errno = ENOTSUP;
@@ -856,21 +835,16 @@ int af_update_segf(AFFILE *af, const char *segname,
 	return -1;	// not supported by this file system
     }
 
-    if(af->vni_cache){
-	free(af->vni_cache);
-	af->vni_cache = 0;
-    }
+    af_invalidate_vni_cache(af);
 
     /* See if we need to encrypt. New memory might need to be allocated.
      * This isn't a big deal, because encryption requires copying memory
      * in any event; it's either an in-place copy or a copy to another location.
      */
-    const u_char *signdata = data;	// remember the original data location
 #ifdef HAVE_AES_ENCRYPT
     const char *oldname = 0;
     unsigned char *newdata = 0;
-    if(AF_SEALING(af)
-       && ((flag & AF_SIGFLAG_NOSEAL)==0)){
+    if(AF_SEALING(af) && ((flag & AF_SIGFLAG_NOSEAL)==0) && af->crypto->auto_encrypt){
 	/* Create an IV */
 	unsigned char iv[AES_BLOCK_SIZE];
 	memset(iv,0,sizeof(iv));
@@ -897,7 +871,7 @@ int af_update_segf(AFFILE *af, const char *segname,
 	datalen += pad + extra;
     }
 #endif
-    int r = (*af->v->update_seg)(af,segname,arg,data,datalen);
+    int r = (*af->v->update_seg)(af,segname,arg,data,datalen); // actually update the segment
     if(r==0) af->bytes_written += datalen;
 #ifdef HAVE_AES_ENCRYPT
     /* if we encrypted, make sure the unencrypted segment is deleted */
@@ -907,12 +881,22 @@ int af_update_segf(AFFILE *af, const char *segname,
 	newdata = 0;
     }
 #endif
+    /* If we wrote out an unencrypted segment, make sure that the corresopnding encrypted
+     * segment is deleted.
+     */
+    char encrypted_name[AF_MAX_NAME_LEN];
+    strlcpy(encrypted_name,segname,sizeof(encrypted_name));
+    strlcat(encrypted_name,AF_AES256_SUFFIX,sizeof(encrypted_name));
+    if(*af->v->del_seg) (*af->v->del_seg)(af,encrypted_name); // no need to check error return
+
+
     /* Sign the segment if:
      * - there is a signing private key
      * - the data structure and flag not set
      * - This is not a signature segment
      */
 #ifdef USE_AFFSIGS
+    const u_char *signdata = data;	// remember the original data location
     if(AF_SEALING(af)
        && (r==0)
        && af->crypto->sign_privkey
@@ -926,7 +910,7 @@ int af_update_segf(AFFILE *af, const char *segname,
     return r;
 }
 
-/* Requires no locking */
+/* Requires no locking because locking is done in af_update_segf */
 int af_update_seg(AFFILE *af, const char *segname,
 		  unsigned long arg,const u_char *data,unsigned int datalen)
 {
@@ -965,6 +949,14 @@ int af_del_seg(AFFILE *af,const char *segname)
     int ret = (*af->v->del_seg)(af,segname);
     AF_UNLOCK(af);
     return ret;
+}
+
+void af_invalidate_vni_cache(AFFILE *af)
+{
+    if(af->vni_cache){
+	free(af->vni_cache);
+	af->vni_cache = 0;
+    }
 }
 
 int af_vstat(AFFILE *af,struct af_vnode_info *vni)

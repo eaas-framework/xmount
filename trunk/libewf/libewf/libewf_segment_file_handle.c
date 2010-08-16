@@ -2,7 +2,7 @@
  * Segment file handle
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -28,7 +28,6 @@
 
 #include "libewf_filename.h"
 #include "libewf_list_type.h"
-#include "libewf_notify.h"
 #include "libewf_section_list.h"
 #include "libewf_segment_file_handle.h"
 
@@ -141,6 +140,7 @@ int libewf_segment_file_handle_free(
      liberror_error_t **error )
 {
 	static char *function = "libewf_segment_file_handle_free";
+	int result            = 1;
 
 	if( segment_file_handle == NULL )
 	{
@@ -158,7 +158,7 @@ int libewf_segment_file_handle_free(
 		if( ( *segment_file_handle )->section_list != NULL )
 		{
 			if( libewf_list_free(
-			     ( *segment_file_handle )->section_list,
+			     &( ( *segment_file_handle )->section_list ),
 			     &libewf_section_list_values_free,
 			     error ) != 1 )
 			{
@@ -168,6 +168,8 @@ int libewf_segment_file_handle_free(
 				 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 				 "%s: unable to free section list.",
 				 function );
+
+				result = -1;
 			}
 		}
 		memory_free(
@@ -175,6 +177,6 @@ int libewf_segment_file_handle_free(
 
 		*segment_file_handle = NULL;
 	}
-	return( 1 );
+	return( result );
 }
 

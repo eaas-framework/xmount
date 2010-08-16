@@ -5,13 +5,16 @@
  * afflib.h:
  * 
  * This file describes the public AFFLIB interface.
- * The interface to reading AFF files, Raw files, and EnCase file (if libewf is compiled in).
+ * The interface to reading AFF files and  Raw files.
  */
 
 /* Figure out what kind of OS we are running on */
 
 /* These are both needed; no need to bother with affconfig.h #defines */
 #include <stdio.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 
 #ifdef HAVE_SYS_CDEFS_H
@@ -31,38 +34,52 @@
 #include <inttypes.h>
 #endif
 
-/* WIN32 is defined by the NMAKE makefile for Visual C++ under Windows */
+/** WIN32 is defined by the NMAKE makefile for Visual C++ under Windows and by mingw **/
 #ifdef WIN32                            
+#include <basetsd.h>
 #include <io.h>				// gets isatty
 typedef unsigned int uint;
 typedef unsigned int u_int;
 typedef unsigned long ulong;
 typedef unsigned long u_long;
-typedef unsigned _int64 uint64;		/* 64-bit types Types */
-typedef          _int64 int64;
+typedef unsigned __int64 uint64;		/* 64-bit types Types */
+typedef          __int64 int64;
 typedef unsigned char u_char;
+
 #ifndef _UINT64_T_DECLARED
-typedef unsigned _int64 uint64_t;	/* 64-bit types Types */
+typedef unsigned __int64 uint64_t;	/* 64-bit types Types */
 #define _UINT64_T_DECLARED
+#endif
+
+#ifndef _INT64_T_DECLARED
+typedef         __int64 int64_t;
+#define _INT64_T_DECLARED
+#endif
 
 #ifndef PRId64
 #define PRId64 "I64d"
 #endif
+
 #ifndef PRIi64
 #define PRIi64 "I64i"
 #endif
+
 #ifndef PRIu64
 #define PRIu64 "I64u"
 #endif
+
+
+#if defined(__MINGW_H)
+#define ftello ftello64
+#define fseeko fseeko64
+#else
+#define ftello _ftelli64			/* replaces ftello64 in VC2008 */
+#define fseeko _fseeki64
 #endif
 
-#ifndef _INT64_T_DECLARED
-typedef          _int64 int64_t;
-#define _INT64_T_DECLARED
-#endif
-int64   ftello(FILE *stream);	 /* Functions that Microsoft forgot */
-int     fseeko(FILE *stream,int64 offset,int whence);
-#endif
+#endif	
+/** END OF WIN32 DEFINES **/
+
 
 #define I64d PRIi64
 #define I64u PRIu64
@@ -82,7 +99,7 @@ struct aff_pagebuf {
 };
 
 struct af_vnode_info {
-    int64_t imagesize;			// size of this image
+    uint64_t imagesize;			// size of this image
     int   pagesize;			// what is the natural page size?
     u_int supports_compression:1; // supports writing compressed segments
     u_int has_pages:1;		 // does system support page segments?
@@ -97,6 +114,7 @@ struct af_vnode_info {
     u_int page_count_total;
     u_int segment_count_signed;
     u_int segment_count_encrypted;
+    u_int page_count_encrypted;
 };					// 
 
 
@@ -149,12 +167,13 @@ void	af_err(int code,const char *fname,...);	// like err(), but will also print 
 
 
 /* Generic set/get option routines; this replaces individual options in previous implementations.
- * af==0 to set global options.
+ * af==0 to set global options. Return the previous value.
  */
 int	af_set_option(AFFILE *af,int option,int value);
 
 #define AF_OPTION_AUTO_ENCRYPT     1	// 1 = auto-encrypt
 #define AF_OPTION_AUTO_DECRYPT     2	// 1 = auto-decrypt
+// The following are not implemented yet 
 #define AF_OPTION_PIECEWISE_MD5    3	// 1 = automatically write pagen_md5 segments
 #define AF_OPTION_PIECEWISE_SHA1   4	// 1 = automatically write pagen_md5 segments
 #define AF_OPTION_PIECEWISE_SHA256 5	// 1 = automatically write pagen_md5 segments
@@ -165,12 +184,17 @@ int	af_set_option(AFFILE *af,int option,int value);
 #define AF_OPEN_PRIMITIVE (1<<31)	// only open primtive, not compound files
 #define AF_BADBLOCK_FILL  (1<<30)	// fill unallocated (sparse) with BADBLOCK flag
 #define AF_HALF_OPEN      (1<<29)       // return af before calling af->v->open; 
+#define AF_NO_CRYPTO      (1<<28)       // disable encryption layer
 
 /* navigating within the data segments as if they were a single file */
-int	af_read(AFFILE *af,unsigned char *buf,size_t count);
+#ifdef _WIN32
+SSIZE_T af_read(AFFILE *af,unsigned char *buf,SSIZE_T count);
+#else
+ssize_t af_read(AFFILE *af,unsigned char *buf,ssize_t count);
+#endif
 uint64_t  af_seek(AFFILE *af,int64_t pos,int whence); // returns new position
 uint64_t  af_tell(AFFILE *af);
-int	af_eof(AFFILE *af);		// is the virtual file at the end?
+int	  af_eof(AFFILE *af);		// is the virtual file at the end?
 
 /* Additional routines for writing */
 void	af_set_callback(AFFILE *af, void (*cb)(struct affcallback_info *acbi)); 
@@ -255,6 +279,7 @@ int af_display_as_hex(const char *segname); // afflib recommends displaying this
 
 /* Crypto */
 /* AFF Base Encryption */
+int  af_SHA256(const unsigned char *buf,size_t buflen,unsigned char md[32]); // return 0 if success, -1 if no cipher
 int  af_set_aes_key(AFFILE *af,const unsigned char *userKey,const int bits);
 int  af_cannot_decrypt(AFFILE *af);	// encrypted pages are present which cannot be decrypted
 int  af_has_encrypted_segments(AFFILE *af);
@@ -329,6 +354,8 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
 #define AF_PAGE_SHA1	AF_PAGE"_sha1"	// sha1 hash of page
 #define AF_PAGE_SHA256	AF_PAGE"_sha256"// sha256 hash of page
 #define AF_PARITY0      "parity0"	// parity page of all bytes
+#define AF_BATCH_NAME		"batch_name"
+#define AF_BATCH_ITEM_NAME	"batch_item_name"
 
 #define AF_BLANKSECTORS "blanksectors"	// all NULs; 8-bytes
 #define AF_AFF_FILE_TYPE "aff_file_type" // contents should be "AFF", "AFM" or "AFD"
@@ -372,8 +399,8 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
 #define AF_PAGE_COMP_ALG_LZMA   0x0020	// high compression but pretty slow
 #define AF_PAGE_COMP_ALG_ZERO   0x0030  // Data segment is a 4-byte value of # of NULLs. 
 
-#define AF_MD5  "md5"			// stores image md5
-#define AF_SHA1 "sha1"			// stores image sha1
+#define AF_MD5    "md5"			// stores image md5
+#define AF_SHA1   "sha1"			// stores image sha1
 #define AF_SHA256 "sha256"		// stores image sha256
 
 #define AF_CREATOR	"creator"	// progname of the program that created the AFF file

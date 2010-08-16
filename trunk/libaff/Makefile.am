@@ -1,11 +1,11 @@
-SUBDIRS = lib tools lzma443 win32 tests doc pyaff man
+SUBDIRS = lib tools lzma443 tests doc pyaff man
 
 pkgconfigdir = $(libdir)/pkgconfig
 
 pkgconfig_DATA = afflib.pc
 
 include_HEADERS = 
-pkginclude_HEADERS = lib/afflib.h lib/afflib_i.h lib/afflib_sha256.h lib/aftimer.h lib/utils.h  lib/threaded_hash.h
+pkginclude_HEADERS = lib/afflib.h lib/afflib_i.h lib/aftimer.h lib/utils.h  lib/threaded_hash.h
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -27,9 +27,17 @@ AM_CPPFLAGS = -Wall
 release:
 	make prerelease
 	make distcheck
-	make therelease
+	make the_release
+	make distribute_release
 
 prerelease:
+	@echo Making sure SVN is up to date
+	svn update
+	@echo update PACKAGE_VERSION in win32 directory
+	sed s/PACKAGE_VERSION.\*/PACKAGE_VERSION\ \"$(PACKAGE_VERSION)\"/ win32/affconfig.h > win32/affconfig.h.$$
+	mv -f win32/affconfig.h.$$ win32/affconfig.h
+	@echo Commit back changes
+	svn commit -m 'make prerelease'
 	@echo Building and uploading the release...
 	@echo Making release $(RELEASE)
 	@echo
@@ -39,54 +47,20 @@ prerelease:
 	python checkversion.py $(RELEASE_FN) $(RELEASE)
 	/bin/rm $(RELEASE_FN)
 
-therelease:
-	scp $(RELEASE).tar.gz $(RELEASE_SSH)
-	ssh $(RELEASE_HOST) 'echo $(RELEASE) > $(RELEASE_PATH)'
-	ssh $(RELEASE_HOST) 'cd $(RELEASE_LOC);/bin/rm $(PACKAGE).tar.gz;ln -s $(RELEASE).tar.gz $(PACKAGE).tar.gz'
-	@echo Release $(RELEASE) uploaded to server
-
 getrelease:
 	@echo testing release on your system
 	wget http://$(PACKAGE).tar.gz
 	tar xfz $(PACKAGE).tar.gz
 	(cd afflib-*;./configure;make;make test_crypto)
 
-DEBIAN_FILES = \
-        debian/afflib.install \
-        debian/afflib.dirs \
-        debian/afflib.docs \
-        debian/afflib.postinst.debhelper \
-        debian/afflib.postrm.debhelper \
-        debian/afflib-default.ex \
-        debian/afflib-dev.dirs \
-        debian/afflib-dev.docs \
-        debian/afflib-dev.install \
-        debian/afflib-tools.dirs \
-        debian/afflib-tools.docs \
-        debian/afflib-tools.install \
-        debian/afflib.doc-base.EX \
-        debian/changelog \
-        debian/changelog.in \
-        debian/compat \
-        debian/control \
-        debian/copyright \
-        debian/cron.d.ex \
-        debian/emacsen-install.ex \
-        debian/emacsen-startup.ex \
-        debian/emacsen-remove.ex \
-        debian/init.d.ex \
-        debian/manpage.1.ex \
-        debian/manpage.sgml.ex \
-        debian/manpage.xml.ex \
-        debian/menu.ex \
-        debian/rules \
-        debian/postinst.ex \
-        debian/postrm.ex \
-        debian/preinst.ex \
-        debian/prerm.ex \
-        debian/shlibs.local.ex \
-        debian/shlibs.local.ex.in \
-        debian/watch.ex
+the_release:
+	gpg --detach-sign $(RELEASE).tar.gz
+
+distribute_release:
+	scp $(RELEASE).tar.gz{,.sig} $(RELEASE_SSH)
+	ssh $(RELEASE_HOST) 'cd $(RELEASE_LOC);/bin/rm $(PACKAGE).tar.gz;ln -s $(RELEASE).tar.gz $(PACKAGE).tar.gz'
+	ssh $(RELEASE_HOST) 'echo $(RELEASE).tar.gz > $(RELEASE_PATH)'
+	@echo Release $(RELEASE) uploaded to server
 
 DOCS = BUGLIST.txt README_Linux.txt README_Win32.txt \
 	doc/crypto_doc.txt \
@@ -96,32 +70,21 @@ DOCS = BUGLIST.txt README_Linux.txt README_Win32.txt \
 	doc/announce_2.2.txt
 
 EXTRA_DIST = $(DOCS) \
-	$(DEBIAN_FILES) \
-	acx_pthread.m4 \
+	bootstrap.sh \
+	bootstrap_mingw.sh \
+	m4/acx_pthread.m4 \
 	afflib.spec.in \
 	afflib.spec \
 	afflib.pc.in \
 	afflib.pubkey.asc \
-	misc/expat-2.0.1.tar.gz \
 	tests/encrypted.iso \
-	tests/encrypted.aff
+	tests/encrypted.aff \
+	win32/Changes.txt \
+	win32/README_MSVC++.txt \
+	win32/affconfig.h \
+	win32/afflib.mak \
+	win32/make.bat
 
-renew:
-	touch NEWS README AUTHORS ChangeLog stamp-h
-	aclocal
-	libtoolize -f  
-	autoheader -f
-	autoconf -f
-	automake --add-missing -c
-
-renew-on-mac:
-	touch NEWS README AUTHORS ChangeLog stamp-h
-	aclocal
-	glibtoolize -f  # perhaps this one works better for you
-	aclocal
-	autoheader -f
-	autoconf -f
-	automake --add-missing -c
 
 #
 # Note: don't forget to run autoreconf when significant changes are made

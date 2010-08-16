@@ -2,7 +2,7 @@
  * The internal pool functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -37,8 +37,6 @@
 #if defined( __cplusplus )
 extern "C" {
 #endif
-
-#define LIBBFIO_POOL_UNLIMITED_AMOUNT_OF_OPEN_HANDLES	0
 
 typedef struct libbfio_internal_pool libbfio_internal_pool_t;
 

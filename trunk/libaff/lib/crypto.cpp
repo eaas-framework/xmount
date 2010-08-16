@@ -41,12 +41,7 @@
 #include "affconfig.h"
 #include "afflib.h"
 #include "afflib_i.h"
-#include "afflib_sha256.h"		// make sure we have a SHA256 implementation
 #include "utils.h"
-
-#ifndef NID_sha256
-#define NID_sha256               672
-#endif
 
 #ifdef HAVE_OPENSSL_PEM_H
 #include <openssl/pem.h>
@@ -99,34 +94,32 @@ int af_is_signature_segment(const char *segname){
 /****************************************************************
  *** AES ENCRYPTION LAYER
  ****************************************************************/
-/* Sometimes SHA256() is defined and sometimes it isn't, so this function defines
- * our own copy.
- */
    
-static const char *aff_cannot_sign = "AFFLIB compiled without EVP_sha256; "\
+static const char *aff_cannot_sign = "AFFLIB: OpenSSL does not have SHA256! "\
     "AFF segments cannot be signed. "\
     "See http://www.afflib.org/requirements.php for additional information.";
-
-static const char *aff_cannot_verify = "AFFLIB compiled without EVP_sha256; "\
-    "AFF segments cannot be verified. "\
-    "See http://www.afflib.org/requirements.php for additional information.";
-
-#if defined(HAVE_SHA256_INIT)
-int af_SHA256(const unsigned char *d,size_t s,unsigned char *md)
-{
-    SHA256_CTX cc;
-    SHA256_Init(&cc);
-    SHA256_Update(&cc,d,s);
-    SHA256_Final(md,&cc);
-    return 0;
-}
-#endif
 
 void af_crypto_allocate(AFFILE *af)
 {
     af->crypto = (struct af_crypto *)calloc(sizeof(struct af_crypto),1); // give space
 }
 
+
+/** compute SHA256.
+ * Return 0 if success, -1 if error.
+ */
+int af_SHA256(const unsigned char *data,size_t datalen,unsigned char md[32])
+{
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256) return -1;
+
+    unsigned int sha256_buflen = 32;
+    EVP_MD_CTX ctx;
+    EVP_DigestInit(&ctx,sha256);
+    EVP_DigestUpdate(&ctx,data,datalen);
+    if(EVP_DigestFinal(&ctx,md,&sha256_buflen)!=1) return -1; // EVP_DigestFinal returns 1 for success
+    return 0;
+}
 
 void af_crypto_deallocate(AFFILE *af)
 {
@@ -171,7 +164,9 @@ int af_set_aes_key(AFFILE *af,const unsigned char *userKey,const int bits)
     if(r) return r;
 
     af->crypto->sealing_key_set = 1;
+    af->crypto->auto_encrypt = 1;	// default
     af->crypto->auto_decrypt = 1;	// default
+    af_invalidate_vni_cache(af);	// invalidate the cache, because now we can read encrypted values
     return 0;
 #else
     return AF_ERROR_NO_AES;
@@ -187,7 +182,7 @@ int af_set_aes_key(AFFILE *af,const unsigned char *userKey,const int bits)
 
 int af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_char affkey[32])
 {
-#if defined(HAVE_AES_ENCRYPT) && defined(HAVE_SHA256_INIT)
+#if defined(HAVE_AES_ENCRYPT)
     if(af->crypto->sealing_key_set) return AF_ERROR_KEY_SET;		// already enabled
 
     /* Make an encrypted copy of the AFFkey */
@@ -197,7 +192,9 @@ int af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_c
     struct affkey affkey_seg;
     assert(sizeof(affkey_seg)==AFFKEY_SIZE);
     memset((unsigned char *)&affkey_seg,0,sizeof(affkey_seg));
-    *(uint32_t *)affkey_seg.version = htonl(1);	// version 1
+    
+    uint32_t version_number = htonl(1);	// version 1
+    memcpy(affkey_seg.version,(u_char *)&version_number,4);
     memcpy(affkey_seg.affkey_aes256,affkey,32);
 
     /* Use the hash to encrypt the key and all zeros */
@@ -216,9 +213,6 @@ int af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_c
 #endif
 #if !defined(HAVE_AES_ENCRYPT)
     return AF_ERROR_NO_AES;
-#endif
-#if !defined(HAVE_SHA256_INIT)
-    return AF_ERROR_NO_SHA256;
 #endif
 }
 
@@ -243,7 +237,7 @@ struct affkey_legacy {
 int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
 					   unsigned char affkey[32])
 {
-#if defined(HAVE_AES_ENCRYPT) && defined(HAVE_SHA256_INIT)
+#if defined(HAVE_AES_ENCRYPT)
     if(af->crypto->sealing_key_set) return AF_ERROR_KEY_SET;		// already enabled
 
     /* Get the segment with the key in it. It should be AFFKEY_SIZE
@@ -253,6 +247,7 @@ int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
     struct affkey affkey_seg;		// in-memory copy
     u_char kbuf[1024];
     size_t klen=sizeof(kbuf);
+    uint32_t version;
     int kversion=0;
 
     /* Try to get the segment */
@@ -261,10 +256,12 @@ int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
     if(sizeof(affkey_seg)==klen){
 	// On-disk structure is correct; copy it over
 	memcpy(&affkey_seg,kbuf,klen);	
-	kversion = ntohl(*((int *)affkey_seg.version));
+	memcpy((char *)&version,affkey_seg.version,4);
+	kversion = ntohl(version);
     } else {
 	// Try to figure it out manually
-	kversion = ntohl(*((int *)kbuf));
+	memcpy((char *)&version,kbuf,4);
+	kversion = ntohl(version);
 	memcpy(affkey_seg.affkey_aes256,kbuf+4,sizeof(affkey_seg.affkey_aes256));
 	memcpy(affkey_seg.zeros_aes256,kbuf+36,sizeof(affkey_seg.zeros_aes256));
     }
@@ -277,7 +274,9 @@ int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
 
     /* hash the passphrase */
     unsigned char passphrase_hash[32];
-    af_SHA256((const unsigned char *)passphrase,strlen(passphrase), passphrase_hash);
+    if(af_SHA256((const unsigned char *)passphrase,strlen(passphrase), passphrase_hash)){
+	return AF_ERROR_NO_SHA256;
+    }
 
     /* Try to decrypt the key */
 
@@ -290,7 +289,7 @@ int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
     AES_decrypt(affkey_seg.zeros_aes256,affkey_seg.zeros_aes256,&dkey);
 
     /* See if its zero? */
-    for(int i=0;i<sizeof(affkey_seg.zeros_aes256);i++){
+    for(u_int i=0;i<sizeof(affkey_seg.zeros_aes256);i++){
 	if(affkey_seg.zeros_aes256[i]) return AF_ERROR_WRONG_PASSPHRASE;
     }
 
@@ -301,9 +300,6 @@ int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase,
 #endif
 #if !defined(HAVE_AES_ENCRYPT)
     return AF_ERROR_NO_AES;
-#endif
-#if !defined(HAVE_SHA256_INIT)
-    return AF_ERROR_NO_SHA256;
 #endif
 }
 
@@ -354,7 +350,7 @@ int  af_use_aes_passphrase(AFFILE *af,const char *passphrase)
 
     unsigned char affkey[32];
     int r = af_get_aes_key_from_passphrase(af,passphrase,affkey);
-    if(r) return r;
+    if(r) return r;			  // wrong keyphrase
     r = af_set_aes_key(af,affkey,256);    /* Set the encryption key */
     memset(affkey,0,sizeof(affkey)); /* Erase the encryption key in memory */
     return r;
@@ -415,29 +411,30 @@ int af_cannot_decrypt(AFFILE *af){
  */
 static int check_keys(EVP_PKEY *privkey,EVP_PKEY *pubkey)
 {
-#ifdef HAVE_EVP_SHA256
     char ptext[16];			/* plaintext of a 128-bit message */
     unsigned char sig[1024];		/* signature; bigger than needed */
     unsigned int siglen = sizeof(sig);	/* length of signature */
+
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256) return -1;		// no SHA256.
+
     EVP_MD_CTX md;			/* EVP message digest */
+
 
     /* make the plaintext message */
     memset(ptext,0,sizeof(ptext));
     strcpy(ptext,"Test Message");
-    EVP_SignInit(&md,EVP_sha256());
+    EVP_SignInit(&md,sha256);
     EVP_SignUpdate(&md,ptext,sizeof(ptext));
     EVP_SignFinal(&md,sig,&siglen,privkey);
 
     /* Verify the message */
-    EVP_VerifyInit(&md,EVP_sha256());
+    EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,ptext,sizeof(ptext));
     if(EVP_VerifyFinal(&md,sig,siglen,pubkey)!=1){
 	return -3;
     }
     return 0;
-#else
-    return -1;			// needs EVP_SHA256
-#endif
 }
 
 
@@ -456,7 +453,12 @@ static int check_keys(EVP_PKEY *privkey,EVP_PKEY *pubkey)
 
 int  af_set_sign_files(AFFILE *af,const char *keyfile,const char *certfile)
 {
-#ifdef HAVE_EVP_SHA256
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256){
+	(*af->error_reporter)(aff_cannot_sign);
+	return AF_ERROR_NO_SHA256;			//
+    }
+	
     BIO *bp = BIO_new_file(keyfile,"r");
     if(!bp) return -1;
     af->crypto->sign_privkey = PEM_read_bio_PrivateKey(bp,0,0,NULL);
@@ -487,10 +489,6 @@ int  af_set_sign_files(AFFILE *af,const char *keyfile,const char *certfile)
     af_update_seg_frombio(af,AF_SIGN256_CERT,0,xbp);
     BIO_free(xbp);
     return 0;
-#else
-    (*af->error_reporter)(aff_cannot_sign);
-    return -99;			// 
-#endif
 }
 
 /* Sign the segment with the signing key.  Signatures are calculated
@@ -503,7 +501,13 @@ int af_sign_seg3(AFFILE *af,const char *segname,
 		 unsigned long arg,const unsigned char *data,unsigned int datalen,
 		 unsigned long signmode)
 {
-#ifdef HAVE_EVP_SHA256
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256){
+	(*af->error_reporter)(aff_cannot_sign);
+	return AF_ERROR_NO_SHA256;			//
+    }
+
+
     if(af->crypto->sign_privkey==0) return -1;		// can't sign; no signing key
 
     if(strlen(segname)+strlen(AF_SIG256_SUFFIX)+1 > AF_MAX_NAME_LEN) return -1;	// too long
@@ -522,16 +526,12 @@ int af_sign_seg3(AFFILE *af,const char *segname,
     unsigned int siglen = sizeof(sig);	/* length of signature */
 
     EVP_MD_CTX md;			/* EVP message digest */
-    EVP_SignInit(&md,EVP_sha256());
+    EVP_SignInit(&md,sha256);
     EVP_SignUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
     EVP_SignUpdate(&md,(const unsigned char *)&arg_net,sizeof(arg_net));
     EVP_SignUpdate(&md,data,datalen);
     EVP_SignFinal(&md,sig,&siglen,af->crypto->sign_privkey);
     return (*af->v->update_seg)(af,signed_segname,signmode,sig,siglen);
-#else
-    (*af->error_reporter)(aff_cannot_sign);
-    return -1;			// 
-#endif
 }
 
 
@@ -604,7 +604,12 @@ int af_sign_all_unsigned_segments(AFFILE *af)
 /* Verify a segment against a particular signature and public key */
 int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t sigbuf_len_,int sigmode)
 {
-#ifdef HAVE_EVP_SHA256
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256){
+	(*af->error_reporter)(aff_cannot_sign);
+	return AF_ERROR_NO_SHA256;			//
+    }
+
     /* Now get the data to verify */
     size_t seglen = 0;
     unsigned char *segbuf = 0;
@@ -643,7 +648,7 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
     u_int sigbuf_len = sizeof(sigbuf);
     u_long arg_net = htonl(arg);
     EVP_MD_CTX md;			/* EVP message digest */
-    EVP_DigestInit(&md,EVP_sha256());
+    EVP_DigestInit(&md,sha256);
     EVP_DigestUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
     EVP_DigestUpdate(&md,(const unsigned char *)&arg_net,sizeof(arg_net));
     EVP_DigestUpdate(&md,segbuf,seglen);
@@ -654,17 +659,18 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
 
     if(r==0) return 0;			// verifies
     return AF_ERROR_SIG_BAD;		// doesn't verify
-#else
-    (*af->error_reporter)(aff_cannot_verify);
-    return -1;			// 
-#endif
 }
 
-#ifdef USE_AFFSIGS
 /* Verify a segment against a particular signature and public key */
 int af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *sigbuf,size_t sigbuf_len,int sigmode)
 {
-#ifdef HAVE_EVP_SHA256
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256){
+	(*af->error_reporter)(aff_cannot_sign);
+	return AF_ERROR_NO_SHA256;			//
+    }
+
+
     /* Now get the data to verify */
     size_t seglen = 0;
     unsigned char *segbuf = 0;
@@ -701,7 +707,7 @@ int af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *s
     /* Verify the signature*/
     unsigned long arg_net = htonl(arg);
     EVP_MD_CTX md;			/* EVP message digest */
-    EVP_VerifyInit(&md,EVP_sha256());
+    EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
     EVP_VerifyUpdate(&md,(const unsigned char *)&arg_net,sizeof(arg_net));
     EVP_VerifyUpdate(&md,segbuf,seglen);
@@ -710,12 +716,8 @@ int af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *s
 
     if(r==1) return 0;			// verifies
     return AF_ERROR_SIG_BAD;		// doesn't verify
-#else
-    (*af->error_reporter)(aff_cannot_sign);
-    return -1;			// 
-#endif
 }
-#endif
+
 
 
 int af_sig_verify_seg(AFFILE *af,const char *segname)
@@ -774,16 +776,21 @@ int af_sig_verify_seg(AFFILE *af,const char *segname)
 
 int  af_set_seal_certificates(AFFILE *af,const char *certfiles[],int numcertfiles)
 {
-#ifdef HAVE_EVP_SHA256
-    char evp0[AF_MAX_NAME_LEN];
+    const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
+    if(!sha256){
+	(*af->error_reporter)(aff_cannot_sign);
+	return AF_ERROR_NO_SHA256;			//
+    }
+
+    char evp0[AF_MAX_NAME_LEN];		// segment where we will store the encrypted session key
     snprintf(evp0,sizeof(evp0),AF_AFFKEY_EVP,0);
 
     /* If an affkey has not been created, create one if there is a public key(s)...
      * todo: this should probably see if there is ANY evp segment.
      */
-    if(af_get_seg(af,evp0,0,0,0)==0) return -1;
-    if(af_get_seg(af,AF_AFFKEY,0,0,0)==0) return -1;
-    if(certfiles==0 || numcertfiles==0) return -1;
+    if(af_get_seg(af,evp0,0,0,0)==0) return -1; // make sure no encrypted EVP exists
+    if(af_get_seg(af,AF_AFFKEY,0,0,0)==0) return -1; // make sure no passphrase exists
+    if(certfiles==0 || numcertfiles==0) return -1;   // make sure the user supplied a certificate
 
     /* First make the affkey */
     unsigned char affkey[32];
@@ -792,11 +799,7 @@ int  af_set_seal_certificates(AFFILE *af,const char *certfiles[],int numcertfile
     if(r!=1) return AF_ERROR_RNG_FAIL; // pretty bad...
     
     af_seal_affkey_using_certificates(af, certfiles, numcertfiles, affkey);
-   
-#else
-    (*af->error_reporter)(aff_cannot_sign);
-    return -1;				// no evp support
-#endif
+    return 0;
 }
 
 /**
@@ -807,8 +810,9 @@ int  af_set_seal_certificates(AFFILE *af,const char *certfiles[],int numcertfile
  *
  */
 
-int  af_seal_affkey_using_certificates(AFFILE *af,const char *certfiles[],int numcertfiles, unsigned char affkey[32]){
-   /* Repeat for each public key.. */
+int  af_seal_affkey_using_certificates(AFFILE *af,const char *certfiles[],int numcertfiles, unsigned char affkey[32])
+{
+    /* Repeat for each public key.. */
     int r;
     for(int i=0;i<numcertfiles;i++){
 	
@@ -921,7 +925,6 @@ int af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,u_char a
     int ret = -1;			// return code; set to 0 when successful
     while(i<1000 && ret!=0){ // hopefully there aren't more than 1000 keys...
 	char segname[AF_MAX_NAME_LEN];
-	int done = 0;
 
 	sprintf(segname,AF_AFFKEY_EVP,i++);
 	size_t buflen=0;
@@ -939,9 +942,9 @@ int af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,u_char a
 	unsigned char *decrypted = 0;	// 
 	if (*(u_int *)buf == htonl(1)){	// check to see if the encrypted EVP is rev 1
 	    /* Handle rev 1 */
-	    const int int1 = sizeof(int)*1; // offset #1 
-	    const int int2 = sizeof(int)*2; // offset #2
-	    const int int3 = sizeof(int)*3; // offset #3
+	    const u_int int1 = sizeof(int)*1; // offset #1 
+	    const u_int int2 = sizeof(int)*2; // offset #2
+	    const u_int int3 = sizeof(int)*3; // offset #3
 	    int ek_size               = ntohl(*(u_int *)(buf+int1));
 	    int total_encrypted_bytes = ntohl(*(u_int *)(buf+int2));
 	    if(int3+EVP_MAX_IV_LENGTH+ek_size+total_encrypted_bytes != buflen){
@@ -950,7 +953,6 @@ int af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,u_char a
 	    unsigned char *iv = buf+int3;
 	    unsigned char *ek = buf+int3+EVP_MAX_IV_LENGTH;
 	    unsigned char *encrypted_affkey = buf+int3+EVP_MAX_IV_LENGTH+ek_size;
-	    bool okay=false;
 		
 	    /* Now let's see if we can decode it*/
 	    EVP_CIPHER_CTX cipher_ctx;
@@ -972,7 +974,7 @@ int af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,u_char a
 			ret = 0;		// successful return
 		    }
 		}
-		memset(decrypted,total_encrypted_bytes,0); // overwrite our temp buffer
+		memset(decrypted,0,total_encrypted_bytes); // overwrite our temp buffer
 		free(decrypted);
 	    }
 	}

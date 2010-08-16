@@ -2,7 +2,7 @@ AC_PREREQ( 2.59 )
 
 AC_INIT(
  [libewf],
- [20090606],
+ [20100226],
  [forensics@hoffmannbv.nl])
 
 AC_CONFIG_SRCDIR(
@@ -10,7 +10,9 @@ AC_CONFIG_SRCDIR(
 
 AM_INIT_AUTOMAKE(
  [libewf],
- [20090606])
+ [20100226])
+
+AC_CONFIG_MACRO_DIR([m4])
 
 dnl Check for host type
 AC_CANONICAL_HOST
@@ -54,11 +56,6 @@ LIBEWF_TEST_ENABLE(
  [python],
  [build python bindings (pyewf)],
  [no])
-LIBEWF_TEST_ENABLE(
- [v1-api],
- [v1_api],
- [enable version 1 API],
- [yes])
 LIBEWF_TEST_ENABLE(
  [v2-api],
  [v2_api],
@@ -124,34 +121,37 @@ AC_CHECK_HEADER(
 dnl Headers included in common/types.h
 AC_CHECK_HEADERS([limits.h])
 
-dnl Headers included in common/narrow_string.h
+dnl Headers included in common/narrow_string.h and common/memory.h
 AC_CHECK_HEADERS([string.h])
-
-dnl Headers included in common/memory.h
 AC_CHECK_HEADERS([stdlib.h])
 
-dnl Headers included in libbfio/libbfio_file.h and ewftools/file_io.h
+dnl Headers included in libnotify/libnotify.c
+AC_CHECK_HEADERS([stdarg.h])
+AC_CHECK_HEADERS([varargs.h])
+
+dnl Headers included in libnotify/libnotify.c, libbfio/libbfio_file.c and libewf/libewf_header_values.c
+AC_CHECK_HEADERS([errno.h])
+
+dnl Headers included in libbfio/libbfio_file.c, libsystem/libsystem_directory_io.h and libsystem/libsystem_file_io.h
 AC_CHECK_HEADERS([sys/stat.h])
+
+dnl Headers included in libbfio/libbfio_file.c and libsystem/libsystem_file_io.h
 AC_CHECK_HEADERS([fcntl.h])
 AC_CHECK_HEADERS([unistd.h])
 
 dnl Headers included in libewf/libewf_date_time.h
 AC_HEADER_TIME
 
-dnl Headers included in libewf/libewf_notify.h
-AC_CHECK_HEADERS([stdarg.h])
-AC_CHECK_HEADERS([varargs.h])
-
-dnl Headers included in ewftools/glob.h
+dnl Headers included in libsystem/libsystem_glob.h
 AC_CHECK_HEADERS([glob.h])
 
-dnl Headers included in ewftools/ewfsignal.h
-AC_CHECK_HEADERS([signal.h])
-AC_CHECK_HEADERS([sys/signal.h])
-
-dnl Headers included in ewftools/system_string.h
+dnl Headers included in libsytem/libsystem_support.c
 AC_CHECK_HEADERS([langinfo.h])
 AC_CHECK_HEADERS([locale.h])
+
+dnl Headers included in libsystem/libsystem_signal.h
+AC_CHECK_HEADERS([signal.h])
+AC_CHECK_HEADERS([sys/signal.h])
 
 dnl Headers included in ewftools/device_handle.c
 dnl and ewftools/io_*.[ch]
@@ -172,13 +172,14 @@ AC_CHECK_HEADERS([sys/disk.h])
 AC_CHECK_HEADERS([sys/disklabel.h])
 AC_CHECK_HEADERS([sys/ioctl.h])
 
-dnl Other headers
-AC_CHECK_HEADERS([errno.h])
-
+dnl Headers included in ewftools/platform.c
 AC_CHECK_HEADERS([sys/utsname.h])
 
+dnl Headers included in ewftools/ewfoutput.c
 AC_CHECK_HEADERS([openssl/opensslv.h])
 AC_CHECK_HEADERS([zlib.h])
+
+dnl Other headers
 
 dnl Check for type definitions
 AC_STRUCT_TM
@@ -239,6 +240,63 @@ AC_CHECK_SIZEOF([off_t])
 AC_CHECK_SIZEOF([size_t])
 
 dnl Check for functions
+dnl File stream functions used in common/file_stream.h
+AC_CHECK_FUNCS(
+ [fclose],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fclose],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [feof],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: feof],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [fgets],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fgets],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [fopen],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fopen],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [fread],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fread],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [fseeko],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fseeko],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [fwrite],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: fwrite],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [vfprintf],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: vfprintf],
+  [1]) ])
+
 dnl Memory functions used in common/memory.h
 AC_CHECK_FUNCS(
  [free],
@@ -292,6 +350,13 @@ AC_CHECK_FUNCS(
   [AC_MSG_FAILURE(
    [Missing functions: snprintf and sprintf],
    [1]) ]) ])
+
+AC_CHECK_FUNCS(
+ [sscanf],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: sscanf],
+  [1]) ])
 
 AC_CHECK_FUNCS(
  [strlen],
@@ -365,7 +430,14 @@ AC_CHECK_FUNCS(
    [Missing functions: strtoull and atoll],
    [1]) ]) ])
 
-dnl File input/output functions used in libbdio/libbfio_file.h
+AC_CHECK_FUNCS(
+ [vsnprintf],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing function: vsnprintf],
+  [1]) ])
+
+dnl File input/output functions used in libbfio/libbfio_file.h
 AC_CHECK_FUNCS(
  [close],
  [],
@@ -426,15 +498,7 @@ AC_CHECK_FUNCS(
   [Missing function: mktime],
   [1]) ])
 
-dnl File input/output functions used in libewf/libewf_notify.h
-AC_CHECK_FUNCS(
- [vfprintf],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: vfprintf],
-  [1]) ])
-
-dnl Date and time functions used in ewftools/date_time.h
+dnl Date and time functions used in libsystem/libsystem_date_time.h
 LIBEWF_CHECK_FUNC_CTIME
 
 AC_CHECK_FUNCS(
@@ -454,7 +518,22 @@ AC_CHECK_FUNCS(
   [Missing function: time],
   [1]) ])
 
-dnl Check for error string functions used in ewftools/error_string.h
+dnl Directory functions used in libsystem/libsystem_directory_io.h
+AC_CHECK_FUNCS(
+ [chdir],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing functions: chdir],
+  [1]) ])
+
+AC_CHECK_FUNCS(
+ [mkdir],
+ [],
+ [AC_MSG_FAILURE(
+  [Missing functions: mkdir],
+  [1]) ])
+
+dnl Check for error string functions used in libsystem/libsystem_error.c
 AC_FUNC_STRERROR_R(
  [],
  [AC_CHECK_FUNCS(
@@ -464,53 +543,10 @@ AC_FUNC_STRERROR_R(
    [Missing functions: strerror_r and strerror],
    [1]) ]) ])
 
-dnl Check for error string functions used in ewftools/ewfgetopt.h
+dnl Commandline argument/option parsing functions in libsystem/libsystem_getopt.h
 AC_CHECK_FUNCS([getopt])
 
-dnl File input/output functions used in ewftools/file_stream_io.h
-AC_CHECK_FUNCS(
- [fclose],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: fclose],
-  [1]) ])
-
-AC_CHECK_FUNCS(
- [feof],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: feof],
-  [1]) ])
-
-AC_CHECK_FUNCS(
- [fgets],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: fgets],
-  [1]) ])
-
-AC_CHECK_FUNCS(
- [fopen],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: fopen],
-  [1]) ])
-
-AC_CHECK_FUNCS(
- [fread],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: fread],
-  [1]) ])
-
-AC_CHECK_FUNCS(
- [fwrite],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: fwrite],
-  [1]) ])
-
-dnl Check for locale functions
+dnl Check for locale functions in libsystem/libsystem_support.h
 AC_CHECK_FUNCS(
  [setlocale],
  [],
@@ -528,14 +564,9 @@ AC_CHECK_FUNCS(
   [Missing function: fstat],
   [1]) ])
 
-AC_CHECK_FUNCS(
- [setlocale],
- [],
- [AC_MSG_FAILURE(
-  [Missing function: setlocale],
-  [1]) ])
-
 AC_CHECK_FUNCS([uname])
+
+LIBEWF_CHECK_FUNC_POSIX_FADVISE
 
 dnl Check for printf conversion specifier support
 LIBEWF_CHECK_PRINTF_JD
@@ -565,7 +596,7 @@ AC_CHECK_LIB(
  [AC_DEFINE(
   [HAVE_COMPRESS_BOUND],
   [1],
-  [Defines if compressBound funtion is present in zlib.])])
+  [Define to 1 if compressBound funtion is available in zlib.])])
 
 AC_CHECK_LIB(
  z,
@@ -890,35 +921,148 @@ AS_IF(
 	 [],
 	 [ac_libewf_have_libbfio=no])
 
-	dnl Basic file IO functions
+	dnl Handle functions
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_initialize,
+	 libbfio_handle_free,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_free,
+	 libbfio_handle_open,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_open,
+	 libbfio_handle_close,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_close,
+	 libbfio_handle_exists,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_seek_offset,
+	 libbfio_handle_read,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	AC_CHECK_LIB(
 	 bfio,
-	 libbfio_read,
+	 libbfio_handle_set_track_offsets_read,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+
+	dnl File functions
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_file_initialize,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_file_get_name_size,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_file_get_name,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_file_set_name,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+
+	AS_IF(
+		[test "x$ac_cv_libewf_enable_wide_character_type" != xno ],
+		[AC_CHECK_LIB(
+		 bfio,
+		 libbfio_file_get_name_size_wide,
+		 [ac_libewf_dummy=yes],
+		 [ac_libewf_have_libbfio=no])
+		AC_CHECK_LIB(
+		 bfio,
+		 libbfio_file_get_name_wide,
+		 [ac_libewf_dummy=yes],
+		 [ac_libewf_have_libbfio=no])
+		AC_CHECK_LIB(
+		 bfio,
+		 libbfio_file_set_name_wide,
+		 [ac_libewf_dummy=yes],
+		 [ac_libewf_have_libbfio=no]) ])
+
+	dnl Pool functions
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_initialize,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_free,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_open,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_reopen,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_close,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_close_all,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_read,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_write,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_seek_offset,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_get_amount_of_handles,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_get_handle,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_add_handle,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_get_offset,
+	 [ac_libewf_dummy=yes],
+	 [ac_libewf_have_libbfio=no])
+	AC_CHECK_LIB(
+	 bfio,
+	 libbfio_pool_get_size,
 	 [ac_libewf_dummy=yes],
 	 [ac_libewf_have_libbfio=no])
 	])
@@ -939,7 +1083,10 @@ AS_IF(
 	 [])
 	AC_SUBST(
 	 [LIBBFIO_LIBADD],
-	 []) ],
+	 [])
+	AC_SUBST(
+	 [HAVE_LIBBFIO],
+	 [1]) ],
 	[dnl If libbfio is not available use the (local) version that came with libewf
 	AC_DEFINE(
 	 [HAVE_LOCAL_LIBBFIO],
@@ -963,6 +1110,9 @@ AS_IF(
 	AC_SUBST(
 	 [LIBBFIO_LIBADD],
 	 [../libbfio/libbfio.la])
+	AC_SUBST(
+	 [HAVE_LIBBFIO],
+	 [0])
 	ac_libewf_have_libbfio=local])
 
 AM_CONDITIONAL(
@@ -1002,7 +1152,13 @@ AS_IF(
 	AC_CHECK_LIB(
 	 crypto,
 	 EVP_md5,
-	 [],
+	 [AC_SUBST(
+	  [LIBCRYPTO_LIBADD],
+	  [-lcrypto])
+	 AC_DEFINE(
+	  [HAVE_LIBCRYPTO],
+	  [1],
+	  [Define to 1 if you have the 'crypto' library (-lcrypto).]) ],
 	 [ac_libewf_have_libcrypto_evp=no])
 	AC_CHECK_LIB(
 	 crypto,
@@ -1040,7 +1196,7 @@ AS_IF(
 	[test "x$ac_libewf_have_libcrypto_evp" = xno],
 	[AC_SUBST(
 	 [HAVE_OPENSSL_EVP_H],
-	 [0])] )
+	 [0]) ])
 
 AS_IF(
 	[test "x$ac_libewf_have_libcrypto_evp" = xyes],
@@ -1061,7 +1217,13 @@ AS_IF(
 	AC_CHECK_LIB(
 	 crypto,
 	 MD5_Init,
-	 [],
+	 [AC_SUBST(
+	  [LIBCRYPTO_LIBADD],
+	  [-lcrypto])
+	 AC_DEFINE(
+	  [HAVE_LIBCRYPTO],
+	  [1],
+	  [Define to 1 if you have the 'crypto' library (-lcrypto).]) ],
 	 [ac_libewf_have_libcrypto_md5=no])
 	AC_CHECK_LIB(
 	 crypto,
@@ -1131,7 +1293,13 @@ AS_IF(
 	  AC_CHECK_LIB(
 	  [uuid],
 	  [uuid_generate],
-	  [],
+	  [AC_SUBST(
+	   [LIBUUID_LIBADD],
+	   [-luuid])
+	  AC_DEFINE(
+	   [HAVE_LIBUUID],
+	   [1],
+	   [Define to 1 if you have the 'uuid' library (-luuid).]) ],
 	  [ac_libewf_have_guid_support=no])
 	 ])
 	])
@@ -1152,7 +1320,7 @@ AS_IF(
 	 [AC_DEFINE(
 	  [HAVE_UUID_GENERATE_RANDOM],
 	  [1],
-	  [Defines if uuid_generate_random funtion is present in libuuid.])
+	  [Define to 1 if uuid_generate_random funtion is available in libuuid.])
 	 ])
 	AC_CHECK_LIB(
 	 [uuid],
@@ -1160,7 +1328,7 @@ AS_IF(
 	 [AC_DEFINE(
 	  [HAVE_UUID_GENERATE_TIME],
 	  [1],
-	  [Defines if uuid_generate_time funtion is present in libuuid.])
+	  [Define to 1 if uuid_generate_time funtion is available in libuuid.])
 	 ])
 	])
 
@@ -1171,15 +1339,32 @@ AS_IF(
 	 [AC_DEFINE(
 	  [HAVE_UUID_GENERATE_RANDOM],
 	  [1],
-	  [Defines if uuid_generate_random funtion is present.])
+	  [Define to 1 if uuid_generate_random funtion is available.])
 	 ])
 	AC_CHECK_FUNC(
 	 [uuid_generate_time],
 	 [AC_DEFINE(
 	  [HAVE_UUID_GENERATE_TIME],
 	  [1],
-	  [Defines if uuid_generate_time funtion is present.])
+	  [Define to 1 if uuid_generate_time funtion is available.])
 	 ])
+	])
+
+AS_IF(
+	[test "x$ac_libewf_have_guid_support" = xlibuuid],
+	[AC_SUBST(
+	 [libewf_spec_requires_libuuid],
+	 [e2fsprogs-devel])
+	AC_SUBST(
+	 [libewf_spec_build_requires_libuuid],
+	 [e2fsprogs-devel]) ],
+	[AC_SUBST(
+	 [libewf_spec_requires_libuuid],
+	 [])
+	AC_SUBST(
+	 [libewf_spec_build_requires_libuuid],
+	 [])
+	ac_libewf_dummy=yes
 	])
 
 dnl Check if libewf should be build with wide character type support
@@ -1203,6 +1388,14 @@ AS_IF(
 	AC_CHECK_SIZEOF([wchar_t])
 
 	dnl Check for wide character string functions
+
+	dnl Wide character string functions used in common/file_stream.h
+	AC_CHECK_FUNCS(
+	 [fgetws],
+	 [],
+	 [AC_MSG_FAILURE(
+	  [Missing function: fgetws],
+	  [1]) ])
 
 	dnl Wide character string functions used in common/wide_string.h
 	AC_CHECK_FUNCS(
@@ -1279,19 +1472,11 @@ AS_IF(
 	  [Missing function: wcstoull],
 	  [1]) ])
 
-	dnl Wide character string functions used in ewftools/file_stream_io.h
-	AC_CHECK_FUNCS(
-	 [fgetws],
-	 [],
-	 [AC_MSG_FAILURE(
-	  [Missing function: fgetws],
-	  [1]) ])
-
 	dnl Make the necessary definitions
 	AC_DEFINE(
 	 [HAVE_WIDE_CHARACTER_TYPE],
 	 [1],
-	 [Defines if wide character type should be used])
+	 [Define to 1 if wide character type should be used.])
 	AC_SUBST(
 	 [HAVE_WIDE_CHARACTER_TYPE],
 	 [1])
@@ -1318,7 +1503,7 @@ AS_IF(
 	[AC_DEFINE(
 	 [HAVE_LOW_LEVEL_FUNCTIONS],
 	 [1],
-	 [Defines if libewf's low level read and write functions should be used in the ewf tools] )
+	 [Define to 1 if libewfs low level read and write functions should be used in the ewf tools.])
 	ac_cv_libewf_enable_low_level_functions=yes])
 
 dnl Check if libewf should be build with verbose output
@@ -1327,7 +1512,7 @@ AS_IF(
 	[AC_DEFINE(
 	 [HAVE_VERBOSE_OUTPUT],
 	 [1],
-	 [Defines if verbose output should be used] )
+	 [Define to 1 if verbose output should be used.])
 	ac_cv_libewf_enable_verbose_output=yes])
 
 dnl Check if libewf should be build with debug output
@@ -1336,7 +1521,7 @@ AS_IF(
 	[AC_DEFINE(
 	 [HAVE_DEBUG_OUTPUT],
 	 [1],
-	 [Defines if debug output should be used] )
+	 [Define to 1 if debug output should be used.])
 	ac_cv_libewf_enable_debug_output=yes])
 
 dnl Check if libewf python bindings (pyewf) should be built
@@ -1354,20 +1539,15 @@ AM_CONDITIONAL(
  HAVE_PYTHON,
  [test "x$ac_cv_libewf_enable_python" != xno])
 
-dnl Check if libewf should be build with version 1 API
-AS_IF(
-	[test "x$ac_cv_libewf_enable_v1_api" != xno],
-	[AC_DEFINE(
-	 [HAVE_V1_API],
-	 [1],
-	 [Defines if experimental version 1 API should be used] )
-	AC_SUBST(
-	 [HAVE_V1_API],
-	 [1])
-	ac_cv_libewf_enable_v1_api=yes],
-	[AC_SUBST(
-	 [HAVE_V1_API],
-	 [0]) ])
+dnl Build libewf with version 1 API
+AC_DEFINE(
+ [HAVE_V1_API],
+ [1],
+ [Define to 1 if experimental version 1 API should be used.])
+AC_SUBST(
+ [HAVE_V1_API],
+ [1])
+ac_cv_libewf_enable_v1_api=yes
 
 AM_CONDITIONAL(
  HAVE_V1_API,
@@ -1379,7 +1559,7 @@ AS_IF(
 	[AC_DEFINE(
 	 [HAVE_V2_API],
 	 [1],
-	 [Defines if experimental version 2 API should be used] )
+	 [Define to 1 if experimental version 2 API should be used.])
 	AC_SUBST(
 	 [HAVE_V2_API],
 	 [1])
@@ -1431,14 +1611,17 @@ AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([include/Makefile])
 AC_CONFIG_FILES([common/Makefile])
 AC_CONFIG_FILES([liberror/Makefile])
+AC_CONFIG_FILES([libnotify/Makefile])
 AC_CONFIG_FILES([libuna/Makefile])
 AC_CONFIG_FILES([libbfio/Makefile])
 AC_CONFIG_FILES([libewf/Makefile])
+AC_CONFIG_FILES([libsystem/Makefile])
 AC_CONFIG_FILES([ewftools/Makefile])
 AC_CONFIG_FILES([pyewf/Makefile])
 AC_CONFIG_FILES([documents/Makefile])
 AC_CONFIG_FILES([manuals/Makefile])
 AC_CONFIG_FILES([macosx/Makefile])
+AC_CONFIG_FILES([borlandc/Makefile])
 AC_CONFIG_FILES([msvscpp/Makefile])
 dnl Have configure make the include files
 AC_CONFIG_FILES([include/libewf.h])
@@ -1448,8 +1631,6 @@ AC_CONFIG_FILES([include/libewf/types.h])
 AC_CONFIG_FILES([libewf/libewf_definitions.h])
 dnl Have configure make distribution specific files
 AC_CONFIG_FILES([common/types.h])
-AC_CONFIG_FILES([debian/changelog])
-AC_CONFIG_FILES([debian/shlibs.local.ex])
 AC_CONFIG_FILES([macosx/Introduction.rtf])
 AC_CONFIG_FILES([libewf.pc])
 AC_CONFIG_FILES([libewf.spec])
@@ -1475,7 +1656,6 @@ Features:
    Python (pyewf) support:                          $ac_cv_libewf_enable_python
    Verbose output:                                  $ac_cv_libewf_enable_verbose_output
    Debug output:                                    $ac_cv_libewf_enable_debug_output
-   Version 1 API:                                   $ac_cv_libewf_enable_v1_api
    Experimental version 2 API:                      $ac_cv_libewf_enable_v2_api
 ]);
 

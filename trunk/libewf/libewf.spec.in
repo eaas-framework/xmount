@@ -7,8 +7,8 @@ License: LGPL
 Source: %{name}-%{version}.tar.gz
 URL: http://libewf.sourceforge.net
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Requires: @libewf_spec_requires_libuna@ @libewf_spec_requires_libbfio@ zlib e2fsprogs-devel
-BuildRequires: @libewf_spec_build_requires_libuna@ @libewf_spec_build_requires_libbfio@ zlib-devel e2fsprogs-devel
+Requires: @libewf_spec_requires_libuna@ @libewf_spec_requires_libbfio@ zlib
+BuildRequires: @libewf_spec_build_requires_libuna@ @libewf_spec_build_requires_libbfio@ zlib-devel
 
 %description
 libewf is a library for support of the Expert Witness Compression Format (EWF).
@@ -27,8 +27,8 @@ Header files and libraries for developing applications for libewf.
 %package tools
 Summary: Several tools for reading and writing EWF files
 Group: Applications/System
-Requires: openssl libewf = %{version}-%{release}
-BuildRequires: zlib-devel openssl-devel
+Requires: openssl @libewf_spec_build_requires_libuuid@ libewf = %{version}-%{release}
+BuildRequires: zlib-devel openssl-devel @libewf_spec_requires_libuuid@
 
 %description tools
 Several tools for reading and writing EWF files.
@@ -77,11 +77,13 @@ rm -rf ${RPM_BUILD_ROOT}
 %attr(755,root,root) %{_bindir}/ewfverify
 %{_mandir}/man1/*
 
-### Exclude expirimental files ###
-%exclude %{_bindir}/ewfalter
-%exclude %{_bindir}/ewfdebug
-
 %changelog
+* Sat Nov 14 2009 Joachim Metz <forensics@hoffmannbv.nl> 20091114-1
+- Removed ewfalter and ewfdebug exclusion for stable release
+
+* Fri Aug 28 2009 Joachim Metz <forensics@hoffmannbv.nl> 20090828-1
+- Added dynamic support for libuuid requires and build requires
+
 * Sun Apr 5 2009 Joachim Metz <forensics@hoffmannbv.nl> 20090405-1
 - Added exclusion for ewfdebug
 - Added default v2 API support

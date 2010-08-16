@@ -239,9 +239,9 @@ static int cow_create(const char *filename, int64_t image_sectors,
     }
     cow_header.sectorsize = cpu_to_be32(512);
     cow_header.size = cpu_to_be64(image_sectors * 512);
-    write(cow_fd, &cow_header, sizeof(cow_header));
+    if(write(cow_fd, &cow_header, sizeof(cow_header))!=sizeof(cow_header)) return -1;
     /* resize to include at least all the bitmap */
-    ftruncate(cow_fd, sizeof(cow_header) + ((image_sectors + 7) >> 3));
+    if(ftruncate(cow_fd, sizeof(cow_header) + ((image_sectors + 7) >> 3))<0) return -1;
     close(cow_fd);
     return 0;
 }

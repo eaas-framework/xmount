@@ -6,10 +6,12 @@
 #include "affconfig.h"
 #include "afflib.h"
 #include "afflib_i.h"
-#include "afflib_sha256.h"		// make sure we have a SHA256 implementation
 #include "base64.h"
 #include "aftimer.h"
+
+#ifdef HAVE_THREADED_HASH_H
 #include "threaded_hash.h"
+#endif
 
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
@@ -69,7 +71,6 @@ AFFILE *open_testfile(const char *base,int wipe)
 int sequential_test()
 {
     char buf[1024];
-    char fn[1024];
     const char *fmt = "this is line %d\n";
 
     printf("Sequential test...\n");
@@ -103,7 +104,7 @@ int sequential_test()
 	}
 	rbuf[len] = 0;			// terminate the string
 	if(strcmp(buf,rbuf)!=0){
-	    err(1,"Attempt to verify entry %d failed.\nExpected: (len=%d) '%s'\nGot: (len=%d) '%s'\n",
+	    err(1,"Attempt to verify entry %d failed.\nExpected: (len=%zd) '%s'\nGot: (len=%zd) '%s'\n",
 		i,strlen(buf),buf,strlen(rbuf),rbuf);
 	}
     }
@@ -117,12 +118,9 @@ int reverse_test()
 {
     char wbuf[1024];
     char rbuf[1024];
-    char fn[1024];
-    int pass = 0;
 
     printf("Reverse write test...\n");
     for(int pass=1;pass<=2;pass++){
-	int mode = (pass==1) ? O_CREAT|O_RDWR|O_TRUNC : O_RDONLY;
 
 	AFFILE *af = open_testfile("test_reverse",pass==1);
 	for(int i=MAX_FMTS-1;i>=0;i--){
@@ -154,7 +152,6 @@ int reverse_test()
 
 int random_write_test()
 {
-    char fn[1024];
     char buf[1024];
     char *tally = (char *)calloc(MAX_FMTS,1);
     int i;
@@ -230,7 +227,6 @@ int random_read_test(int total_bytes,int data_page_size)
 		     O_CREAT|O_RDWR|O_TRUNC|O_BINARY,0666);
     if(fd<0) err(1,"fopen");
 
-    char fn[1024];
     AFFILE *af = open_testfile("test_random_contents",1);
 
     /* Just write it out as one big write */
@@ -370,7 +366,7 @@ void sparse_test()
     af_set_maxsize(af,(int64_t)1024*1024*256);
     af_set_pagesize(af,1024*1024*16);
 
-    for(uint i=0;i<10;i++){
+    for(u_int i=0;i<10;i++){
 	uint64_t pos = mult*i;
 	memset(buf,0,sizeof(buf));
 	snprintf(buf,sizeof(buf),"This is at location=%"I64u"\n",pos);
@@ -379,7 +375,7 @@ void sparse_test()
     }
 
     /* Now verify */
-    for(uint i=0;i<10;i++){
+    for(u_int i=0;i<10;i++){
 	uint64_t pos = mult*i;
 	uint64_t q;
 	af_seek(af,pos,SEEK_SET);
@@ -402,11 +398,11 @@ void sparse_test()
     /* Now seek to somewhere that no data has been written and see if we get 0s. */
     memset(buf,'g',sizeof(buf));
     af_seek(af,mult/2,SEEK_SET);
-    int r = af_read(af,(unsigned char *)buf,sizeof(buf));
+    ssize_t r = af_read(af,(unsigned char *)buf,sizeof(buf));
     if(r!=sizeof(buf)){
-	err(1,"Tried to read %d bytes at mult/2; got %d bytes\n",sizeof(buf),r);
+	err(1,"Tried to read %zd bytes at mult/2; got %zd bytes\n",sizeof(buf),r);
     }
-    for(int i=0;i<sizeof(buf);i++){
+    for(u_int i=0;i<sizeof(buf);i++){
 	if(buf[i]!=0) err(1,"data error; buf[%d]=%d\n",i,buf[i]);
     }
 
@@ -415,7 +411,7 @@ void sparse_test()
     af_seek(af,9*mult,SEEK_SET);
     r = af_read(af,big_buf,sizeof(big_buf));
     if(r!=sizeof(buf)){
-	errx(1,"Tried to read %d bytes at the end of the file; got %d bytes (should get %d)",
+	errx(1,"Tried to read %zd bytes at the end of the file; got %zd bytes (should get %zd)",
 	    sizeof(big_buf),r,sizeof(buf));
     }
 			  
@@ -423,7 +419,7 @@ void sparse_test()
     /* Now see if we can read past the end of the file */
     af_seek(af,11*mult,SEEK_SET);
     r = af_read(af,(unsigned char *)buf,sizeof(buf));
-    if(r!=0) errx(1,"Tried to read past end of file; got %d bytes (should get 0)",r);
+    if(r!=0) errx(1,"Tried to read past end of file; got %zd bytes (should get 0)",r);
 
     af_close(af);
     printf("\nSprase test passes.\n");
@@ -440,8 +436,8 @@ void figure(const char *fn)
 	err(1,"af_figure_media");
     }
     printf("sector size: %d\n",afb.sector_size);
-    printf("total sectors: %qd\n",afb.total_sectors);
-    printf("max read blocks: %d\n",afb.max_read_blocks);
+    printf("total sectors: %"PRId64"\n",afb.total_sectors);
+    printf("max read blocks: %"PRId64"\n",afb.max_read_blocks);
     exit(0);
 }
 
@@ -536,7 +532,7 @@ int aestest()
     u_char test[1024],buf[1024],rbuf[1024];
     size_t  buflen = sizeof(buf);
     make_test_seg(test,0);
-    for(int len=0;len<=strlen((const char *)test);len++){
+    for(u_int len=0;len<=strlen((const char *)test);len++){
 	if(af_update_seg(af,"page0",0,test,len)) err(1,"af_update_seg len=%d",len);
 	
 	/* Now try to read the segment */
@@ -546,7 +542,7 @@ int aestest()
 	    err(1,"Could not read encrypted segment with length %d.\n",len);
 	}
 	if(buflen!=len){
-	    printf("size of returned segment = %d ",buflen);
+	    printf("size of returned segment = %zd ",buflen);
 	    printf("(should be %d) \n",len);
 	    exit(0);
 	}
@@ -590,7 +586,7 @@ int aestest()
     /* Try to read a segment that doesn't eixst */
     buflen = 0;
     if(af_get_seg(af,"encrypted2",0,0,&buflen)==0){
-	errx(1,"Error: Attempt to get size of non-existant segment 'encrypted2' got %d\n",buflen);
+	errx(1,"Error: Attempt to get size of non-existant segment 'encrypted2' got %zd\n",buflen);
     }
     af_close(af);
 
@@ -684,11 +680,12 @@ void readfile_test(const char *fname)
 	err(1,"af_open(%s)",fname);
     }
     printf("using '%s'\n",af->v->name);
-    printf("af_get_imagesize()=%qd errno=%d\n",af_get_imagesize(af),errno);
+    printf("af_get_imagesize()=%"PRId64" errno=%d\n",af_get_imagesize(af),errno);
 
     int r = af_read(af,buf,sizeof(buf));
     printf("af_read(af,buf,1024)=%d  errno=%d\n",r,errno);
-    fwrite(buf,1,512,stdout);
+    r = fwrite(buf,1,512,stdout);
+    assert(r==512);
     af_close(af);
     exit(0);
 }
@@ -697,7 +694,7 @@ void zap(const char *fn)
 {
     unsigned char buf[1024*1024];
     AFFILE *af = af_open(fn,O_RDWR,0666);
-    if(!af) err(1,"af_open(%s)");
+    if(!af) err(1,"af_open(%s)",fn);
     memset(buf,0,sizeof(buf));
     if(af_write(af,buf,sizeof(buf))!=sizeof(buf)){
 	err(1,"af_write()");
@@ -723,6 +720,7 @@ void xmltest(const char *fn);
 
 void time_test()
 {
+#ifdef HAVE_THREADED_HASH_H
     int size = 1024*1024*256;
     unsigned char *buf1 = (u_char *)calloc(size,1);
     int threaded=0;
@@ -732,13 +730,11 @@ void time_test()
 	buf1[0]= count;
 	for(threaded=0;threaded<2;threaded++){
 	    aftimer t;
-	    threaded_hash h_md5(EVP_md5,threaded);
-	    threaded_hash h_sha1(EVP_sha1,threaded);
-	    threaded_hash h_sha2(EVP_sha1,threaded);
-	    threaded_hash h_sha3(EVP_sha1,threaded);
-#ifdef HAVE_EVP_SHA256
-	    threaded_hash h_sha256(EVP_sha256,threaded);
-#endif
+	    threaded_hash h_md5(EVP_get_digestbyname("md5"),threaded);
+	    threaded_hash h_sha1(EVP_get_digestbyname("sha1"),threaded);
+	    threaded_hash h_sha2(EVP_get_digestbyname("sha1"),threaded);
+	    threaded_hash h_sha3(EVP_get_digestbyname("sha1"),threaded);
+	    threaded_hash h_sha256(EVP_get_digestbyname("sha256"),threaded);
 	    
 	    printf("Threaded: %d size: %d\n",threaded,size);
 	    t.start();
@@ -746,9 +742,7 @@ void time_test()
 	    h_sha2.update(buf1,size);
 	    h_sha3.update(buf1,size);
 	    h_md5.update(buf1,size);
-#ifdef HAVE_EVP_SHA256
 	    h_sha256.update(buf1,size);
-#endif
 	    
 	    unsigned char md[32];
 	    char b[64];
@@ -757,14 +751,13 @@ void time_test()
 	    h_sha1.final(md,sizeof(md)); printf("sha1: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
 	    h_sha2.final(md,sizeof(md)); printf("sha2: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
 	    h_sha3.final(md,sizeof(md)); printf("sha3: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
-#ifdef HAVE_EVP_SHA256
 	    h_sha256.final(md,sizeof(md)); printf("sha256: %s\n",af_hexbuf(b,sizeof(b),md,32,0));
-#endif
 	    t.stop();
 	    printf("time: %g\n",t.elapsed_seconds());
 	    printf("==============================\n");
 	}
     }
+#endif
     exit(0);
 }
 
@@ -774,7 +767,13 @@ void time_test()
  
 void rsatest()
 {
-#ifdef HAVE_EVP_sha256
+    const EVP_MD *sha256 = EVP_get_digestbyname("sha256");
+
+    if(!sha256){
+	fprintf(stderr,"SHA256 not available\n");
+	return;
+    }
+
     printf("Now try signing with X.509 certificates and EVP\n");
 
     char ptext[16];
@@ -789,7 +788,7 @@ void rsatest()
     EVP_MD_CTX md;
     EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bp,0,0,0);
 
-    EVP_SignInit(&md,EVP_sha256());
+    EVP_SignInit(&md,sha256);
     EVP_SignUpdate(&md,ptext,sizeof(ptext));
     EVP_SignFinal(&md,sig,&siglen,pkey);
 
@@ -799,26 +798,25 @@ void rsatest()
     PEM_read_bio_X509(bp,&x,0,0);
     EVP_PKEY *pubkey = X509_get_pubkey(x);
     
-    printf("pubkey=%x\n",pubkey);
+    printf("pubkey=%p\n",pubkey);
 	
-    EVP_VerifyInit(&md,EVP_sha256());
+    EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,ptext,sizeof(ptext));
     int r = EVP_VerifyFinal(&md,sig,siglen,pubkey);
     printf("r=%d\n",r);
 
     printf("do it again...\n");
-    EVP_VerifyInit(&md,EVP_sha256());
+    EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,ptext,sizeof(ptext));
     r = EVP_VerifyFinal(&md,sig,siglen,pubkey);
     printf("r=%d\n",r);
 
     printf("make a tiny change...\n");
     ptext[0]='f';
-    EVP_VerifyInit(&md,EVP_sha256());
+    EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,ptext,sizeof(ptext));
     r = EVP_VerifyFinal(&md,sig,siglen,pubkey);
     printf("r=%d\n",r);
-#endif
 }
 
 void xmlseg(BIO *bp,AFFILE *af,const char *segname)
@@ -844,14 +842,15 @@ void xmltest(const char *fn)
 {
     BIO *bp = BIO_new(BIO_s_mem());
     AFFILE *af = af_open(fn,O_RDONLY,0);
-    if(!af) err(1,fn);
+    if(!af) err(1,"%s",fn);
     char segname[AF_MAX_NAME_LEN];
     while(af_get_next_seg(af,segname,sizeof(segname),0,0,0)==0){
 	xmlseg(bp,af,segname);
     }
     char *buf=0;
-    size_t len = BIO_get_mem_data(bp,&buf);
-    fwrite(buf,1,len,stdout);
+    ssize_t len = BIO_get_mem_data(bp,&buf);
+    int r = fwrite(buf,1,len,stdout);
+    assert(r==len);
 }
 
 

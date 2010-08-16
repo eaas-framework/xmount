@@ -93,6 +93,7 @@ void usage()
 /* Returns 0 if this is a valid AFF file, code if it isn't. */
 int af_is_valid_afffile(const char *file)
 {
+    return 0;				// I should write this
 }
 
 int fix(const char *infile)
@@ -119,15 +120,15 @@ int fix(const char *infile)
     if(read(fd,buf,strlen(AF_HEADER)+1)!=strlen(AF_HEADER)+1)
 	err(1,"can't read AFF file header. Stop.");
     if(strcmp(buf,AF_HEADER)!=0)
-	err(1,"%s does not begin with an AF_HEADER. Stop.");
+	err(1,"%s does not begin with an AF_HEADER. Stop.",infile);
     if(read(fd,buf,strlen(AF_SEGHEAD)+1)!=strlen(AF_SEGHEAD)+1)
 	err(1,"Can't read AF_SEGHEAD after AF_HEADER. Stop.");
     if(strcmp(buf,AF_SEGHEAD)!=0)
-	err(1,"%s does not have an AF_SEGHEAD after AF_SEGEADER. Stop.");
+	err(1,"%s does not have an AF_SEGHEAD after AF_SEGEADER. Stop.",infile);
 
     /* Figure out length */
     off_t len = lseek(fd,0,SEEK_END);
-    if(len<0) err(1,"Can't seek to end of %s. Stop.");
+    if(len<0) err(1,"Can't seek to end of %s. Stop.",infile);
     close(fd);
     
     AFFILE *af = af_open_with(infile,AF_HALF_OPEN|flags,0,&vnode_aff);
@@ -136,10 +137,10 @@ int fix(const char *infile)
     /* See if we can build a TOC */
     if(r<0){
 	printf("AFF file corrupt at %"I64d" out of %"I64d" (%"I64d" bytes from end)\n",
-	       ftello(af->aseg),len,len-ftello(af->aseg));
+	       ftello(af->aseg),(int64_t)len,len-ftello(af->aseg));
 	if(opt_fix){
 	    printf("Truncating... %d \n",fileno(af->aseg));
-	    if(truncate(af_filename(af),ftello(af->aseg))){
+	    if(ftruncate(fileno(af->aseg),ftello(af->aseg))){
 		err(1,"ftruncate");
 	    }
 	}

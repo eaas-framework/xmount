@@ -2,7 +2,7 @@
  * EWF CRC handling
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +26,7 @@
 #include <common.h>
 #include <types.h>
 
-#if defined( HAVE_ZLIB_H ) && defined( HAVE_LIBZ )
+#if defined( HAVE_ZLIB_H ) || defined( ZLIB_DLL )
 #include <zlib.h>
 #endif
 

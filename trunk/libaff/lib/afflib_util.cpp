@@ -209,15 +209,16 @@ int64_t	af_segname_page_number(const char *name)
 
 int64_t	af_segname_hash_page_number(const char *name,char *hash,int hashlen)
 {
-  const char *cc = strchr((char *)name,'_');
+    char copy[AF_MAX_NAME_LEN];
+    const char *cc = strchr((char *)name,'_');
     if(!cc) return -1;			// not possibly correct
-    char *copy = strdup(name);		// get a local copy
+    strlcpy(copy,name,sizeof(copy));
     char *dd = strchr(copy,'_');
-    if(!dd){free(copy);return -1;}	// really weird; shouldn't happen
+    if(!dd) return -1;		        // really weird; shouldn't happen
     *dd++ = '\000';			// terminate at _
-    if(strcmp(dd,"md5")!=0){free(copy);return -1;} // not a valid hash
+    if(strcmp(dd,"md5")!=0) return -1;	// not a valid hash
     int64_t page = af_segname_page_number(copy);
-    if(page<0){free(copy);return -1;}	// wasn't what we wanted
+    if(page<0) return -1;		// wasn't what we wanted
     strlcpy(hash,dd,hashlen);
     return page;
 }

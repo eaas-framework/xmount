@@ -1113,20 +1113,20 @@ static int qcow_create(const char *filename, int64_t total_size,
     create_refcount_update(s, s->refcount_block_offset, s->cluster_size);
 
     /* write all the data */
-    write(fd, &header, sizeof(header));
+    if(write(fd, &header, sizeof(header))!=sizeof(header)) return -1;
     if (backing_file) {
-        write(fd, backing_file, backing_filename_len);
+        if(write(fd, backing_file, backing_filename_len)!=backing_filename_len) return -1;
     }
     lseek(fd, s->l1_table_offset, SEEK_SET);
     tmp = 0;
     for(i = 0;i < l1_size; i++) {
-        write(fd, &tmp, sizeof(tmp));
+        if(write(fd, &tmp, sizeof(tmp))!=sizeof(tmp)) return -1;
     }
     lseek(fd, s->refcount_table_offset, SEEK_SET);
-    write(fd, s->refcount_table, s->cluster_size);
+    if(write(fd, s->refcount_table, s->cluster_size)!=s->cluster_size) return -1;
 
     lseek(fd, s->refcount_block_offset, SEEK_SET);
-    write(fd, s->refcount_block, s->cluster_size);
+    if(write(fd, s->refcount_block, s->cluster_size)!=s->cluster_size) return -1;
 
     qemu_free(s->refcount_table);
     qemu_free(s->refcount_block);

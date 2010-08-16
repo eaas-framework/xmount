@@ -2248,7 +2248,7 @@ static int commit_one_file(BDRVVVFATState* s,
 	c = c1;
     }
 
-    ftruncate(fd, size);
+    if(ftruncate(fd, size)<0) return -1;
     close(fd);
 
     return commit_mappings(s, first_cluster, dir_index);

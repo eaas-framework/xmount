@@ -2,7 +2,7 @@
  * Section reading/writing functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -23,19 +23,19 @@
  */
 
 #include <common.h>
-#include <endian.h>
+#include <byte_stream.h>
 #include <memory.h>
 #include <narrow_string.h>
 #include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_definitions.h"
 #include "libewf_compression.h"
 #include "libewf_debug.h"
 #include "libewf_header_values.h"
 #include "libewf_libbfio.h"
-#include "libewf_notify.h"
 #include "libewf_section.h"
 
 #include "ewf_data.h"
@@ -160,7 +160,7 @@ ssize_t libewf_section_start_read(
 	              sizeof( ewf_section_t ),
 	              error );
 
-	if( read_count != sizeof( ewf_section_t ) )
+	if( read_count != (ssize_t) sizeof( ewf_section_t ) )
 	{
 		liberror_error_set(
 		 error,
@@ -176,9 +176,9 @@ ssize_t libewf_section_start_read(
 	                  sizeof( ewf_section_t ) - sizeof( ewf_crc_t ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 section->crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 section->crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -194,7 +194,7 @@ ssize_t libewf_section_start_read(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_section_print(
 	       section,
 	       error ) != 1 ) )
@@ -210,14 +210,17 @@ ssize_t libewf_section_start_read(
 	}
 #endif
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: padding:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 section->padding,
 	 40 );
 #endif
 
-	endian_little_convert_64bit(
-	 *section_size,
-	 section->size );
+	byte_stream_copy_to_uint64_little_endian(
+	 section->size,
+	 *section_size );
 
 	if( *section_size > (uint64_t) INT64_MAX )
 	{
@@ -230,9 +233,9 @@ ssize_t libewf_section_start_read(
 
 		return( -1 );
 	}
-	endian_little_convert_64bit(
-	 *section_next,
-	 section->next );
+	byte_stream_copy_to_uint64_little_endian(
+	 section->next,
+	 *section_next );
 
 	if( *section_next > (uint64_t) INT64_MAX )
 	{
@@ -366,11 +369,11 @@ ssize_t libewf_section_start_write(
 
 		return( -1 );
 	}
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 section.size,
 	 section_size );
 
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 section.next,
 	 section_offset );
 
@@ -379,12 +382,12 @@ ssize_t libewf_section_start_write(
 	                  ( sizeof( ewf_section_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 section.crc,
 	 calculated_crc );
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing section start of type: %s with size: %" PRIu64 " and CRC: %" PRIu32 ".\n",
 	 function,
 	 (char *) section_type,
@@ -399,7 +402,7 @@ ssize_t libewf_section_start_write(
 	               sizeof( ewf_section_t ),
 	               error );
 
-	if( write_count != sizeof( ewf_section_t ) )
+	if( write_count != (ssize_t) sizeof( ewf_section_t ) )
 	{
 		liberror_error_set(
 		 error,
@@ -425,7 +428,6 @@ ssize_t libewf_section_compressed_string_read(
          liberror_error_t **error )
 {
 	uint8_t *compressed_string = NULL;
-	uint8_t *uncompressed      = NULL;
 	static char *function      = "libewf_section_compressed_string_read";
 	void *reallocation         = NULL;
 	ssize_t read_count         = 0;
@@ -442,14 +444,24 @@ ssize_t libewf_section_compressed_string_read(
 
 		return( -1 );
 	}
-	if( ( uncompressed_string == NULL )
-	 || ( *uncompressed_string != NULL ) )
+	if( uncompressed_string == NULL )
 	{
 		liberror_error_set(
 		 error,
 		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
 		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid uncompressed string.",
+		 function );
+
+		return( -1 );
+	}
+	if( *uncompressed_string != NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_ALREADY_SET,
+		 "%s: invalid uncompressed string value already set.",
 		 function );
 
 		return( -1 );
@@ -515,10 +527,10 @@ ssize_t libewf_section_compressed_string_read(
 	 */
 	*uncompressed_string_size = 2 * compressed_string_size;
 
-	uncompressed = (uint8_t *) memory_allocate(
-	                            sizeof( uint8_t ) * *uncompressed_string_size );
+	*uncompressed_string = (uint8_t *) memory_allocate(
+	                                    sizeof( uint8_t ) * *uncompressed_string_size );
 
-	if( uncompressed == NULL )
+	if( *uncompressed_string == NULL )
 	{
 		liberror_error_set(
 		 error,
@@ -533,7 +545,7 @@ ssize_t libewf_section_compressed_string_read(
 		return( -1 );
 	}
 	result = libewf_uncompress(
-	          uncompressed,
+	          *uncompressed_string,
 	          uncompressed_string_size,
 	          compressed_string,
 	          compressed_string_size,
@@ -546,7 +558,7 @@ ssize_t libewf_section_compressed_string_read(
 		 error );
 
 		reallocation = memory_reallocate(
-		                uncompressed,
+		                *uncompressed_string,
 		                sizeof( uint8_t ) * *uncompressed_string_size );
 
 		if( reallocation == NULL )
@@ -561,14 +573,16 @@ ssize_t libewf_section_compressed_string_read(
 			memory_free(
 			 compressed_string );
 			memory_free(
-			 uncompressed );
+			 *uncompressed_string );
+
+			*uncompressed_string = NULL;
 
 			return( -1 );
 		}
-		uncompressed = (uint8_t *) reallocation;
+		*uncompressed_string = (uint8_t *) reallocation;
 
 		result = libewf_uncompress(
-		          uncompressed,
+		          *uncompressed_string,
 		          uncompressed_string_size,
 		          compressed_string,
 		          compressed_string_size,
@@ -587,11 +601,20 @@ ssize_t libewf_section_compressed_string_read(
 		 function );
 
 		memory_free(
-		 uncompressed );
+		 *uncompressed_string );
+
+		*uncompressed_string = NULL;
 
 		return( -1 );
 	}
-	*uncompressed_string = uncompressed;
+#if defined( HAVE_DEBUG_OUTPUT )
+	libnotify_verbose_printf(
+	 "%s: uncompressed string:\n",
+	 function );
+	libnotify_verbose_print_data(
+	 *uncompressed_string,
+	 *uncompressed_string_size );
+#endif
 
 	return( read_count );
 }
@@ -891,7 +914,7 @@ ssize_t libewf_section_header_read(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_byte_stream_print(
 	       _LIBEWF_STRING( "Header" ),
 	       header,
@@ -966,7 +989,7 @@ ssize_t libewf_section_header_write(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_byte_stream_print(
 	       _LIBEWF_STRING( "Header" ),
 	       header,
@@ -1099,7 +1122,7 @@ ssize_t libewf_section_header2_read(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf16_stream_print(
 	       _LIBEWF_STRING( "Header2" ),
 	       header2,
@@ -1174,7 +1197,7 @@ ssize_t libewf_section_header2_write(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf16_stream_print(
 	       _LIBEWF_STRING( "Header2" ),
 	       header2,
@@ -1305,9 +1328,9 @@ ssize_t libewf_section_volume_s01_read(
 	                  ( sizeof( ewf_volume_smart_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 volume->crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -1323,32 +1346,41 @@ ssize_t libewf_section_volume_s01_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 volume->unknown1,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown2:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 volume->unknown2,
 	 20 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown3:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 volume->unknown3,
 	 45 );
 #endif
 
-	endian_little_convert_32bit(
-	 media_values->amount_of_chunks,
-	 volume->amount_of_chunks );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->amount_of_chunks,
+	 media_values->amount_of_chunks );
 
-	endian_little_convert_32bit(
-	 media_values->sectors_per_chunk,
-	 volume->sectors_per_chunk );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->sectors_per_chunk,
+	 media_values->sectors_per_chunk );
 
-	endian_little_convert_32bit(
-	 media_values->bytes_per_sector,
-	 volume->bytes_per_sector );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->bytes_per_sector,
+	 media_values->bytes_per_sector );
 
-	endian_little_convert_32bit(
-	 media_values->amount_of_sectors,
-	 volume->amount_of_sectors );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->amount_of_sectors,
+	 media_values->amount_of_sectors );
 
 	if( memory_compare(
 	     (void *) volume->signature,
@@ -1457,19 +1489,19 @@ ssize_t libewf_section_volume_s01_write(
 	}
 	volume->unknown1[ 0 ] = 1;
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->amount_of_chunks,
 	 media_values->amount_of_chunks );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->sectors_per_chunk,
 	 media_values->sectors_per_chunk );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->bytes_per_sector,
 	 media_values->bytes_per_sector );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->amount_of_sectors,
 	 media_values->amount_of_sectors );
 
@@ -1486,19 +1518,19 @@ ssize_t libewf_section_volume_s01_write(
 	                  ( sizeof( ewf_volume_smart_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->crc,
 	 calculated_crc );
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu32 " chunks of %" PRIi32 " bytes (%" PRIi32 " sectors) each.\n",
 	 function,
 	 media_values->amount_of_chunks,
 	 media_values->chunk_size,
 	 media_values->sectors_per_chunk );
 
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu64 " sectors of %" PRIi32 " bytes each.\n",
 	 function,
 	 media_values->amount_of_sectors,
@@ -1662,9 +1694,9 @@ ssize_t libewf_section_volume_e01_read(
 	                  sizeof( ewf_volume_t ) - sizeof( ewf_crc_t ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 volume->crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -1683,81 +1715,81 @@ ssize_t libewf_section_volume_e01_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: unknown1.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown1,
 	 3 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown2.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown2:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown2,
 	 3 );
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: PALM volume start sector.\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->palm_volume_start_sector,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown3.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown3:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown3,
 	 4 );
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: SMART logs start sector.\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->smart_logs_start_sector,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown4.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown4:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown4,
 	 3 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown5.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown5:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown5,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown6.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown6:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->unknown6,
 	 963 );
-	libewf_notify_verbose_printf(
-	 "%s: signature.\n",
+	libnotify_verbose_printf(
+	 "%s: signature:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 volume->signature,
 	 5 );
 #endif
 
-	endian_little_convert_32bit(
-	 media_values->amount_of_chunks,
-	 volume->amount_of_chunks );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->amount_of_chunks,
+	 media_values->amount_of_chunks );
 
-	endian_little_convert_32bit(
-	 media_values->sectors_per_chunk,
-	 volume->sectors_per_chunk );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->sectors_per_chunk,
+	 media_values->sectors_per_chunk );
 
-	endian_little_convert_32bit(
-	 media_values->bytes_per_sector,
-	 volume->bytes_per_sector );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->bytes_per_sector,
+	 media_values->bytes_per_sector );
 
-	endian_little_convert_64bit(
-	 media_values->amount_of_sectors,
-	 volume->amount_of_sectors );
+	byte_stream_copy_to_uint64_little_endian(
+	 volume->amount_of_sectors,
+	 media_values->amount_of_sectors );
 
-	endian_little_convert_32bit(
-	 media_values->error_granularity,
-	 volume->error_granularity );
+	byte_stream_copy_to_uint32_little_endian(
+	 volume->error_granularity,
+	 media_values->error_granularity );
 
 	media_values->media_type  = volume->media_type;
 	media_values->media_flags = volume->media_flags;
@@ -1885,19 +1917,19 @@ ssize_t libewf_section_volume_e01_write(
 	}
 	volume->media_flags = media_values->media_flags;
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->amount_of_chunks,
 	 media_values->amount_of_chunks );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->sectors_per_chunk,
 	 media_values->sectors_per_chunk );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->bytes_per_sector,
 	 media_values->bytes_per_sector );
 
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 volume->amount_of_sectors,
 	 media_values->amount_of_sectors );
 
@@ -1926,7 +1958,7 @@ ssize_t libewf_section_volume_e01_write(
 
 			return( -1 );
 		}
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 volume->error_granularity,
 		 media_values->error_granularity );
 	}
@@ -1935,19 +1967,19 @@ ssize_t libewf_section_volume_e01_write(
 	                  sizeof( ewf_volume_t ) - sizeof( ewf_crc_t ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 volume->crc,
 	 calculated_crc );
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu32 " chunks of %" PRIi32 " bytes (%" PRIi32 " sectors) each.\n",
 	 function,
 	 media_values->amount_of_chunks,
 	 media_values->chunk_size,
 	 media_values->sectors_per_chunk );
 
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu64 " sectors of %" PRIi32 " bytes each.\n",
 	 function,
 	 media_values->amount_of_sectors,
@@ -2152,7 +2184,7 @@ ssize_t libewf_section_volume_read(
 
 	if( bytes_per_chunk > (size64_t) INT32_MAX )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: chunk size value exceeds maximum defaulting to: %d.n",
 		 function,
 		 EWF_MINIMUM_CHUNK_SIZE );
@@ -2164,14 +2196,14 @@ ssize_t libewf_section_volume_read(
 		media_values->chunk_size = (uint32_t) bytes_per_chunk;
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu32 " chunks of %" PRIi32 " bytes (%" PRIi32 " sectors) each.\n",
 	 function,
 	 media_values->amount_of_chunks,
 	 media_values->chunk_size,
 	 media_values->sectors_per_chunk );
 
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: volume has %" PRIu64 " sectors of %" PRIi32 " bytes each.\n",
 	 function,
 	 media_values->amount_of_sectors,
@@ -2288,9 +2320,9 @@ ssize_t libewf_section_table_read(
 	                  ( sizeof( ewf_table_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 table.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 table.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -2305,24 +2337,30 @@ ssize_t libewf_section_table_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 amount_of_chunks,
-	 table.amount_of_chunks );
+	byte_stream_copy_to_uint32_little_endian(
+	 table.amount_of_chunks,
+	 amount_of_chunks );
 
-	endian_little_convert_64bit(
-	 base_offset,
-	 table.base_offset );
+	byte_stream_copy_to_uint64_little_endian(
+	 table.base_offset,
+	 base_offset );
 
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: padding1:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 table.padding1,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: padding2:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 table.padding2,
 	 4 );
 #endif
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: table is of size %" PRIu32 " chunks CRC %" PRIu32 " (%" PRIu32 ").\n",
 	 function,
 	 amount_of_chunks,
@@ -2336,7 +2374,7 @@ ssize_t libewf_section_table_read(
 		 */
 		if( amount_of_chunks > EWF_MAXIMUM_OFFSETS_IN_TABLE )
 		{
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: table contains more offsets: %" PRIu32 " than the maximum amount: %d.\n",
 			 function,
 			 amount_of_chunks,
@@ -2426,13 +2464,13 @@ ssize_t libewf_section_table_read(
 			}
 			section_read_count += read_count;
 
-			endian_little_convert_32bit(
-			 stored_crc,
-			 stored_crc_buffer );
+			byte_stream_copy_to_uint32_little_endian(
+			 stored_crc_buffer,
+			 stored_crc );
 
 			if( stored_crc != calculated_crc )
 			{
-				libewf_notify_verbose_printf(
+				libnotify_verbose_printf(
 				 "%s: CRC does not match (in file: %" PRIu32 " calculated: %" PRIu32 ").\n",
 				 function,
 				 stored_crc,
@@ -2485,13 +2523,13 @@ ssize_t libewf_section_table_read(
 	}
 	else
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: table contains no offsets.\n",
 		 function );
 	}
 	if( section_size < (size_t) section_read_count )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: section size: %" PRIzd " smaller than section read count: %" PRIzd ".\n",
 		 function,
 		 section_size,
@@ -2505,7 +2543,7 @@ ssize_t libewf_section_table_read(
 		if( ( ewf_format != EWF_FORMAT_S01 )
 		 && ( format != LIBEWF_FORMAT_ENCASE1 ) )
 		{
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: data found after table offsets.\n",
 			 function );
 		}
@@ -2635,9 +2673,9 @@ ssize_t libewf_section_table2_read(
 	                  ( sizeof( ewf_table_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 table.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 table.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -2652,24 +2690,30 @@ ssize_t libewf_section_table2_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 amount_of_chunks,
-	 table.amount_of_chunks );
+	byte_stream_copy_to_uint32_little_endian(
+	 table.amount_of_chunks,
+	 amount_of_chunks );
 
-	endian_little_convert_64bit(
-	 base_offset,
-	 table.base_offset );
+	byte_stream_copy_to_uint64_little_endian(
+	 table.base_offset,
+	 base_offset );
 
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: padding1:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 table.padding1,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: padding2:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 table.padding2,
 	 4 );
 #endif
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: table is of size %" PRIu32 " chunks CRC %" PRIu32 " (%" PRIu32 ").\n",
 	 function,
 	 amount_of_chunks,
@@ -2683,7 +2727,7 @@ ssize_t libewf_section_table2_read(
 		 */
 		if( amount_of_chunks > EWF_MAXIMUM_OFFSETS_IN_TABLE )
 		{
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: table contains more offsets: %" PRIu32 " than the maximum amount: %d.\n",
 			 function,
 			 amount_of_chunks,
@@ -2773,13 +2817,13 @@ ssize_t libewf_section_table2_read(
 			}
 			section_read_count += read_count;
 
-			endian_little_convert_32bit(
-			 stored_crc,
-			 stored_crc_buffer );
+			byte_stream_copy_to_uint32_little_endian(
+			 stored_crc_buffer,
+			 stored_crc );
 
 			if( stored_crc != calculated_crc )
 			{
-				libewf_notify_verbose_printf(
+				libnotify_verbose_printf(
 				 "%s: CRC does not match (in file: %" PRIu32 " calculated: %" PRIu32 ").\n",
 				 function,
 				 stored_crc,
@@ -2832,13 +2876,13 @@ ssize_t libewf_section_table2_read(
 	}
 	else
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: table contains no offsets.\n",
 		 function );
 	}
 	if( section_size < (size_t) section_read_count )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: section size: %" PRIzd " smaller than section read count: %" PRIzd ".\n",
 		 function,
 		 section_size,
@@ -2852,7 +2896,7 @@ ssize_t libewf_section_table2_read(
 		if( ( ewf_format != EWF_FORMAT_S01 )
 		 && ( format != LIBEWF_FORMAT_ENCASE1 ) )
 		{
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: unexpected data found after table offsets.\n",
 			 function );
 		}
@@ -2978,11 +3022,11 @@ ssize_t libewf_section_table_write(
 
 		return( -1 );
 	}
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 table.amount_of_chunks,
 	 amount_of_offsets );
 
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 table.base_offset,
 	 base_offset );
 
@@ -2991,7 +3035,7 @@ ssize_t libewf_section_table_write(
 	                  ( sizeof( ewf_table_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 table.crc,
 	 calculated_crc );
 
@@ -3065,7 +3109,7 @@ ssize_t libewf_section_table_write(
 
 	if( write_crc != 0 )
 	{
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 calculated_crc_buffer,
 		 calculated_crc );
 
@@ -3149,7 +3193,7 @@ ssize64_t libewf_section_sectors_read(
 	 */
 	if( ewf_format == EWF_FORMAT_S01 )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: EWF-S01 format should not contain sectors section.\n",
 		 function );
 	}
@@ -3312,7 +3356,7 @@ ssize_t libewf_section_ltree_read(
 	}
 	if( *ewf_format == EWF_FORMAT_S01 )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: EWF-S01 format should not contain ltree section.\n",
 		 function );
 	}
@@ -3354,19 +3398,34 @@ ssize_t libewf_section_ltree_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ltree->unknown1,
 	 16 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: tree size:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ltree->tree_size,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown2:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ltree->unknown2,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown3:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ltree->unknown3,
 	 4 );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown4:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ltree->unknown4,
 	 20 );
 #endif
@@ -3414,7 +3473,7 @@ ssize_t libewf_section_ltree_read(
 	section_read_count += read_count;
 
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf16_stream_print(
 	       _LIBEWF_STRING( "ltree data" ),
 	       ltree_data,
@@ -3513,7 +3572,7 @@ ssize_t libewf_section_session_read(
 	}
 	if( ewf_format == EWF_FORMAT_S01 )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: EWF-S01 format should not contain session section.\n",
 		 function );
 	}
@@ -3540,9 +3599,9 @@ ssize_t libewf_section_session_read(
 	                  ( sizeof( ewf_session_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 ewf_session.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 ewf_session.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -3558,14 +3617,24 @@ ssize_t libewf_section_session_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 ewf_session.unknown1,
 	 28 );
 #endif
 
-	endian_little_convert_32bit(
-	 amount_of_ewf_sessions,
-	 ewf_session.amount_of_sessions );
+	byte_stream_copy_to_uint32_little_endian(
+	 ewf_session.amount_of_sessions,
+	 amount_of_ewf_sessions );
+
+#if defined( HAVE_DEBUG_OUTPUT )
+	libnotify_verbose_printf(
+	 "%s: amount of sessions: %" PRIu32 "\n",
+	 function,
+	 amount_of_ewf_sessions );
+#endif
 
 	if( amount_of_ewf_sessions > 0 )
 	{
@@ -3636,9 +3705,9 @@ ssize_t libewf_section_session_read(
 		}
 		section_read_count += read_count;
 
-		endian_little_convert_32bit(
-		 stored_crc,
-		 stored_crc_buffer );
+		byte_stream_copy_to_uint32_little_endian(
+		 stored_crc_buffer,
+		 stored_crc );
 
 		if( stored_crc != calculated_crc )
 		{
@@ -3654,14 +3723,17 @@ ssize_t libewf_section_session_read(
 			return( -1 );
 		}
 #if defined( HAVE_DEBUG_OUTPUT )
-		libewf_notify_verbose_dump_data(
-		 ewf_sessions,
+		libnotify_verbose_printf(
+		 "%s: sessions data:\n",
+		 function );
+		libnotify_verbose_print_data(
+		 (uint8_t *) ewf_sessions,
 		 ewf_sessions_size );
 #endif
 		if( sessions->sector != NULL )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: session entries already set in handle - removing previous one.\n",
 			 function );
 #endif
@@ -3692,10 +3764,17 @@ ssize_t libewf_section_session_read(
 
 		for( iterator = 0; iterator < amount_of_ewf_sessions; iterator++ )
 		{
-			endian_little_convert_32bit(
-			 first_sector,
-			 ewf_sessions[ iterator ].first_sector );
+			byte_stream_copy_to_uint32_little_endian(
+			 ewf_sessions[ iterator ].first_sector,
+			 first_sector );
 
+#if defined( HAVE_DEBUG_OUTPUT )
+			libnotify_verbose_printf(
+			 "%s: session: %" PRIu32 " first sector: %" PRIu32 "\n",
+			 function,
+			 iterator,
+			 first_sector );
+#endif
 			sessions->sector[ iterator ].first_sector = (uint64_t) first_sector;
 
 			if( iterator > 0 )
@@ -3704,14 +3783,21 @@ ssize_t libewf_section_session_read(
 			}
 			last_first_sector = first_sector;
 		}
-		sessions->sector[ iterator - 1 ].amount_of_sectors = media_values->amount_of_sectors - last_first_sector;
+		if( media_values->amount_of_sectors > last_first_sector )
+		{
+			sessions->sector[ iterator - 1 ].amount_of_sectors = media_values->amount_of_sectors - last_first_sector;
+		}
+		else
+		{
+			sessions->sector[ iterator - 1 ].amount_of_sectors = 0;
+		}
 
 		memory_free(
 		 ewf_sessions );
 	}
 	else
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: session contains no session data.\n",
 		 function );
 	}
@@ -3796,7 +3882,7 @@ ssize_t libewf_section_session_write(
 
 		return( -1 );
 	}
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 ewf_session.amount_of_sessions,
 	 sessions->amount );
 
@@ -3805,7 +3891,7 @@ ssize_t libewf_section_session_write(
 	                  ( sizeof( ewf_session_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 ewf_session.crc,
 	 calculated_crc );
 
@@ -3825,7 +3911,7 @@ ssize_t libewf_section_session_write(
 	}
 	for( iterator = 0; iterator < sessions->amount; iterator++ )
 	{
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 ewf_sessions[ iterator ].first_sector,
 		 (uint32_t) sessions->sector[ iterator ].first_sector );
 	}
@@ -3904,7 +3990,7 @@ ssize_t libewf_section_session_write(
 	}
 	section_write_count += write_count;
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 calculated_crc_buffer,
 	 calculated_crc );
 
@@ -3995,7 +4081,7 @@ ssize_t libewf_section_data_read(
 	}
 	if( ewf_format == EWF_FORMAT_S01 )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: EWF-S01 format should not contain data section.\n",
 		 function );
 	}
@@ -4050,9 +4136,9 @@ ssize_t libewf_section_data_read(
 	                  sizeof( ewf_data_t ) - sizeof( ewf_crc_t ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 data->crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 data->crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -4068,62 +4154,63 @@ ssize_t libewf_section_data_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: unknown1.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown1,
 	 3 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown2.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown2:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown2,
 	 3 );
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: PALM volume start sector.\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->palm_volume_start_sector,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown3.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown3:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown3,
 	 4 );
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: SMART logs start sector.\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->smart_logs_start_sector,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown4.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown4:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown4,
 	 3 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown5.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown5:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown5,
 	 4 );
-	libewf_notify_verbose_printf(
-	 "%s: unknown6.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown6:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->unknown6,
 	 963 );
-	libewf_notify_verbose_printf(
-	 "%s: signature.\n",
+	libnotify_verbose_printf(
+	 "%s: signature:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 data->signature,
 	 5 );
 #endif
-	if( media_values->media_type != data->media_type )
+	if( ( data->media_type != 0 )
+	 && ( data->media_type != media_values->media_type ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4137,11 +4224,12 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 amount_of_chunks,
-	 data->amount_of_chunks );
+	byte_stream_copy_to_uint32_little_endian(
+	 data->amount_of_chunks,
+	 amount_of_chunks );
 
-	if( media_values->amount_of_chunks != amount_of_chunks )
+	if( ( amount_of_chunks != 0 )
+	 && ( amount_of_chunks != media_values->amount_of_chunks ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4157,11 +4245,12 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 sectors_per_chunk,
-	 data->sectors_per_chunk );
+	byte_stream_copy_to_uint32_little_endian(
+	 data->sectors_per_chunk,
+	 sectors_per_chunk );
 
-	if( media_values->sectors_per_chunk != sectors_per_chunk )
+	if( ( sectors_per_chunk != 0 )
+	 && ( sectors_per_chunk != media_values->sectors_per_chunk ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4175,11 +4264,12 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 bytes_per_sector,
-	 data->bytes_per_sector );
+	byte_stream_copy_to_uint32_little_endian(
+	 data->bytes_per_sector,
+	 bytes_per_sector );
 
-	if( media_values->bytes_per_sector != bytes_per_sector )
+	if( ( bytes_per_sector != 0 )
+	 && ( bytes_per_sector != media_values->bytes_per_sector ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4193,11 +4283,12 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	endian_little_convert_64bit(
-	 amount_of_sectors,
-	 data->amount_of_sectors );
+	byte_stream_copy_to_uint64_little_endian(
+	 data->amount_of_sectors,
+	 amount_of_sectors );
 
-	if( media_values->amount_of_sectors != amount_of_sectors )
+	if( ( amount_of_sectors != 0 )
+	 && ( amount_of_sectors != media_values->amount_of_sectors ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4211,11 +4302,12 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 error_granularity,
-	 data->error_granularity );
+	byte_stream_copy_to_uint32_little_endian(
+	 data->error_granularity,
+	 error_granularity );
 
-	if( media_values->error_granularity != error_granularity )
+	if( ( error_granularity != 0 )
+	 && ( error_granularity != media_values->error_granularity ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4229,7 +4321,8 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	if( media_values->media_flags != data->media_flags )
+	if( ( data->media_flags != 0 )
+	 && ( data->media_flags != media_values->media_flags ) )
 	{
 		liberror_error_set(
 		 error,
@@ -4243,22 +4336,40 @@ ssize_t libewf_section_data_read(
 
 		return( -1 );
 	}
-	if( memory_compare(
-	     media_values->guid,
-	     data->guid,
-	     16 ) != 0 )
+	if( ( data->guid[ 0 ] != 0 )
+	 || ( data->guid[ 1 ] != 0 )
+	 || ( data->guid[ 2 ] != 0 )
+	 || ( data->guid[ 3 ] != 0 )
+	 || ( data->guid[ 4 ] != 0 )
+	 || ( data->guid[ 5 ] != 0 )
+	 || ( data->guid[ 6 ] != 0 )
+	 || ( data->guid[ 7 ] != 0 )
+	 || ( data->guid[ 8 ] != 0 )
+	 || ( data->guid[ 9 ] != 0 )
+	 || ( data->guid[ 10 ] != 0 )
+	 || ( data->guid[ 11 ] != 0 )
+	 || ( data->guid[ 12 ] != 0 )
+	 || ( data->guid[ 13 ] != 0 )
+	 || ( data->guid[ 14 ] != 0 )
+	 || ( data->guid[ 15 ] != 0 ) )
 	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_INPUT,
-		 LIBERROR_INPUT_ERROR_VALUE_MISMATCH,
-		 "%s: GUID does not match in data section.",
-		 function );
+		if( memory_compare(
+		     media_values->guid,
+		     data->guid,
+		     16 ) != 0 )
+		{
+			liberror_error_set(
+			 error,
+			 LIBERROR_ERROR_DOMAIN_INPUT,
+			 LIBERROR_INPUT_ERROR_VALUE_MISMATCH,
+			 "%s: GUID does not match in data section.",
+			 function );
 
-		memory_free(
-		 data );
+			memory_free(
+			 data );
 
-		return( -1 );
+			return( -1 );
+		}
 	}
 	memory_free(
 	 data );
@@ -4377,19 +4488,19 @@ ssize_t libewf_section_data_write(
 		}
 		( *cached_data_section )->media_flags = media_values->media_flags;
 
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 ( *cached_data_section )->amount_of_chunks,
 		 media_values->amount_of_chunks );
 
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 ( *cached_data_section )->sectors_per_chunk,
 		 media_values->sectors_per_chunk );
 
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 ( *cached_data_section )->bytes_per_sector,
 		 media_values->bytes_per_sector );
 
-		endian_little_revert_64bit(
+		byte_stream_copy_from_uint64_little_endian(
 		 ( *cached_data_section )->amount_of_sectors,
 		 media_values->amount_of_sectors );
 
@@ -4399,7 +4510,7 @@ ssize_t libewf_section_data_write(
 		 || ( format == LIBEWF_FORMAT_LINEN6 )
 		 || ( format == LIBEWF_FORMAT_EWFX ) )
 		{
-			endian_little_revert_32bit(
+			byte_stream_copy_from_uint32_little_endian(
 			 ( *cached_data_section )->error_granularity,
 			 media_values->error_granularity );
 
@@ -4425,7 +4536,7 @@ ssize_t libewf_section_data_write(
 		                  ( sizeof( ewf_data_t ) - sizeof( ewf_crc_t ) ),
 		                  1 );
 
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 ( *cached_data_section )->crc,
 		 calculated_crc );
 	}
@@ -4552,7 +4663,7 @@ ssize_t libewf_section_error2_read(
 	}
 	if( ewf_format == EWF_FORMAT_S01 )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: EWF-S01 format should not contain error2 section.\n",
 		 function );
 	}
@@ -4579,13 +4690,13 @@ ssize_t libewf_section_error2_read(
 	                  ( sizeof( ewf_error2_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 error2.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 error2.crc,
+	 stored_crc );
 
-	endian_little_convert_32bit(
-	 amount_of_errors,
-	 error2.amount_of_errors );
+	byte_stream_copy_to_uint32_little_endian(
+	 error2.amount_of_errors,
+	 amount_of_errors );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -4601,7 +4712,10 @@ ssize_t libewf_section_error2_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_printf(
+	 "%s: unknown:\n",
+	 function );
+	libnotify_verbose_print_data(
 	 error2.unknown,
 	 200 );
 #endif
@@ -4675,9 +4789,9 @@ ssize_t libewf_section_error2_read(
 		}
 		section_read_count += read_count;
 
-		endian_little_convert_32bit(
-		 stored_crc,
-		 stored_crc_buffer );
+		byte_stream_copy_to_uint32_little_endian(
+		 stored_crc_buffer,
+		 stored_crc );
 
 		if( stored_crc != calculated_crc )
 		{
@@ -4696,17 +4810,17 @@ ssize_t libewf_section_error2_read(
 			return( -1 );
 		}
 #if defined( HAVE_DEBUG_OUTPUT )
-		libewf_notify_verbose_printf(
-		 "%s: error2 sectors.\n",
+		libnotify_verbose_printf(
+		 "%s: error2 sectors:\n",
 		 function );
-		libewf_notify_verbose_dump_data(
-		 error2_sectors,
+		libnotify_verbose_print_data(
+		 (uint8_t *) error2_sectors,
 		 sectors_size );
 #endif
 		if( acquiry_errors->sector != NULL )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: acquiry error sectors already set in handle - removing previous one.\n",
 			 function );
 #endif
@@ -4737,22 +4851,22 @@ ssize_t libewf_section_error2_read(
 
 		for( iterator = 0; iterator < amount_of_errors; iterator++ )
 		{
-			endian_little_convert_32bit(
-			 first_sector,
-			 error2_sectors[ iterator ].first_sector );
+			byte_stream_copy_to_uint32_little_endian(
+			 error2_sectors[ iterator ].first_sector,
+			 first_sector );
 
 			acquiry_errors->sector[ iterator ].first_sector = (uint64_t) first_sector;
 
-			endian_little_convert_32bit(
-			 acquiry_errors->sector[ iterator ].amount_of_sectors,
-			 error2_sectors[ iterator ].amount_of_sectors );
+			byte_stream_copy_to_uint32_little_endian(
+			 error2_sectors[ iterator ].amount_of_sectors,
+			 acquiry_errors->sector[ iterator ].amount_of_sectors );
 		}
 		memory_free(
 		 error2_sectors );
 	}
 	else
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: error2 contains no sectors!.\n",
 		 function );
 	}
@@ -4837,7 +4951,7 @@ ssize_t libewf_section_error2_write(
 
 		return( -1 );
 	}
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 error2.amount_of_errors,
 	 acquiry_errors->amount );
 
@@ -4846,7 +4960,7 @@ ssize_t libewf_section_error2_write(
 	                  ( sizeof( ewf_error2_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 error2.crc,
 	 calculated_crc );
 
@@ -4868,11 +4982,11 @@ ssize_t libewf_section_error2_write(
 	}
 	for( iterator = 0; iterator < acquiry_errors->amount; iterator++ )
 	{
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 error2_sectors[ iterator ].first_sector,
 		 (uint32_t) acquiry_errors->sector[ iterator ].first_sector );
 
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 error2_sectors[ iterator ].amount_of_sectors,
 		 acquiry_errors->sector[ iterator ].amount_of_sectors );
 	}
@@ -4951,7 +5065,7 @@ ssize_t libewf_section_error2_write(
 	}
 	section_write_count += write_count;
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 calculated_crc_buffer,
 	 calculated_crc );
 
@@ -5069,9 +5183,9 @@ ssize_t libewf_section_digest_read(
 	                  ( sizeof( ewf_digest_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 digest.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 digest.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -5087,22 +5201,22 @@ ssize_t libewf_section_digest_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: MD5 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: MD5 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 digest.md5_hash,
 	 16 );
-	libewf_notify_verbose_printf(
-	 "%s: SHA1 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: SHA1 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 digest.sha1_hash,
 	 20 );
-	libewf_notify_verbose_printf(
-	 "%s: padding.\n",
+	libnotify_verbose_printf(
+	 "%s: padding:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 digest.padding1,
 	 40 );
 #endif
@@ -5249,16 +5363,16 @@ ssize_t libewf_section_digest_write(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: MD5 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: MD5 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 digest.md5_hash,
 	 16 );
-	libewf_notify_verbose_printf(
-	 "%s: SHA1 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: SHA1 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 digest.sha1_hash,
 	 20 );
 #endif
@@ -5267,7 +5381,7 @@ ssize_t libewf_section_digest_write(
 	                  ( sizeof( ewf_digest_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 digest.crc,
 	 calculated_crc );
 
@@ -5395,9 +5509,9 @@ ssize_t libewf_section_hash_read(
 	                  ( sizeof( ewf_hash_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 hash.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 hash.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -5413,16 +5527,16 @@ ssize_t libewf_section_hash_read(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: MD5 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: MD5 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 hash.md5_hash,
 	 16 );
-	libewf_notify_verbose_printf(
-	 "%s: padding.\n",
+	libnotify_verbose_printf(
+	 "%s: unknown1:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 hash.unknown1,
 	 16 );
 #endif
@@ -5529,10 +5643,10 @@ ssize_t libewf_section_hash_write(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: MD5 hash.\n",
+	libnotify_verbose_printf(
+	 "%s: MD5 hash:\n",
 	 function );
-	libewf_notify_verbose_dump_data(
+	libnotify_verbose_print_data(
 	 hash.md5_hash,
 	 16 );
 #endif
@@ -5541,7 +5655,7 @@ ssize_t libewf_section_hash_write(
 	                  ( sizeof( ewf_hash_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 hash.crc,
 	 calculated_crc );
 
@@ -5713,11 +5827,11 @@ ssize_t libewf_section_last_write(
 
 		return( -1 );
 	}
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 section.size,
 	 section_size );
 
-	endian_little_revert_64bit(
+	byte_stream_copy_from_uint64_little_endian(
 	 section.next,
 	 section_offset );
 
@@ -5726,7 +5840,7 @@ ssize_t libewf_section_last_write(
 	                  ( sizeof( ewf_section_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(	
+	byte_stream_copy_from_uint32_little_endian(	
 	 section.crc,
 	 calculated_crc );
 
@@ -5861,7 +5975,7 @@ ssize_t libewf_section_xheader_read(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf8_stream_print(
 	       _LIBEWF_STRING( "XHeader" ),
 	       xheader,
@@ -5936,7 +6050,7 @@ ssize_t libewf_section_xheader_write(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf8_stream_print(
 	       _LIBEWF_STRING( "XHeader" ),
 	       xheader,
@@ -6069,7 +6183,7 @@ ssize_t libewf_section_xhash_read(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf8_stream_print(
 	       _LIBEWF_STRING( "XHash" ),
 	       xhash,
@@ -6144,7 +6258,7 @@ ssize_t libewf_section_xhash_write(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( libewf_notify_verbose != 0 )
+	if( ( libnotify_verbose != 0 )
 	 && ( libewf_debug_utf8_stream_print(
 	       _LIBEWF_STRING( "XHash" ),
 	       xhash,
@@ -6261,9 +6375,9 @@ ssize_t libewf_section_delta_chunk_read(
 	                  ( sizeof( ewfx_delta_chunk_header_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 delta_chunk_header.crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 delta_chunk_header.crc,
+	 stored_crc );
 
 	if( stored_crc != calculated_crc )
 	{
@@ -6280,9 +6394,9 @@ ssize_t libewf_section_delta_chunk_read(
 	}
 	/* The chunk value is stored + 1 count in the file
 	 */
-	endian_little_convert_32bit(
-	 chunk,
-	 delta_chunk_header.chunk );
+	byte_stream_copy_to_uint32_little_endian(
+	 delta_chunk_header.chunk,
+	 chunk );
 
 	chunk -= 1;
 
@@ -6298,13 +6412,13 @@ ssize_t libewf_section_delta_chunk_read(
 
 		return( -1 );
 	}
-	endian_little_convert_32bit(
-	 chunk_size,
-	 delta_chunk_header.chunk_size );
+	byte_stream_copy_to_uint32_little_endian(
+	 delta_chunk_header.chunk_size,
+	 chunk_size );
 
 	if( chunk_size != ( section_size - sizeof( ewfx_delta_chunk_header_t ) ) )
 	{
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: chunk size: %" PRIu32 " does not match size of data in section correcting in: %" PRIzd ".\n",
 		 function,
 		 chunk_size,
@@ -6451,11 +6565,11 @@ ssize_t libewf_section_delta_chunk_write(
 	}
 	/* The chunk value is stored + 1 count in the file
 	 */
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 delta_chunk_header.chunk,
 	 ( chunk + 1 ) );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 delta_chunk_header.chunk_size,
 	 (uint32_t) write_size );
 
@@ -6470,7 +6584,7 @@ ssize_t libewf_section_delta_chunk_write(
 	                  ( sizeof( ewfx_delta_chunk_header_t ) - sizeof( ewf_crc_t ) ),
 	                  1 );
 
-	endian_little_revert_32bit(
+	byte_stream_copy_from_uint32_little_endian(
 	 delta_chunk_header.crc,
 	 calculated_crc );
 
@@ -6532,7 +6646,7 @@ ssize_t libewf_section_delta_chunk_write(
 
 			return( -1 );
 		}
-		endian_little_revert_32bit(
+		byte_stream_copy_from_uint32_little_endian(
 		 crc_buffer,
 		 *chunk_crc );
 
@@ -6571,7 +6685,7 @@ ssize_t libewf_section_delta_chunk_write(
 			       sizeof( ewf_crc_t ),
 		               error );
 
-		if( write_count != (size_t) sizeof( ewf_crc_t ) )
+		if( write_count != (ssize_t) sizeof( ewf_crc_t ) )
 		{
 			liberror_error_set(
 			 error,
@@ -7302,7 +7416,7 @@ int libewf_section_read(
 	else
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: unsupported section type: %s.\n",
 		 function,
 		 (char *) section->type );

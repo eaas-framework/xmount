@@ -2,7 +2,7 @@
  * The internal libuna header
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,7 +27,7 @@
 
 /* Define HAVE_LOCAL_LIBUNA for local use of libuna
  */
-#if( HAVE_LOCAL_LIBUNA )
+#if defined( HAVE_LOCAL_LIBUNA )
 
 #include <libuna_byte_stream.h>
 #include <libuna_compare.h>
@@ -38,6 +38,7 @@
 #include <libuna_utf16_string.h>
 #include <libuna_utf32_stream.h>
 #include <libuna_utf32_string.h>
+#include <libuna_types.h>
 
 #elif defined( HAVE_LIBUNA_H )
 

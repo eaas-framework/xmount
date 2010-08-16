@@ -1,9 +1,10 @@
-bin_PROGRAMS = aftest
-aftest_SOURCES = aftest.cpp
-aftest_LDADD = libafflib.la  
-
+EXTRA_PROGRAMS = aftest
 TESTS = aftest 
 
+CLEANFILES = aftest
+
+aftest_SOURCES = aftest.cpp
+aftest_LDADD = libafflib.la  
 aftest_LDFLAGS = $(PTHREAD_CFLAGS) -static # easier debugging
 
 AFFLIB_SOURCES = aff_db.cpp aff_db.h aff_toc.cpp \
@@ -14,11 +15,9 @@ AFFLIB_SOURCES = aff_db.cpp aff_db.h aff_toc.cpp \
 	vnode_aff.cpp vnode_aff.h \
 	vnode_afd.cpp vnode_afd.h \
 	vnode_afm.cpp vnode_afm.h \
-	vnode_ewf.cpp vnode_ewf.h \
 	vnode_raw.cpp vnode_raw.h \
 	vnode_split_raw.cpp vnode_split_raw.h \
-	aftimer.cpp aftimer.h \
-	afflib_sha256.h \
+	aftimer.h \
 	utils.cpp utils.h display.cpp
 
 libafflib_la_SOURCES = $(AFFLIB_SOURCES) 
@@ -58,7 +57,7 @@ if MAYBE_QEMU
 endif
 
 if MAYBE_S3
-   bin_PROGRAMS += s3
+   EXTRA_PROGRAMS += s3
    libafflib_la_SOURCES +=   vnode_s3.cpp vnode_s3.h s3_glue.cpp 
    s3_SOURCES = s3.cpp
    s3_LDADD = libafflib.la  

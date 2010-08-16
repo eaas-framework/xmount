@@ -2,7 +2,7 @@
  * libewf main handle
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -25,13 +25,13 @@
 #include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_definitions.h"
 #include "libewf_handle.h"
 #include "libewf_header_values.h"
 #include "libewf_io_handle.h"
 #include "libewf_libbfio.h"
-#include "libewf_notify.h"
 #include "libewf_segment_file.h"
 #include "libewf_segment_file_handle.h"
 #include "libewf_string.h"
@@ -393,6 +393,7 @@ int libewf_handle_free(
 {
 	libewf_internal_handle_t *internal_handle = NULL;
 	static char *function                     = "libewf_internal_handle_free";
+	int result                                = 1;
 
 	if( handle == NULL )
 	{
@@ -419,6 +420,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free io handle.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_read_io_handle_free(
 		     &( internal_handle->read_io_handle ),
@@ -430,6 +433,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free read io handle.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_write_io_handle_free(
 		     &( internal_handle->write_io_handle ),
@@ -441,6 +446,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free write io handle.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_segment_table_free(
 		     &( internal_handle->segment_table ),
@@ -452,6 +459,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free segment table.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_segment_table_free(
 		     &( internal_handle->delta_segment_table ),
@@ -463,6 +472,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free delta segment table.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_offset_table_free(
 		     &( internal_handle->offset_table ),
@@ -474,6 +485,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free offset table.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_chunk_cache_free(
 		     &( internal_handle->chunk_cache ),
@@ -485,6 +498,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free chunk cache.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_media_values_free(
 		     &( internal_handle->media_values ),
@@ -496,6 +511,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free media values.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_header_sections_free(
 		     &( internal_handle->header_sections ),
@@ -507,6 +524,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free header sections.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_hash_sections_free(
 		     &( internal_handle->hash_sections ),
@@ -518,6 +537,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free hash sections.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_values_table_free(
 		     &( internal_handle->header_values ),
@@ -529,6 +550,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free header values.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_values_table_free(
 		     &( internal_handle->hash_values ),
@@ -540,6 +563,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free hash values.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_sector_table_free(
 		     &( internal_handle->sessions ),
@@ -551,6 +576,8 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free sessions.",
 			 function );
+
+			result = -1;
 		}
 		if( libewf_sector_table_free(
 		     &( internal_handle->acquiry_errors ),
@@ -562,13 +589,15 @@ int libewf_handle_free(
 			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
 			 "%s: unable to free acquiry errors.",
 			 function );
+
+			result = -1;
 		}
 		memory_free(
 		 internal_handle );
 
 		*handle = NULL;
 	}
-	return( 1 );
+	return( result );
 }
 
 /* Signals the libewf handle to abort its current activity
@@ -682,7 +711,9 @@ int libewf_handle_open(
 	if( ( ( flags & LIBEWF_FLAG_READ ) == LIBEWF_FLAG_READ )
 	 || ( ( flags & LIBEWF_FLAG_RESUME ) == LIBEWF_FLAG_RESUME ) )
 	{
-		for( filename_iterator = 0; filename_iterator < amount_of_filenames; filename_iterator++ )
+		for( filename_iterator = 0;
+		     filename_iterator < amount_of_filenames;
+		     filename_iterator++ )
 		{
 			filename_length = narrow_string_length(
 					   filenames[ filename_iterator ] );
@@ -785,6 +816,14 @@ int libewf_handle_open(
 
 				return( -1 );
 			}
+#if defined( HAVE_VERBOSE_OUTPUT )
+			libnotify_verbose_printf(
+			 "%s: added pool entry: %d with filename: %s.\n",
+			 function,
+			 file_io_pool_entry,
+			 filenames[ filename_iterator ] );
+#endif
+
 			if( ( filenames[ filename_iterator ][ filename_length - 3 ] == 'e' )
 			 || ( filenames[ filename_iterator ][ filename_length - 3 ] == 'E' )
 			 || ( filenames[ filename_iterator ][ filename_length - 3 ] == 'l' )
@@ -1135,6 +1174,14 @@ int libewf_handle_open_wide(
 
 				return( -1 );
 			}
+#if defined( HAVE_VERBOSE_OUTPUT )
+			libnotify_verbose_printf(
+			 "%s: added pool entry: %d with filename: %ls.\n",
+			 function,
+			 file_io_pool_entry,
+			 filenames[ filename_iterator ] );
+#endif
+
 			if( ( filenames[ filename_iterator ][ filename_length - 3 ] == 'e' )
 			 || ( filenames[ filename_iterator ][ filename_length - 3 ] == 'E' )
 			 || ( filenames[ filename_iterator ][ filename_length - 3 ] == 'l' )
@@ -1414,7 +1461,9 @@ int libewf_handle_open_file_io_pool(
 	if( ( ( flags & LIBEWF_FLAG_READ ) == LIBEWF_FLAG_READ )
 	 || ( ( flags & LIBEWF_FLAG_RESUME ) == LIBEWF_FLAG_RESUME ) )
 	{
-		for( file_io_handle_iterator = 0; file_io_handle_iterator < amount_of_handles; file_io_handle_iterator++ )
+		for( file_io_handle_iterator = 0;
+		     file_io_handle_iterator < amount_of_handles;
+		     file_io_handle_iterator++ )
 		{
 			file_io_handle = NULL;
 
@@ -1435,6 +1484,13 @@ int libewf_handle_open_file_io_pool(
 
 				return( -1 );
 			}
+#if defined( HAVE_VERBOSE_OUTPUT )
+			libnotify_verbose_printf(
+			 "%s: processing pool entry: %d.\n",
+			 function,
+			 file_io_handle_iterator );
+#endif
+
 			result = libewf_internal_handle_add_segment_file(
 			          internal_handle,
 			          file_io_handle_iterator,
@@ -1506,7 +1562,7 @@ int libewf_handle_open_file_io_pool(
 
 			if( ( flags & LIBEWF_FLAG_RESUME ) == LIBEWF_FLAG_RESUME )
 			{
-				libewf_notify_error_backtrace(
+				libnotify_print_error_backtrace(
 				 *error );
 				liberror_error_free(
 				 error );
@@ -1678,9 +1734,10 @@ int libewf_handle_close(
 
 		return( -1 );
 	}
-	if( libbfio_pool_close_all(
-	     internal_handle->io_handle->file_io_pool,
-	     error ) != 0 )
+	if( ( internal_handle->io_handle->pool_created_in_library != 0 )
+	 && ( libbfio_pool_close_all(
+	       internal_handle->io_handle->file_io_pool,
+	       error ) != 0 ) )
 	{
 		liberror_error_set(
 		 error,
@@ -1722,6 +1779,17 @@ off64_t libewf_handle_seek_offset(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->media_values == NULL )
 	{
 		liberror_error_set(
@@ -1756,8 +1824,8 @@ off64_t libewf_handle_seek_offset(
 		offset += (off64_t) internal_handle->media_values->media_size;
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
-	 "%s: seeking offset: %" PRIjd ".\n",
+	libnotify_verbose_printf(
+	 "%s: seeking offset: %" PRIi64 ".\n",
 	 function,
 	 offset );
 #endif
@@ -1970,6 +2038,17 @@ ssize_t libewf_handle_read_chunk(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->chunk_cache == NULL )
 	{
 		liberror_error_set(
@@ -2049,6 +2128,17 @@ ssize_t libewf_handle_read_buffer(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->media_values == NULL )
 	{
 		liberror_error_set(
@@ -2106,7 +2196,7 @@ ssize_t libewf_handle_read_buffer(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: reading size: %" PRIzu ".\n",
 	 function,
 	 size );
@@ -2120,7 +2210,7 @@ ssize_t libewf_handle_read_buffer(
 	if( chunk_data_size > internal_handle->chunk_cache->allocated_size )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: reallocating chunk data size: %" PRIzu ".\n",
 		 function,
 		 chunk_data_size );
@@ -2283,6 +2373,17 @@ ssize_t libewf_handle_prepare_write_chunk(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->chunk_cache == NULL )
 	{
 		liberror_error_set(
@@ -2335,7 +2436,7 @@ ssize_t libewf_handle_prepare_write_chunk(
 				 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
 				 "%s: chunk: %d does not exist.",
 				 function,
-				 ( internal_handle->io_handle->current_chunk + 1 ) );
+				 internal_handle->io_handle->current_chunk );
 
 				return( -1 );
 			}
@@ -2410,6 +2511,17 @@ ssize_t libewf_handle_write_chunk(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->media_values == NULL )
 	{
 		liberror_error_set(
@@ -2495,12 +2607,12 @@ ssize_t libewf_handle_write_chunk(
 		return( -1 );
 	}
 #if defined( HAVE_VERBOSE_OUTPUT )
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing chunk: %d of total: %d.\n",
 	 function,
-	 ( internal_handle->io_handle->current_chunk + 1 ),
+	 internal_handle->io_handle->current_chunk,
 	 internal_handle->offset_table->amount_of_chunk_offsets );
-	libewf_notify_verbose_printf(
+	libnotify_verbose_printf(
 	 "%s: writing chunk buffer of size: %" PRIzd " with data of size: %" PRIzd ".\n",
 	 function,
 	 chunk_buffer_size,
@@ -2522,7 +2634,7 @@ ssize_t libewf_handle_write_chunk(
 			 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
 			 "%s: chunk: %d does not exist.",
 			 function,
-			 internal_handle->io_handle->current_chunk + 1 );
+			 internal_handle->io_handle->current_chunk );
 
 			return( -1 );
 		}
@@ -2613,6 +2725,17 @@ ssize_t libewf_handle_write_buffer(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->write_io_handle == NULL )
 	{
 		liberror_error_set(
@@ -2705,7 +2828,7 @@ ssize_t libewf_handle_write_buffer(
 	if( chunk_data_size > internal_handle->chunk_cache->allocated_size )
 	{
 #if defined( HAVE_VERBOSE_OUTPUT )
-		libewf_notify_verbose_printf(
+		libnotify_verbose_printf(
 		 "%s: reallocating chunk data size: %" PRIzu ".\n",
 		 function,
 		 chunk_data_size );
@@ -2743,7 +2866,7 @@ ssize_t libewf_handle_write_buffer(
 				 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
 				 "%s: chunk: %d does not exist.",
 				 function,
-				 ( internal_handle->io_handle->current_chunk + 1 ) );
+				 internal_handle->io_handle->current_chunk );
 
 				return( -1 );
 			}
@@ -2959,6 +3082,17 @@ int libewf_handle_get_offset(
 	}
 	internal_handle = (libewf_internal_handle_t *) handle;
 
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
+		 function );
+
+		return( -1 );
+	}
 	if( internal_handle->media_values == NULL )
 	{
 		liberror_error_set(
@@ -4305,7 +4439,7 @@ int libewf_handle_get_file_io_handle(
 		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
 		 "%s: invalid segment file handle for chunk: %" PRIu32 ".",
 		 function,
-		 internal_handle->io_handle->current_chunk + 1 );
+		 internal_handle->io_handle->current_chunk );
 
 		return( -1 );
 	}
@@ -4324,7 +4458,7 @@ int libewf_handle_get_file_io_handle(
 		 "%s: unable to retrieve file io handle for pool entry: %d (chunk: %" PRIu32 ").",
 		 function,
 		 file_io_pool_entry,
-		 internal_handle->io_handle->current_chunk + 1 );
+		 internal_handle->io_handle->current_chunk );
 
 		return( -1 );
 	}
@@ -4352,6 +4486,17 @@ int libewf_internal_handle_add_segment_file(
 		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
 		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid handle.",
+		 function );
+
+		return( -1 );
+	}
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
 		 function );
 
 		return( -1 );
@@ -4462,7 +4607,7 @@ int libewf_internal_handle_add_segment_file(
 		if( internal_handle->segment_table->segment_file_handle[ *segment_number ] != NULL )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: segment file: %" PRIu16 " already exists.\n",
 			 function,
 			 *segment_number );
@@ -4496,7 +4641,7 @@ int libewf_internal_handle_add_segment_file(
 		if( internal_handle->delta_segment_table->segment_file_handle[ *segment_number ] != NULL )
 		{
 #if defined( HAVE_VERBOSE_OUTPUT )
-			libewf_notify_verbose_printf(
+			libnotify_verbose_printf(
 			 "%s: delta segment file: %" PRIu16 " already exists.\n",
 			 function,
 			 *segment_number );
@@ -4771,6 +4916,17 @@ int libewf_internal_handle_set_format(
 		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
 		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid handle.",
+		 function );
+
+		return( -1 );
+	}
+	if( internal_handle->io_handle == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
+		 "%s: invalid handle - missing io handle.",
 		 function );
 
 		return( -1 );

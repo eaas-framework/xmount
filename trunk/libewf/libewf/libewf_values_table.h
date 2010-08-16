@@ -2,7 +2,7 @@
  * Values table functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -71,6 +71,11 @@ int libewf_values_table_free(
 int libewf_values_table_resize(
      libewf_values_table_t *values_table,
      int amount_of_values,
+     liberror_error_t **error );
+
+int libewf_values_table_get_amount_of_values(
+     libewf_values_table_t *values_table,
+     int *amount_of_values,
      liberror_error_t **error );
 
 int libewf_values_table_get_index(

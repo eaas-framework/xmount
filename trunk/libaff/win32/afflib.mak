@@ -3,36 +3,36 @@
 #
 
 # What to make:
-TARGETS = afcompare.exe afconvert.exe afcopy.exe affix.exe afinfo.exe afstats.exe afxml.exe
+TARGETS = affcompare.exe affconvert.exe affcopy.exe affdiskprint.exe affix.exe affinfo.exe affstats.exe affxml.exe
 
 # These are things you may need to change:
 #
 # SDK_DIR is where the Windows Platform SDK is installed on your computer
 #
-SDK_DIR = "C:\Program Files\Microsoft Platform SDK"
+SDK_DIR = "C:\Program Files\Microsoft SDKs\Windows\v6.1"
+OPENSSL_DIR = C:\OpenSSL
 
 # COMPILER_MODE specifies how you want the libaries compiled:
 
-COMPILE_MODE = /MT
+COMPILER_MODE = /MT /O2 /D NDEBUG
 
-LIBEWF  = libewf-20070512
-LIBEWFDIR = $(LIBEWF)\libewf
-
+EXPATDIR = expat-2.0.1\lib
 
 all:   $(TARGETS)
 
 ################################################################
+
 
 INCS =	/I.\
 	/Izlib-1.2.3\ \
 	/I..\lib \
 	/I..\lzma443\C \
 	/I..\lzma443\C\7zip\Compress\LZMA_Alone \
-	/I$(LIBEWF)\include \
-	/I$(SDK_DIR)/Include
+	/I$(EXPATDIR) \
+	/I$(SDK_DIR)/Include /I$(OPENSSL_DIR)/Include
 
-EWF_DEFS = /DHAVE_CONFIG_WINDOWS_H /DHAVE_LIBCRYPTO /DHAVE_OPENSSL_EVP_H /DHAVE_WINDOWS_API
-DEFS = /DWIN32 /DWIN32_NT /DUSE_LIBEWF /DMSC /D_CRT_SECURE_NO_DEPRECATE $(EWF_DEFS)
+DEFS = /DWIN32 /DWIN32_NT /DMSC /D_CRT_SECURE_NO_DEPRECATE /DHAVE_CONFIG_WINDOWS_H /DHAVE_LIBCRYPTO /DHAVE_OPENSSL_EVP_H /DHAVE_WINDOWS_API/DHAVE_MEMMOVE
+
 
 CC=cl
 
@@ -108,42 +108,12 @@ AFF_OBJS = ..\lib\aff_db.obj \
 	..\lib\vnode_aff.obj \
 	..\lib\vnode_afd.obj \
 	..\lib\vnode_afm.obj \
-	..\lib\vnode_ewf.obj \
 	..\lib\vnode_raw.obj \
 	..\lib\vnode_s3.obj \
-	..\lib\vnode_split_raw.obj 
+	..\lib\vnode_split_raw.obj \
+	..\lib\utils.obj \
+	..\lib\display.obj
 
-
-EWF_OBJS = \
-	 $(LIBEWFDIR)\ewf_compress.obj \
-	 $(LIBEWFDIR)\ewf_crc.obj \
-	 $(LIBEWFDIR)\ewf_data.obj \
-	 $(LIBEWFDIR)\ewf_error2.obj \
-	 $(LIBEWFDIR)\ewf_file_header.obj \
-	 $(LIBEWFDIR)\ewf_hash.obj \
-	 $(LIBEWFDIR)\ewf_ltree.obj \
-	 $(LIBEWFDIR)\ewf_section.obj \
-	 $(LIBEWFDIR)\ewf_string.obj \
-	 $(LIBEWFDIR)\ewf_table.obj \
-	 $(LIBEWFDIR)\ewf_volume.obj \
-	 $(LIBEWFDIR)\ewf_volume_smart.obj \
-	 $(LIBEWFDIR)\libewf_chunk_cache.obj \
-	 $(LIBEWFDIR)\libewf_common.obj \
-	 $(LIBEWFDIR)\libewf_debug.obj \
-	 $(LIBEWFDIR)\libewf_digest_context.obj \
-	 $(LIBEWFDIR)\libewf_endian.obj \
-	 $(LIBEWFDIR)\libewf_file.obj \
-	 $(LIBEWFDIR)\libewf_hash_values.obj \
-	 $(LIBEWFDIR)\libewf_header_values.obj \
-	 $(LIBEWFDIR)\libewf_internal_handle.obj \
-	 $(LIBEWFDIR)\libewf_notify.obj \
-	 $(LIBEWFDIR)\libewf_offset_table.obj \
-	 $(LIBEWFDIR)\libewf_read.obj \
-	 $(LIBEWFDIR)\libewf_section.obj \
-	 $(LIBEWFDIR)\libewf_section_list.obj \
-	 $(LIBEWFDIR)\libewf_segment_table.obj \
-	 $(LIBEWFDIR)\libewf_string.obj \
-	 $(LIBEWFDIR)\libewf_write.obj 
 
 ZLIB_OBJS = zlib-1.2.3\adler32.obj \
 	zlib-1.2.3\compress.obj \
@@ -158,18 +128,22 @@ ZLIB_OBJS = zlib-1.2.3\adler32.obj \
 	zlib-1.2.3\uncompr.obj \
 	zlib-1.2.3\zutil.obj
 
+EXPAT_OBJS = $(EXPATDIR)\xmlparse.obj \
+	   $(EXPATDIR)\xmlrole.obj \
+	   $(EXPATDIR)\xmltok.obj \
+	   $(EXPATDIR)\xmltok_impl.obj \
+	   $(EXPATDIR)\xmltok_ns.obj 
+	   
 #
 # WIN32_OBJS are extra objects we need on windows because
 # they aren't present
 #
-WIN32_OBJS = getopt.obj \
-	   openssl\md5.obj \
-	   openssl\sha.obj \
+WIN32_OBJS = getopt.obj 
 
 
 # LIB_OBJS are all of the objects that we'll put in the library
 
-LIB_OBJS = $(EWF_OBJS)	$(AFF_OBJS) $(LZMA_OBJS)  $(WIN32_OBJS) $(ZLIB_OBJS)
+LIB_OBJS = $(AFF_OBJS) $(LZMA_OBJS)  $(WIN32_OBJS) $(ZLIB_OBJS)
 
 afflib.lib: $(LIB_OBJS)
 	lib -out:afflib.lib $(LIB_OBJS)
@@ -178,40 +152,43 @@ afflib.lib: $(LIB_OBJS)
 # ws2_32.lib = Winsock 2
 # advapi32.lib = CryptoAPI support DLL (LIBEWF uses crypto api)
 
-WIN32LIBS = ws2_32.lib advapi32.lib 
+WIN32LIBS = ws2_32.lib advapi32.lib c:\openssl\lib\libeay32.lib
 
 clean:
 	del afflib.lib $(LIB_OBJS) $(TARGETS)
 
 LINK_OPTS = /libpath:$(SDK_DIR)/Lib /nodefaultlib:libc $(WIN32LIBS)
 
-aftest.exe: ..\lib\aftest.obj afflib.lib
-	link -out:aftest.exe ..\lib\aftest.obj afflib.lib $(LINK_OPTS)	    
+afftest.exe: ..\lib\aftest.obj afflib.lib
+	link -out:afftest.exe ..\lib\afftest.obj afflib.lib $(LINK_OPTS)	    
 
-afcat.exe: ..\tools\afcat.obj afflib.lib
-	link -out:afcat.exe ..\tools\afcat.obj afflib.lib $(LINK_OPTS)
+affcat.exe: ..\tools\affcat.obj afflib.lib
+	link -out:affcat.exe ..\tools\affcat.obj afflib.lib $(LINK_OPTS)
 
-afcopy.exe: ..\tools\afcopy.obj ..\tools\utils.obj afflib.lib 
-	link -out:afcopy.exe ..\tools\afcopy.obj ..\tools\utils.obj afflib.lib $(LINK_OPTS)
+affcopy.exe: ..\tools\affcopy.obj ..\tools\aff_bom.obj afflib.lib 
+	link -out:affcopy.exe ..\tools\affcopy.obj ..\tools\aff_bom.obj afflib.lib $(LINK_OPTS)
 
-afcompare.exe: ..\tools\afcompare.obj ..\tools\utils.obj afflib.lib 
-	link -out:afcompare.exe ..\tools\afcompare.obj ..\tools\utils.obj afflib.lib $(LINK_OPTS)
+affcompare.exe: ..\tools\affcompare.obj afflib.lib 
+	link -out:affcompare.exe ..\tools\affcompare.obj afflib.lib $(LINK_OPTS)
 
-afconvert.exe: ..\tools\afconvert.obj afflib.lib
-	link -out:afconvert.exe ..\tools\afconvert.obj afflib.lib $(LINK_OPTS)
+affconvert.exe: ..\tools\affconvert.obj afflib.lib
+	link -out:affconvert.exe ..\tools\affconvert.obj afflib.lib $(LINK_OPTS)
+
+affdiskprint.exe: ..\tools\affdiskprint.obj afflib.lib $(EXPAT_OBJS)
+	link -out:affdiskprint.exe ..\tools\affdiskprint.obj ..\tools\aff_bom.obj afflib.lib $(EXPAT_OBJS) $(LINK_OPTS) 
 
 affix.exe: ..\tools\affix.obj afflib.lib
 	link -out:affix.exe ..\tools\affix.obj afflib.lib $(LINK_OPTS)
 
-afinfo.exe: ..\tools\afinfo.obj ..\tools\quads.obj afflib.lib
-	link -out:afinfo.exe ..\tools\afinfo.obj ..\tools\quads.obj afflib.lib $(LINK_OPTS)
+affinfo.exe: ..\tools\affinfo.obj afflib.lib
+	link -out:affinfo.exe ..\tools\affinfo.obj afflib.lib $(LINK_OPTS)
 
-afsegment.exe: ..\tools\afsegment.obj afflib.lib
-	link -out:afsegment.exe ..\tools\afsegment.obj afflib.lib $(LINK_OPTS)
+affsegment.exe: ..\tools\affsegment.obj afflib.lib
+	link -out:affsegment.exe ..\tools\affsegment.obj afflib.lib $(LINK_OPTS)
 
-afstats.exe: ..\tools\afstats.obj ..\tools\quads.obj afflib.lib
-	link -out:afstats.exe ..\tools\afstats.obj ..\tools\quads.obj afflib.lib $(LINK_OPTS)
+affstats.exe: ..\tools\affstats.obj afflib.lib
+	link -out:affstats.exe ..\tools\affstats.obj afflib.lib $(LINK_OPTS)
 
-afxml.exe: ..\tools\afxml.obj ..\tools\quads.obj afflib.lib
-	link -out:afxml.exe ..\tools\afxml.obj  ..\tools\quads.obj afflib.lib $(LINK_OPTS)
+affxml.exe: ..\tools\affxml.obj  afflib.lib
+	link -out:affxml.exe ..\tools\affxml.obj  afflib.lib $(LINK_OPTS)
 

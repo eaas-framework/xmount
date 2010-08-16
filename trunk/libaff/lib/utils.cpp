@@ -8,7 +8,6 @@
 #include "affconfig.h"
 #include "afflib.h"
 #include "afflib_i.h"
-#include "afflib_sha256.h"
 #include "utils.h"
 #ifdef HAVE_ERR_H
 #include "err.h"

@@ -2,7 +2,7 @@
  * Chunk offset functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,8 +27,6 @@
 #include <types.h>
 
 #include "libewf_segment_file_handle.h"
-
-#include "ewf_table.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -60,6 +58,7 @@ struct libewf_chunk_offset
 	 * 0x01 indicates if the chunk is compressed
 	 * 0x02 indicates if the chunk is tainted and possibly corrupted
 	 * 0x04 indicates if the chunk is corrupted
+	 * 0x08 indicates if the chunk is missing
 	 * 0x80 indicates if the chunk is a delta chunk
 	 */
 	uint8_t flags;

@@ -2,7 +2,7 @@
  * Debugging functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,14 +21,14 @@
  */
 
 #include <common.h>
-#include <endian.h>
+#include <byte_stream.h>
 #include <memory.h>
 #include <types.h>
 
 #include <liberror.h>
+#include <libnotify.h>
 
 #include "libewf_debug.h"
-#include "libewf_notify.h"
 #include "libewf_string.h"
 
 #include "ewf_crc.h"
@@ -87,19 +87,19 @@ int libewf_debug_dump_data(
 
 	crc_data = &data[ data_size - sizeof( ewf_crc_t ) ];
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 crc_data );
+	byte_stream_copy_to_uint32_little_endian(
+	 crc_data,
+	 stored_crc );
 
-	libewf_notify_printf(
+	libnotify_printf(
 	 "%" PRIs_LIBEWF ":\n",
 	 header );
 
-	libewf_notify_dump_data(
+	libnotify_verbose_print_data(
 	 data,
 	 data_size );
 
-	libewf_notify_printf(
+	libnotify_printf(
 	 "%s: possible CRC (in file: %" PRIu32 " calculated: %" PRIu32 ").\n",
 	 function,	
 	 stored_crc,	
@@ -137,19 +137,19 @@ int libewf_debug_section_print(
 	                  sizeof( ewf_section_t ) - sizeof( ewf_crc_t ),
 	                  1 );
 
-	endian_little_convert_32bit(
-	 stored_crc,
-	 section->crc );
+	byte_stream_copy_to_uint32_little_endian(
+	 section->crc,
+	 stored_crc );
 
-	endian_little_convert_64bit(
-	 section_next,
-	 section->next );
+	byte_stream_copy_to_uint64_little_endian(
+	 section->next,
+	 section_next );
 
-	endian_little_convert_64bit(
-	 section_size,
-	 section->size );
+	byte_stream_copy_to_uint64_little_endian(
+	 section->size,
+	 section_size );
 
-	libewf_notify_printf(
+	libnotify_printf(
 	 "Section:\n"
 	 "type:\t%s\n"
 	 "next:\t%" PRIu64 "\n"
@@ -250,7 +250,7 @@ int libewf_debug_byte_stream_print(
 
 		return( -1 );
 	}
-	libewf_notify_printf(
+	libnotify_printf(
 	 "%" PRIs_LIBEWF ":\n"
 	 "%" PRIs_LIBEWF "",
 	 header,
@@ -345,7 +345,7 @@ int libewf_debug_utf8_stream_print(
 
 		return( -1 );
 	}
-	libewf_notify_printf(
+	libnotify_printf(
 	 "%" PRIs_LIBEWF ":\n"
 	 "%" PRIs_LIBEWF "",
 	 header,
@@ -442,7 +442,7 @@ int libewf_debug_utf16_stream_print(
 
 		return( -1 );
 	}
-	libewf_notify_printf(
+	libnotify_printf(
 	 "%" PRIs_LIBEWF ":\n"
 	 "%" PRIs_LIBEWF "",
 	 header,

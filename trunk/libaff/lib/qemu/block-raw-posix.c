@@ -21,6 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <signal.h>
+
 #include "qemu-common.h"
 #ifndef QEMU_IMG
 #include "qemu-timer.h"
@@ -534,7 +536,7 @@ static int raw_create(const char *filename, int64_t total_size,
               0644);
     if (fd < 0)
         return -EIO;
-    ftruncate(fd, total_size * 512);
+    if(ftruncate(fd, total_size * 512)<0) return -1;
     close(fd);
     return 0;
 }

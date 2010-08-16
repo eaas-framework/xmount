@@ -1,13 +1,36 @@
 if HAVE_LOCAL_LIBUNA
-AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/common -I$(top_srcdir)/liberror @MEMWATCH_CPPFLAGS@
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/common \
+	-I$(top_srcdir)/liberror \
+	@MEMWATCH_CPPFLAGS@
 
 noinst_LTLIBRARIES = libuna.la
 
 libuna_la_SOURCES = \
-	libuna.c \
+	libuna_base64_stream.c libuna_base64_stream.h \
+	libuna_base64url_stream.c libuna_base64url_stream.h \
 	libuna_byte_stream.c libuna_byte_stream.h \
 	libuna_compare.c libuna_compare.h \
 	libuna_codepage_ascii.h \
+	libuna_codepage_iso_8859_1.h \
+	libuna_codepage_iso_8859_2.c libuna_codepage_iso_8859_2.h \
+	libuna_codepage_iso_8859_3.c libuna_codepage_iso_8859_3.h \
+	libuna_codepage_iso_8859_4.c libuna_codepage_iso_8859_4.h \
+	libuna_codepage_iso_8859_5.c libuna_codepage_iso_8859_5.h \
+	libuna_codepage_iso_8859_6.c libuna_codepage_iso_8859_6.h \
+	libuna_codepage_iso_8859_7.c libuna_codepage_iso_8859_7.h \
+	libuna_codepage_iso_8859_8.c libuna_codepage_iso_8859_8.h \
+	libuna_codepage_iso_8859_9.c libuna_codepage_iso_8859_9.h \
+	libuna_codepage_iso_8859_10.c libuna_codepage_iso_8859_10.h \
+	libuna_codepage_iso_8859_11.h \
+	libuna_codepage_iso_8859_13.c libuna_codepage_iso_8859_13.h \
+	libuna_codepage_iso_8859_14.c libuna_codepage_iso_8859_14.h \
+	libuna_codepage_iso_8859_15.c libuna_codepage_iso_8859_15.h \
+	libuna_codepage_iso_8859_16.c libuna_codepage_iso_8859_16.h \
+	libuna_codepage_koi8_r.c libuna_codepage_koi8_r.h \
+	libuna_codepage_koi8_u.c libuna_codepage_koi8_u.h \
+	libuna_codepage_windows_874.c libuna_codepage_windows_874.h \
 	libuna_codepage_windows_1250.c libuna_codepage_windows_1250.h \
 	libuna_codepage_windows_1251.c libuna_codepage_windows_1251.h \
 	libuna_codepage_windows_1252.c libuna_codepage_windows_1252.h \

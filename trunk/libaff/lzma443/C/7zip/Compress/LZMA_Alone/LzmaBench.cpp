@@ -363,7 +363,7 @@ static void ThrowError(FILE *f, HRESULT result, const char *s)
   if (result == E_OUTOFMEMORY)
     fprintf(f, "Can not allocate memory");
   else
-    fprintf(f, s);
+    fputs(s,f);
   fprintf(f, "\n");
 }
 

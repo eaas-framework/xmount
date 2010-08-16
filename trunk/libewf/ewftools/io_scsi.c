@@ -2,7 +2,7 @@
  * SCSI IO functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -31,10 +31,6 @@
 #include <sys/ioctl.h>
 #endif
 
-#if defined( WINAPI )
-
-#else
-
 #if defined( HAVE_SCSI_SCSI_H )
 #include <scsi/scsi.h>
 #endif
@@ -47,13 +43,12 @@
 #include <scsi/sg.h>
 #endif
 
-#endif
+#include <libsystem.h>
 
 #include "io_bus.h"
 #include "io_scsi.h"
-#include "notify.h"
 
-#if defined( HAVE_IO_SCSI )
+#if defined( HAVE_SCSI_SG_H )
 
 /* Sends a SCSI command to the file descriptor
  * Returns 1 if successful or -1 on error
@@ -198,7 +193,7 @@ int io_scsi_command(
 		 error,
 		 LIBERROR_ERROR_DOMAIN_IO,
 		 LIBERROR_IO_ERROR_IOCTL_FAILED,
-		 "%s: error while querying device: scsi status: %X, host status: %X, driver status: %X.\n",
+		 "%s: error while querying device: scsi status: %X, host status: %X, driver status: %X.",
 		 function,
 		 sg_io_header.status,
 		 sg_io_header.host_status,
@@ -427,7 +422,7 @@ ssize_t io_scsi_inquiry(
 /* Retrieves the SCSI identifier
  * Returns 1 if successful or -1 on error
  */
-int io_scsi_get_identiier(
+int io_scsi_get_identier(
      int file_descriptor,
      liberror_error_t **error )
 {
@@ -468,8 +463,8 @@ int io_scsi_get_identiier(
 		return( -1 );
 	}
 #if defined( HAVE_DEBUG_OUTPUT )
-	notify_verbose_dump_data(
-	 &identifier,
+	libsystem_notify_verbose_print_data(
+	 (uint8_t *) &identifier,
 	 sizeof( identifier ) );
 #endif
 #endif
@@ -543,27 +538,35 @@ int io_scsi_get_bus_type(
 	                        sg_probe_host.buffer );
 
 #if defined( HAVE_DEBUG_OUTPUT )
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "SCSI_IOCTL_PROBE_HOST (%d): %s\n",
 	 sg_probe_host_length,
 	 sg_probe_host.buffer );
 #endif
 
-	if( ( sg_probe_host_length == 4 )
-	 && ( narrow_string_compare(
-	       sg_probe_host.buffer,
-	       "ahci",
-	       4 ) == 0 ) )
+	if( sg_probe_host_length >= 4 )
 	{
-		*bus_type = IO_BUS_TYPE_ATA;
-	}
-	else if( ( sg_probe_host_length == 7 )
-	      && ( narrow_string_compare(
-	            sg_probe_host.buffer,
-	            "sata_nv",
-	            7 ) == 0 ) )
-	{
-		*bus_type = IO_BUS_TYPE_ATA;
+		if( narrow_string_compare(
+		     sg_probe_host.buffer,
+		     "ahci",
+		     4 ) == 0 )
+		{
+			*bus_type = IO_BUS_TYPE_ATA;
+		}
+		else if( narrow_string_compare(
+		          sg_probe_host.buffer,
+		          "pata",
+		          4 ) == 0 )
+		{
+			*bus_type = IO_BUS_TYPE_ATA;
+		}
+		else if( narrow_string_compare(
+		          sg_probe_host.buffer,
+		          "sata",
+		          4 ) == 0 )
+		{
+			*bus_type = IO_BUS_TYPE_ATA;
+		}
 	}
 	/* Serial Bus Protocol (SBP-2)
 	 */
@@ -646,6 +649,20 @@ int io_scsi_get_pci_bus_address(
 
 		return( -1 );
 	}
+	if( memory_set(
+	     pci_bus_address,
+	     0,
+	     pci_bus_address_size ) == NULL )
+	{
+		liberror_error_set(
+		 error,
+		 LIBERROR_ERROR_DOMAIN_MEMORY,
+		 LIBERROR_MEMORY_ERROR_SET_FAILED,
+		 "%s: unable to clear PCI bus address.",
+		 function );
+
+		return( -1 );
+	}
 #if defined( SCSI_IOCTL_GET_PCI )
 	if( ioctl(
 	     file_descriptor,
@@ -664,7 +681,7 @@ int io_scsi_get_pci_bus_address(
 	pci_bus_address[ pci_bus_address_size - 1 ] = 0;
 
 #if defined( HAVE_DEBUG_OUTPUT )
-	notify_verbose_printf(
+	libsystem_notify_verbose_printf(
 	 "SCSI_IOCTL_GET_PCI: %s\n",
 	 pci_bus_address );
 #endif

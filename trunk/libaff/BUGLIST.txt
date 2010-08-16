@@ -2,7 +2,7 @@ AFFLIB Buglist and future development plans
 
 
 PERFORMANCE IMPROVEMENTS:
-* Cache the results of vstat 
+* afconvert should calculate MD5, SHA256 and SHA1
 * Store TOC sorted and find entries with binary search.
   (A 1TB TOC has 62,500 pages or 100K segments; with fixed size records that would be 8,000,000, which is not much.)
 * aff_write_seg() shouldn't be calling af_rewind_seg after every call

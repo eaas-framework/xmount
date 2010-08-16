@@ -52,33 +52,45 @@
  */
 void af_read_sizes(AFFILE *af)
 {
-    if(af_get_seg(af,AF_PAGESIZE,&af->image_pagesize,0,0)){
-	af_get_seg(af,AF_SEGSIZE_D,&af->image_pagesize,0,0); // try old name
-    }
-    if(af_get_segq(af,AF_IMAGESIZE,(int64_t *)&af->image_size)){
-	/* Need to recover the image size */
-	char segname[AF_MAX_NAME_LEN];
-	size_t datalen = 0;
-	af_rewind_seg(af);		//  start at the beginning
-	int64_t highest_page = -1;
-	while(af_get_next_seg(af,segname,sizeof(segname),0,0,&datalen)==0){
-	    if(segname[0]==0) continue;	// ignore sector
-	    int64_t pagenum = af_segname_page_number(segname);
-	    if(pagenum > highest_page) highest_page = pagenum;
-	}
-	af->image_size = af->image_pagesize * (highest_page+1);
-    }
-	
-    af->image_size_in_file = af->image_size;
-
     af_get_seg(af,AF_SECTORSIZE,&af->image_sectorsize,0,0);
     if(af->image_sectorsize==0) af->image_sectorsize = 512; // reasonable default
 
+    if(af_get_seg(af,AF_PAGESIZE,&af->image_pagesize,0,0)){
+	af_get_seg(af,AF_SEGSIZE_D,&af->image_pagesize,0,0); // try old name
+    }
+
+    /* Read the badflag if it is present */
     size_t sectorsize = af->image_sectorsize;
     if(af->badflag==0) af->badflag = (unsigned char *)malloc(sectorsize);
     if(af_get_seg(af,AF_BADFLAG,0,af->badflag,(size_t *)&sectorsize)==0){
 	af->badflag_set = 1;
     }
+
+    /* Read the image file segment if it is present. 
+     * If it isn't, scan through the disk image to figure out the size of the disk image.
+     */
+
+    if(af_get_segq(af,AF_IMAGESIZE,(int64_t *)&af->image_size)){
+
+	/* Calculate the imagesize by scanning all of the pages that are in
+	 * the disk image and finding the highest page number.
+	 * Then read that page to find the last allocated byte.
+	 */
+	char segname[AF_MAX_NAME_LEN];
+	size_t datalen = 0;
+	af_rewind_seg(af);		//  start at the beginning
+	int64_t highest_page_number = 0;
+	while(af_get_next_seg(af,segname,sizeof(segname),0,0,&datalen)==0){
+	    if(segname[0]==0) continue;	// ignore sector
+	    int64_t pagenum = af_segname_page_number(segname);
+	    if(pagenum > highest_page_number) highest_page_number = pagenum;
+	}
+	size_t highest_page_len = 0;
+	if(af_get_page(af,highest_page_number,0,&highest_page_len)==0){
+	    af->image_size = af->image_pagesize * highest_page_number + highest_page_len;
+	}
+    }
+    af->image_size_in_file = af->image_size;
 }
 
 
@@ -119,7 +131,7 @@ int	af_get_sectorsize(AFFILE *af)	// returns sector size
  * af_set_pagesize:
  * Sets the pagesize. Fails with -1 if it can't be changed.
  */
-int af_set_pagesize(AFFILE *af,long pagesize)
+int af_set_pagesize(AFFILE *af,u_long pagesize)
 {
     /* Allow the pagesize to be changed if it hasn't been set yet
      * and if this format doesn't support metadata updating (which is the raw formats)
@@ -177,7 +189,6 @@ int af_get_page_raw(AFFILE *af,int64_t pagenum,unsigned long *arg,
  * If the page is compressed, uncompress it.
  * data points to a segmenet of at least *bytes;
  * *bytes is then modified to indicate the actual amount of bytes read.
- * if shouldfree is set, then data should be freed.
  * Return 0 if success, -1 if fail.
  */
 
@@ -187,8 +198,7 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
     size_t page_len=0;
 
     if (af_trace){
-	fprintf(af_trace,"af_get_page(%p,pagenum=%"I64d",buf=%p,bytes=%d)\n",
-		af,pagenum,data,bytes);
+	fprintf(af_trace,"af_get_page(%p,pagenum=%"I64d",buf=%p,bytes=%zu)\n",af,pagenum,data,*bytes);
     }
 
     /* Find out the size of the segment and if it is compressed or not.
@@ -273,7 +283,7 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 #ifdef USE_LZMA
 	case AF_PAGE_COMP_ALG_LZMA:
 	    res = lzma_uncompress(data,bytes,compressed_data,compressed_data_len);
-	    if (af_trace) fprintf(af_trace,"   LZMA decompressed page %"I64d". %d bytes => %d bytes\n",
+	    if (af_trace) fprintf(af_trace,"   LZMA decompressed page %"I64d". %zd bytes => %zd bytes\n",
 				  pagenum,compressed_data_len,*bytes);
 	    switch(res){
 	    case 0:break;		// OK
@@ -350,7 +360,7 @@ int af_update_page(AFFILE *af,int64_t pagenum,unsigned char *data,int datalen)
     }
 #endif
 #ifdef HAVE_SHA1
-    /* Write out MD5 if requested */
+    /* Write out SHA1 if requested */
     if(af->write_sha1){
 	unsigned char sha1_buf[20];
 	char sha1name_buf[32];
@@ -359,16 +369,15 @@ int af_update_page(AFFILE *af,int64_t pagenum,unsigned char *data,int datalen)
 	af_update_segf(af,sha1name_buf,0,sha1_buf,sizeof(sha1_buf),AF_SIGFLAG_NOSIG); // ignore failure
     }
 #endif
-#ifdef HAVE_AF_SHA256
-    /* Write out MD5 if requested */
+    /* Write out SHA256 if requested and if SHA256 is available */
     if(af->write_sha256){
 	unsigned char sha256_buf[32];
-	char sha256name_buf[32];
-	af_SHA256(data,datalen,sha256_buf);
-	snprintf(sha256name_buf,sizeof(sha256name_buf),AF_PAGE_SHA256,pagenum);
-	af_update_segf(af,sha256name_buf,0,sha256_buf,sizeof(sha256_buf),AF_SIGFLAG_NOSIG); // ignore failure
+	if(af_SHA256(data,datalen,sha256_buf)==0){
+	    char sha256name_buf[32];
+	    snprintf(sha256name_buf,sizeof(sha256name_buf),AF_PAGE_SHA256,pagenum);
+	    af_update_segf(af,sha256name_buf,0,sha256_buf,sizeof(sha256_buf),AF_SIGFLAG_NOSIG); // ignore failure
+	}
     }
-#endif
 
     /* Check for bypass */
     if(af->v->write){
@@ -537,7 +546,7 @@ int af_cache_flush(AFFILE *af)
 		ret = -1;		// got an error; keep going, though
 	    }
 	    p->pagebuf_dirty = 0;
-	    if(af_trace) fprintf(af_trace,"af_cache_flush: slot %d page %qd flushed.\n",i,p->pagenum);
+	    if(af_trace) fprintf(af_trace,"af_cache_flush: slot %d page %"PRIu64" flushed.\n",i,p->pagenum);
 	}
     }
     return ret;				// now return the error that I might have gotten

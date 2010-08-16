@@ -300,7 +300,7 @@ static string encode(const char *aws_secret_access_key,string str)
 	 md,&md_len);
     /* Now encode this to base64 */
     char b64str[64];
-    memset(b64str,sizeof(b64str),0);
+    memset(b64str,0,sizeof(b64str));
     b64_ntop(md,md_len,b64str,sizeof(b64str));
     return string(b64str);
 }

@@ -2,7 +2,7 @@
  * Compare functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,8 +24,6 @@
 #include <types.h>
 
 #include <liberror.h>
-
-#include <stdlib.h>
 
 #include "libuna_compare.h"
 #include "libuna_unicode_character.h"

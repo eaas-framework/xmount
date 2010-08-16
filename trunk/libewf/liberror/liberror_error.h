@@ -2,7 +2,7 @@
  * Error functions
  *
  * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -28,28 +28,10 @@
 
 #include <stdio.h>
 
-#if defined( HAVE_STDARG_H )
-#include <stdarg.h>
-#elif defined( HAVE_VARARGS_H )
-#include <varargs.h>
-#else
-#error Missing headers stdarg.h and varargs.h
-#endif
-
 #include "liberror_types.h"
 
 #if defined( __cplusplus )
 extern "C" {
-#endif
-
-#if defined( WINAPI )
-#define liberror_error_vsnprintf( string, size, format, ... ) \
-	_vsnprintf( string, size, format, __VA_ARGS__ )
-
-#else
-#define liberror_error_vsnprintf( string, size, format, ... ) \
-	vsnprintf( string, size, format, __VA_ARGS__ )
-
 #endif
 
 typedef struct liberror_internal_error liberror_internal_error_t;
@@ -88,13 +70,23 @@ int liberror_error_matches(
 void liberror_error_free(
       liberror_error_t **error );
 
-void liberror_error_fprint(
-      liberror_error_t *error,
-      FILE *stream );
+int liberror_error_fprint(
+     liberror_error_t *error,
+     FILE *stream );
 
-void liberror_error_backtrace_fprint(
-      liberror_error_t *error,
-      FILE *stream );
+int liberror_error_sprint(
+     liberror_error_t *error,
+     char *string,
+     size_t size );
+
+int liberror_error_backtrace_fprint(
+     liberror_error_t *error,
+     FILE *stream );
+
+int liberror_error_backtrace_sprint(
+     liberror_error_t *error,
+     char *string,
+     size_t size );
 
 #if defined( __cplusplus )
 }

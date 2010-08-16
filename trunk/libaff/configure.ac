@@ -5,7 +5,7 @@
 # and http://www.openismus.com/documents/linux/automake/automake.shtml
 
 
-AC_INIT([AFFLIB],[3.3.6],[bugs@afflib.org])
+AC_INIT([AFFLIB],[3.6.2],[bugs@afflib.org])
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
 
@@ -23,32 +23,28 @@ AC_PROG_LIBTOOL
 AC_CONFIG_MACRO_DIR([m4])
 
 # We are now threading
-m4_include([acx_pthread.m4])
-m4_include([acinclude.m4])
-
+m4_include([m4/acx_pthread.m4])
+m4_include([m4/acinclude.m4])
 ACX_PTHREAD()
 
 
-# AC_PROG_RANLIB not needed if you are using AC_PROG_LIBTOOL
-# AC_PROG_RANLIB
-AC_CONFIG_FILES([Makefile lib/Makefile tools/Makefile lzma443/Makefile win32/Makefile 
-			  tests/Makefile doc/Makefile pyaff/Makefile man/Makefile])
-dnl Have configure make distribution specific files
-AC_CONFIG_FILES([debian/changelog])
-AC_CONFIG_FILES([debian/shlibs.local.ex])
-AC_CONFIG_FILES([afflib.spec])
-dnl Have configure write its configuration
-AM_CONFIG_HEADER([affconfig.h])
-
-# Bring additional directories where things might be found into our
-# search path. I don't know why autoconf doesn't do this by default
-for spfx in /usr/local /opt/local /sw ; do
-    echo checking ${spfx}/include
+if test x"${cross_compiling}" = "xno" ; then
+  # Bring additional directories where things might be found into our
+  # search path. I don't know why autoconf doesn't do this by default
+  for spfx in /usr/local /opt/local /sw ${prefix} ; do
+    AC_MSG_NOTICE([checking ${spfx}/include])
     if test -d ${spfx}/include; then
         CPPFLAGS="-I${spfx}/include $CPPFLAGS"
         LDFLAGS="-L${spfx}/lib $LDFLAGS"
+        AC_MSG_NOTICE([ *** ADDING ${spfx}/include to CPPFLAGS *** ])
+        AC_MSG_NOTICE([ *** ADDING ${spfx}/lib to LDFLAGS *** ])
     fi
-done
+  done
+  AC_MSG_NOTICE([ CPPFLAGS = ${CPPFLAGS} ])        
+  AC_MSG_NOTICE([ LDFLAGS = ${LDFLAGS} ])        
+else
+  AC_MSG_NOTICE([Cross Compiling --- will not update CPPFALGS or LDFLAGS with /usr/local, /opt/local or /sw])
+fi
         
 
 AC_DEFINE([IN_AFFLIB],1,[Defined if we are inside AFFLIB])
@@ -74,7 +70,9 @@ AC_STRUCT_ST_RDEV
 
 
 # Specific headers that I plan to use
-AC_CHECK_HEADERS([arpa/inet.h assert.h ctype.h dmalloc.h err.h errno.h fcntl.h getopt.h inttypes.h linux/fs.h malloc.h ncurses/term.h netinet/in.h signal.h stdio.h stdlib.h string.h sys/cdefs.h sys/disk.h sys/file.h sys/ioctl.h sys/ioctl.h sys/param.h sys/param.h sys/socket.h sys/signal.h sys/stat.h sys/time.h sys/types.h sys/vfs.h sysexits.h term.h time.h unistd.h zlib.h])
+AC_CHECK_HEADERS([arpa/inet.h assert.h ctype.h dmalloc.h err.h errno.h fcntl.h getopt.h inttypes.h linux/fs.h malloc.h ncurses/term.h netinet/in.h regex.h signal.h stdint.h stdio.h stdlib.h string.h sys/cdefs.h sys/disk.h sys/file.h sys/ioctl.h sys/ioctl.h sys/param.h sys/param.h sys/socket.h sys/signal.h sys/stat.h sys/time.h sys/types.h sys/vfs.h sysexits.h term.h time.h unistd.h zlib.h])
+
+AC_CHECK_LIB([regex],[regcomp])        # see if we need -lregex
 
 AC_CHECK_MEMBER([struct sockaddr_in.sin_len],
 		[ AC_DEFINE(HAVE_SOCKADDR_SIN_LEN, 1, [Do we have sockaddr.sin_len?]) ],
@@ -87,10 +85,7 @@ AC_CHECK_MEMBER([struct sockaddr_in.sin_len],
 
 
 # Specific functions that we want to know about
-AC_CHECK_FUNCS([getprogname strlcpy strlcat err_set_exit srandom srandomdev flock])
-AC_CHECK_FUNCS([fstatfs valloc isdigit isalnum isalphanum isatty popen])
-AC_CHECK_FUNCS([ftruncate memset mkdir putenv regcomp strcasecmp strchr strdup strerror strrchr])
-AC_CHECK_FUNCS([err errx warn warnx])
+AC_CHECK_FUNCS([getprogname strlcpy strlcat err_set_exit srandom srandomdev flock fstatfs valloc isdigit isalnum isalphanum isatty popen ftruncate memset mkdir putenv regcomp srandomdev strcasecmp strchr strdup strerror strrchr err errx warn warnx utimes unsetenv])
 
 # Special features that can be enabled or disabled
 AC_ARG_WITH([noopt], AC_HELP_STRING([--with-noopt],[Drop -O C flags]))
@@ -101,102 +96,6 @@ AC_LANG_PUSH([C++])
 AC_CHECK_HEADERS([cstring])
 AC_LANG_POP([C++])
 
-
-
-################################################################
-## LIBEWF support
-dnl Function to test if a libewf_get_media_size takes value as an argument
-AC_DEFUN([AFF_CHECK_LIBEWF_GET_MEDIA_SIZE],
-        [AC_CHECK_FUNC(
-         [libewf_get_media_size],
-         [AC_DEFINE(
-          [HAVE_LIBEWF_GET_MEDIA_SIZE],
-          [1],
-          [Define to 1 if you have the libewf_get_media_size function.])
-	 AC_LANG_PUSH(C)
-	 AC_MSG_CHECKING(
-	  [if libewf_get_media_size takes size as an argument.])
-	 AC_LINK_IFELSE(
-		[AC_LANG_PROGRAM(
-		 [[#include <libewf.h>]],
-		 [[libewf_get_media_size(NULL,NULL); ]] )],
-		[AC_MSG_RESULT(
-		 [yes])
-		AC_DEFINE(
-		 [HAVE_LIBEWF_GET_MEDIA_SIZE_ARGUMENT_VALUE],
-		 [1],
-		 [Define to 1 if libewf_get_media_size takes value as an argument.])],
-		[AC_MSG_RESULT(
-		 [no])] )
-	 AC_LANG_POP(C) ])
-])
-
-dnl Function to test if a libewf_get_chunk_size takes value as an argument
-AC_DEFUN([AFF_CHECK_LIBEWF_GET_CHUNK_SIZE],
-        [AC_CHECK_FUNC(
-         [libewf_get_chunk_size],
-         [AC_DEFINE(
-          [HAVE_LIBEWF_GET_CHUNK_SIZE],
-          [1],
-          [Define to 1 if you have the libewf_get_chunk_size function.])
-	 AC_LANG_PUSH(C)
-	 AC_MSG_CHECKING(
-	  [if libewf_get_chunk_size takes size as an argument.])
-	 AC_LINK_IFELSE(
-		[AC_LANG_PROGRAM(
-		 [[#include <libewf.h>]],
-		 [[libewf_get_chunk_size(NULL,NULL); ]] )],
-		[AC_MSG_RESULT(
-		 [yes])
-		AC_DEFINE(
-		 [HAVE_LIBEWF_GET_CHUNK_SIZE_ARGUMENT_VALUE],
-		 [1],
-		 [Define to 1 if libewf_get_chunk_size takes value as an argument.])],
-		[AC_MSG_RESULT(
-		 [no])] )
-	 AC_LANG_POP(C) ])
-])
-
-dnl Function to test if a libewf_get_bytes_per_sector takes value as an argument
-AC_DEFUN([AFF_CHECK_LIBEWF_GET_BYTES_PER_SECTOR],
-        [AC_CHECK_FUNC(
-         [libewf_get_bytes_per_sector],
-         [AC_DEFINE(
-          [HAVE_LIBEWF_GET_BYTES_PER_SECTOR],
-          [1],
-          [Define to 1 if you have the libewf_get_bytes_per_sector function.])
-	 AC_LANG_PUSH(C)
-	 AC_MSG_CHECKING(
-	  [if libewf_get_bytes_per_sector takes size as an argument.])
-	 AC_LINK_IFELSE(
-		[AC_LANG_PROGRAM(
-		 [[#include <libewf.h>]],
-		 [[libewf_get_bytes_per_sector(NULL,NULL); ]] )],
-		[AC_MSG_RESULT(
-		 [yes])
-		AC_DEFINE(
-		 [HAVE_LIBEWF_GET_BYTES_PER_SECTOR_ARGUMENT_VALUE],
-		 [1],
-		 [Define to 1 if libewf_get_bytes_per_sector takes value as an argument.])],
-		[AC_MSG_RESULT(
-		 [no])] )
-	 AC_LANG_POP(C) ])
-])
-
-AC_ARG_ENABLE([libewf],
-	AC_HELP_STRING([--enable-libewf=yes], [Use libewf for reading EnCase files(default yes)]),
-        [enable_libewf=$enableval], [enable_libewf=yes])
-if test "${enable_libewf}" = "yes" ; then
-  AC_CHECK_LIB([ewf],[libewf_get_version],,[enable_libewf=no])
-  AC_CHECK_HEADERS([libewf.h],,[enable_libewf=no])
-fi
-if test "${enable_libewf}" = "yes"; then
-      AFF_CHECK_LIBEWF_GET_MEDIA_SIZE
-      AFF_CHECK_LIBEWF_GET_CHUNK_SIZE
-      AFF_CHECK_LIBEWF_GET_BYTES_PER_SECTOR
-      AC_DEFINE([USE_LIBEWF],1,[Use libewf to read EnCase files])
-fi
-
 ################################################################
 # For AFF tools
 AC_CHECK_FUNCS(tputs tgoto tgetstr tgetnum gotorc beep endwin setupterm printw)
@@ -204,7 +103,7 @@ AC_CHECK_HEADERS([readline/readline.h])
 AC_CHECK_HEADERS([curses.h termcap.h])
 AC_CHECK_LIB([readline],[readline],, AC_MSG_RESULT([readline not installed]))
 AC_CHECK_LIB([ncurses],[initscr],, AC_MSG_RESULT([ncurses not installed]))
-AC_CHECK_LIB([z],[uncompress],, AC_MSG_ERROR([zlib not installed; cannot continue.]))
+AC_CHECK_LIB([z],[uncompress],, AC_MSG_ERROR([zlib not installed; cannot continue. Try adding zlib-dev or zlib1g-dev.]))
 AC_CHECK_LIB([rt],[aio_error64])
 
 ################################################################
@@ -235,12 +134,6 @@ if test "x${enable_s3}" = "xyes" ; then
   AC_ARG_WITH(curl,
             AC_HELP_STRING([--with-curl=PATH], [where libcurl is installed; required for S3]),
             [CURL_CONFIG="${with_curl}/bin/curl-config"])
-  if test -f "${CURL_CONFIG}"; then
-      LDFLAGS="`${CURL_CONFIG} --libs` $LDFLAGS"
-      CPPFLAGS="`${CURL_CONFIG} --cflags` $CPPFLAGS"
-  else
-      AC_MSG_WARN([curl-config not found, guessing at libcurl build settings])
-  fi
   AC_CHECK_HEADER([curl/curl.h],,
     AC_MSG_WARN([curl/curl.h not found; Disabling S3 Support.])
     enable_s3=no)
@@ -265,6 +158,11 @@ AC_ARG_ENABLE([qemu])
 
 echo "disable_qemu: " ${disable_qemu}
 echo "enable_qemu: " ${enable_qemu}
+
+if test x"${cross_compiling}" = "xyes" ; then
+  AC_MSG_NOTICE([cross-compiling: Disabling QEMU])
+  enable_qemu="no";
+fi
 
 if test "x${enable_qemu}" = "xno" ; then
    enable_qemu="no"
@@ -292,31 +190,33 @@ fi
 
 AM_CONDITIONAL(HAVE_PYTHON, test "$enable_python" = yes)
 
+
+
 ##
 ################################################################
 ################################################################
 ## Crypto (must follow S3)
 ###
 
+# If we are cross-compiling, then add the specail libs that OpenSSL requires
 
-AC_CHECK_LIB([ssl],[ssl3_new],,
-	AC_MSG_ERROR([OpenSSL developer library 'libssl-dev' or 'openssl-devel' not installed; cannot continue.]))
+if test x"${cross_compiling}" == "xyes" ; then
+  LIBS="$LIBS -lws2_32 -lgdi32"
+fi
+
+
 AC_CHECK_LIB([crypto],[MD5_Update],,
 	AC_MSG_ERROR([OpenSSL developer library 'libcrypto' not installed; cannot continue.]))	
 
-AC_CHECK_HEADERS([openssl/aes.h openssl/bio.h openssl/evp.h openssl/hmac.h openssl/md5.h openssl/rand.h openssl/rsa.h openssl/sha.h openssl/pem.h])
+AC_CHECK_LIB([ssl],[ssl3_new],,
+	AC_MSG_ERROR([OpenSSL developer library 'libssl-dev' or 'openssl-devel' not installed; cannot continue.]))
 
-AC_CHECK_FUNCS([MD5 SHA1 AES_encrypt RAND_pseudo_bytes des_read_pw_string EVP_read_pw_string])
+
+AC_CHECK_HEADERS([openssl/aes.h openssl/bio.h openssl/evp.h openssl/hmac.h openssl/md5.h openssl/rand.h openssl/rsa.h openssl/sha.h openssl/pem.h openssl/x509.h])
+
+AC_CHECK_FUNCS([MD5 SHA1 AES_encrypt RAND_pseudo_bytes des_read_pw_string EVP_read_pw_string EVP_MD_size])
 AC_CHECK_LIB([md],[MD5])		# if libmd is available, get it
 
-### SHA256 insanity. 
-### Some sha.h include files have sha256 defined and some do not
-### Some systems put it in a different location.
-### the whole thing is really disturbing
-AC_CHECK_HEADERS([sha256.h])		# on some system
-AC_CHECK_HEADERS([openssl/fips_sha.h])	# on other systems
-AC_CHECK_FUNCS([SHA256_Init])           # try to figure out what it's called
-AC_CHECK_FUNCS([EVP_sha256],[evp_sha256=yes],[evp_sha256="no "])
 AC_CHECK_FUNCS([PEM_read_bio_RSA_PUBKEY])
 
 ################################################################
@@ -358,6 +258,11 @@ if test "${with_noopt}" = "yes" ; then
   CXXFLAGS=`echo "$CXXFLAGS" | sed s/-O[[0-9]]//`
 fi
 
+# I am a glutten for punishment and this is security-critical software
+CFLAGS="$CFLAGS -D_FORTIFY_SOURCE=2 -Wall"
+CXXFLAGS="$CXXFLAGS -D_FORTIFY_SOURCE=2 -Wall"
+
+
 ################ drop threading if requested ################
 AC_ARG_ENABLE(threading,
   [  --disable-threading    builds library without threading
@@ -378,20 +283,30 @@ AC_MSG_NOTICE([*****************************************])
 AC_MSG_NOTICE([AFFLIB ${PACKAGE_VERSION} configuration])
 AC_MSG_NOTICE([Amazon S3 Support:  ${enable_s3}])
 AC_MSG_NOTICE([LZMA Compression:   yes])
-AC_MSG_NOTICE([LIBEWF:             ${enable_libewf}])
+AC_MSG_NOTICE([LIBEWF:             ${enable_libewf} (requires uuid-dev on Linux)])
 AC_MSG_NOTICE([PYTHON Bindings:    ${enable_python}])
 AC_MSG_NOTICE([QEMU Image Drivers: ${enable_qemu}])
 AC_MSG_NOTICE([FUSE:               ${enable_fuse}])
 AC_MSG_NOTICE([LIBEXPAT:           ${have_expat} (needed for AFF signatures)])
-AC_MSG_NOTICE([EVP_SHA256:         ${evp_sha256} (in OpenSSL -- also needed for AFF signatures)])
 AC_MSG_NOTICE([])
+AC_MSG_NOTICE([CFLAGS:     ${CFLAGS}])
 AC_MSG_NOTICE([CPPFLAGS:   ${CPPFLAGS}])
 AC_MSG_NOTICE([CXXFLAGS:   ${CXXFLAGS}])
-AC_MSG_NOTICE([CFLAGS:     ${CFLAGS}])
 AC_MSG_NOTICE([LIBS:       ${LIBS}])
 AC_MSG_NOTICE([LDFLAGS:    ${LDFLAGS}])
 AC_MSG_NOTICE([*****************************************])
 AC_MSG_NOTICE([])
+
+# AC_PROG_RANLIB not needed if you are using AC_PROG_LIBTOOL
+# AC_PROG_RANLIB
+AC_CONFIG_FILES([Makefile lib/Makefile tools/Makefile lzma443/Makefile 
+			  tests/Makefile doc/Makefile pyaff/Makefile man/Makefile lib/version.h])
+dnl Have configure make distribution specific files
+AC_CONFIG_FILES([afflib.spec])
+
+dnl Have configure write its configuration
+AM_CONFIG_HEADER([affconfig.h])
+
 AC_OUTPUT([afflib.pc])
 
 

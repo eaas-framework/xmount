@@ -2,7 +2,7 @@
  * Platform functions
  *
  * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations. All rights reserved.
+ * Hoffmann Investigations.
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -31,7 +31,9 @@
 #include <sys/utsname.h>
 #endif
 
-#include "system_string.h"
+#include <libsystem.h>
+
+#include "platform.h"
 
 #if !defined( LIBEWF_OPERATING_SYSTEM )
 #define LIBEWF_OPERATING_SYSTEM "Unknown"
@@ -41,7 +43,7 @@
  * Return 1 if successful or -1 on error
  */
 int platform_get_operating_system(
-     system_character_t *operating_system_string,
+     libsystem_character_t *operating_system_string,
      size_t operating_system_string_size,
      liberror_error_t **error )
 {
@@ -52,6 +54,15 @@ int platform_get_operating_system(
 	char *operating_system         = NULL;
 	static char *function          = "platform_get_operating_system";
 	size_t operating_system_length = 0;
+
+#if defined( WINAPI )
+	DWORD windows_version          = 0; 
+	DWORD windows_major_version    = 0;
+	DWORD windows_minor_version    = 0; 
+/*
+	DWORD windows_build_number     = 0;
+ */
+#endif
 
 	if( operating_system_string == NULL )
 	{
@@ -66,6 +77,85 @@ int platform_get_operating_system(
 	}
 #if defined( WINAPI )
 	operating_system = "Windows";
+
+	windows_version = GetVersion();
+ 
+	windows_major_version = (DWORD) ( LOBYTE( LOWORD( windows_version ) ) );
+	windows_minor_version = (DWORD) ( HIBYTE( LOWORD( windows_version ) ) );
+
+/*
+	if( windows_version < 0x80000000 )
+	{
+		windows_build_number = (DWORD)( HIWORD( windows_version ) );
+	}
+*/
+	if( windows_major_version == 3 )
+	{
+		if( windows_version < 0x80000000 )
+		{
+			if( windows_minor_version == 51 )
+			{
+				operating_system = "Windows NT 3.51";
+			}
+		}
+	}
+	else if( windows_major_version == 4 )
+	{
+		if( windows_version < 0x80000000 )
+		{
+			if( windows_minor_version == 0 )
+			{
+				operating_system = "Windows NT 4";
+			}
+		}
+		else
+		{
+			if( windows_minor_version == 0 )
+			{
+				operating_system = "Windows 95";
+			}
+			else if( windows_minor_version == 10 )
+			{
+				operating_system = "Windows 98";
+			}
+			else if( windows_minor_version == 90 )
+			{
+				operating_system = "Windows ME";
+			}
+		}
+	}
+	else if( windows_major_version == 5 )
+	{
+		if( windows_version < 0x80000000 )
+		{
+			if( windows_minor_version == 0 )
+			{
+				operating_system = "Windows 2000";
+			}
+			else if( windows_minor_version == 1 )
+			{
+				operating_system = "Windows XP";
+			}
+			else if( windows_minor_version == 2 )
+			{
+				operating_system = "Windows 2003";
+			}
+		}
+	}
+	else if( windows_major_version == 6 )
+	{
+		if( windows_version < 0x80000000 )
+		{
+			if( windows_minor_version == 0 )
+			{
+				operating_system = "Windows Vista/2008";
+			}
+			else if( windows_minor_version == 1 )
+			{
+				operating_system = "Windows 7";
+			}
+		}
+	}
 
 #elif defined( HAVE_UNAME )
 	/* Determine the operating system
@@ -99,7 +189,7 @@ int platform_get_operating_system(
 
 		return( -1 );
 	}	
-	if( system_string_copy_from_utf8_string(
+	if( libsystem_string_copy_from_utf8_string(
 	     operating_system_string,
 	     operating_system_string_size,
 	     (uint8_t *) operating_system,
