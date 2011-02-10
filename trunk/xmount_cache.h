@@ -73,12 +73,12 @@ typedef struct TXMImageMapEntry {
  * xmount cachefile file index entry
  */
 #define XM_CACHEFILE_FILEINDEX_MAXPATHLEN 512
-#define XM_CACHEFILE_FILEINDEX_MAXFILELEN 512
+#define XM_CACHEFILE_FILEINDEX_MAXNAMELEN 512
 typedef struct TXMFileIndexEntry {
   /** File path */
   char filepath[XM_CACHEFILE_FILEINDEX_MAXPATHLEN];
   /** File name or '\0' when entry represents a folder */
-  char filename[XM_CACHEFILE_FILEINDEX_MAXFILELEN];
+  char filename[XM_CACHEFILE_FILEINDEX_MAXNAMELEN];
   /** File size */
   uint64_t filesize;
   /** Number of first file map entry */

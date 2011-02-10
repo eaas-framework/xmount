@@ -34,7 +34,7 @@ typedef enum eInputImageType {
   eInputImageType_EWF,
   //! Input image is an AFF file
   eInputImageType_AFF
-} tInputImageType;
+} teInputImageType;
 
 /*!
   @brief Output (virtual) image types
@@ -49,7 +49,7 @@ typedef enum eOutputImageType {
   eOutputImageType_VMDK,
   //! Virtual image is a VMDK file (SCSI bus)
   eOutputImageType_VMDKS
-} tOutputImageType;
+} teOutputImageType;
 
 /*!
   @brief xmount runtime options
@@ -59,7 +59,7 @@ typedef enum eOutputImageType {
 typedef struct sXmountOptions {
   /* Input image related */
   //! Input image type
-  tInputImageType input_image_type;
+  teInputImageType input_image_type;
   //! Size of input image
   uint64_t input_image_size;
   //! Amount of data to use for following hash
@@ -69,7 +69,7 @@ typedef struct sXmountOptions {
 
   /* Output image related (general) */
   //! Output image type
-  tOutputImageType output_image_type;
+  teOutputImageType output_image_type;
   //! Size of virtual image
   uint64_t output_image_size;
   //! Path and name of the output image file
@@ -93,10 +93,10 @@ typedef struct sXmountOptions {
   uint8_t writable;
   //! Overwrite existing cache
   uint8_t overwrite_cache;
-} tXmountOptions;
+} tsXmountOptions;
 
 /* Global xmount options var */
-tXmountOptions xmount_options;
+tsXmountOptions xmount_options;
 
 /* Functions to deal with the above defined global xmount option variable */
 /*!

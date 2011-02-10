@@ -14,6 +14,12 @@
     <File Name="xmount.h"/>
     <File Name="xmount_options.c"/>
     <File Name="xmount_options.h"/>
+    <File Name="xmount_args.c"/>
+    <File Name="xmount_cache.c"/>
+    <File Name="xmount_cache.h"/>
+    <File Name="xmount_log.c"/>
+    <File Name="xmount_log.h"/>
+    <File Name="xmount_macros.h"/>
   </VirtualDirectory>
   <VirtualDirectory Name="autoconf/automake">
     <File Name="aclocal.m4"/>

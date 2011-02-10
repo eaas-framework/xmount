@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2010 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2011 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
 * vdi or vmdk files and enable virtual write access to them.                   *
@@ -224,7 +224,7 @@ static void PrintUsage(char *pProgramName) {
 static int CheckFuseAllowOther() {
   if(geteuid()!=0) {
     // Not running xmount as root. Try to read FUSE's config file /etc/fuse.conf
-    FILE *hFuseConf=(FILE*)fopen64("/etc/fuse.conf","r");
+    FILE *hFuseConf=(FILE*)FOPEN("/etc/fuse.conf","r");
     if(hFuseConf==NULL) {
       LogWarnMessage("FUSE will not allow other users nor root to access your "
                      "virtual harddisk image. To change this behavior, please "
@@ -278,7 +278,7 @@ static int ParseCmdLine(const int argc,
                         int *pFilenameCount,
                         char ***pppFilenames,
                         char **ppMountpoint) {
-  int i=1,files=0,opts=0,AllowOther=TRUE;
+  int i=1,files=0,opts=0,FuseMinusOControl=TRUE,FuseAllowOther=TRUE;
 
   // add argv[0] to pppNargv
   opts++;
@@ -312,8 +312,8 @@ static int ParseCmdLine(const int argc,
             XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
             XMOUNT_STRSET((*pppNargv)[opts-2],argv[i-1])
             XMOUNT_STRSET((*pppNargv)[opts-1],argv[i])
-          }
-          AllowOther=FALSE;
+            FuseMinusOControl=FALSE;
+          } else FuseAllowOther=FALSE;
         } else {
           LOG_ERROR("Couldn't parse mount options!\n")
           PrintUsage(argv[0]);
@@ -448,16 +448,6 @@ static int ParseCmdLine(const int argc,
     i++;
   }
   
-  if(AllowOther==TRUE) {
-    // Try to add "-o allow_other" to FUSE's cmd-line params
-    if(CheckFuseAllowOther()==TRUE) {
-      opts+=2;
-      XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-      XMOUNT_STRSET((*pppNargv)[opts-2],"-o")
-      XMOUNT_STRSET((*pppNargv)[opts-1],"allow_other")
-    }
-  }
-
   // Parse input image filename(s)
   while(i<(argc-1)) {
     files++;
@@ -482,6 +472,21 @@ static int ParseCmdLine(const int argc,
     LOG_ERROR("No mountpoint specified!\n")
     PrintUsage(argv[0]);
     exit(1);
+  }
+
+  if(FuseMinusOControl==TRUE) {
+    // We control the -o flag, set subtype, fsname and allow_other options
+    opts+=2;
+    XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
+    XMOUNT_STRSET((*pppNargv)[opts-2],"-o")
+    XMOUNT_STRSET((*pppNargv)[opts-1],"subtype=xmount,fsname=")
+    XMOUNT_STRAPP((*pppNargv)[opts-1],(*pppFilenames)[0])
+    if(FuseAllowOther==TRUE) {
+      // Try to add "allow_other" to FUSE's cmd-line params
+      if(CheckFuseAllowOther()==TRUE) {
+        XMOUNT_STRAPP((*pppNargv)[opts-1],",allow_other")
+      }
+    }
   }
 
   *pNargc=opts;
@@ -1040,7 +1045,9 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
   // All important data has been written, now flush all buffers to make
   // sure data is written to cache file
   fflush(hCacheFile);
+#ifndef __APPLE__
   ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
   return size;
 }
 
@@ -1213,7 +1220,9 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
       // All important data for this cache block has been written,
       // flush all buffers and mark cache block as assigned
       fflush(hCacheFile);
+#ifndef __APPLE__
       ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
       pCacheFileBlockIndex[CurBlock].Assigned=1;
       // Update cache block index entry in cache file
       fseeko(hCacheFile,
@@ -1233,7 +1242,9 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
     }
     // Flush buffers
     fflush(hCacheFile);
+#ifndef __APPLE__
     ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
     BlockOff=0;
     CurBlock++;
     WriteBuf+=CurToWrite;
@@ -2161,13 +2172,13 @@ static int InitCacheFile() {
 
   if(!XMountConfData.OverwriteCache) {
     // Try to open an existing cache file or create a new one
-    hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"rb+");
+    hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"rb+");
     if(hCacheFile==NULL) {
       // As the c lib seems to have no possibility to open a file rw wether it
       // exists or not (w+ does not work because it truncates an existing file),
       // when r+ returns NULL the file could simply not exist
       LOG_DEBUG("Cache file does not exist. Creating new one\n")
-      hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"wb+");
+      hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"wb+");
       if(hCacheFile==NULL) {
         // There is really a problem opening the file
         LOG_ERROR("Couldn't open cache file \"%s\"!\n",
@@ -2177,7 +2188,7 @@ static int InitCacheFile() {
     }
   } else {
     // Overwrite existing cache file or create a new one
-    hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"wb+");
+    hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"wb+");
     if(hCacheFile==NULL) {
       LOG_ERROR("Couldn't open cache file \"%s\"!\n",
                 XMountConfData.pCacheFile)
@@ -2408,7 +2419,7 @@ int main(int argc, char *argv[])
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
       // Input image is a DD file
-      hDdFile=(FILE*)fopen64(ppInputFilenames[0],"rb");
+      hDdFile=(FILE*)FOPEN(ppInputFilenames[0],"rb");
       if(hDdFile==NULL) {
         LOG_ERROR("Couldn't open DD file \"%s\"\n",ppInputFilenames[0])
         return 1;
@@ -2729,4 +2740,6 @@ int main(int argc, char *argv[])
             * Found a bug in InitVirtVdiHeader(). The 64bit values were
               addressed incorrectly while filled with rand(). This leads to an
               error message when trying to add a VDI file to VirtualBox 3.2.8.
+  20110210: * Adding subtype and fsname FUSE options in order to display mounted
+              source in mount command output.
 */
