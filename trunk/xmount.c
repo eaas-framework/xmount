@@ -421,7 +421,7 @@ static int ParseCmdLine(const int argc,
         LOG_DEBUG("Enabling virtual write support overwriting cache file \"%s\"\n",
                   XMountConfData.pCacheFile)
       } else if(strcmp(argv[i],"--version")==0 || strcmp(argv[i],"--info")==0) {
-        printf("xmount v%s copyright (c) 2008, 2009 by Gillen Daniel "
+        printf("xmount v%s copyright (c) 2008-2011 by Gillen Daniel "
                "<gillen.dan@pinguin.lu>\n\n",PACKAGE_VERSION);
 #ifdef __GNUC__
         printf("  compile timestamp: %s %s\n",__DATE__,__TIME__);
