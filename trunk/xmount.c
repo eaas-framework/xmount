@@ -21,21 +21,22 @@
 #define HAVE_LIBAFF_STATIC
 #define HAVE_LIBEWF_STATIC
 
+#include "config.h"
+
 #ifdef HAVE_LIBEWF
   #define WITH_LIBEWF
 #endif
-#ifdef HAVE_LIBAFF_STATIC
+#ifdef HAVE_LIBEWF_STATIC
   #define WITH_LIBEWF
 #endif
 
-#ifdef HAVE_LIBAFF
+#ifdef HAVE_LIBAFFLIB
   #define WITH_LIBAFF
 #endif
 #ifdef HAVE_LIBAFF_STATIC
   #define WITH_LIBAFF
 #endif
 
-#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -52,8 +53,8 @@
 #ifdef HAVE_LIBEWF_STATIC
   #include "libewf/include/libewf.h"
 #endif
-#ifdef HAVE_LIBAFF
-  #include <libaff.h>
+#ifdef HAVE_LIBAFFLIB
+  #include <afflib/afflib.h>
 #endif
 #ifdef HAVE_LIBAFF_STATIC
   #include "libaff/lib/afflib.h"
@@ -164,7 +165,7 @@ static void LogWarnMessage(char *pMessage,...) {
  *   n/a
  */
 static void PrintUsage(char *pProgramName) {
-  printf("\nxmount v%s copyright (c) 2008-2010 by Gillen Daniel "
+  printf("\nxmount v%s copyright (c) 2008-2011 by Gillen Daniel "
          "<gillen.dan@pinguin.lu>\n",PACKAGE_VERSION);
   printf("\nUsage:\n");
   printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",pProgramName);
@@ -435,7 +436,7 @@ static int ParseCmdLine(const int argc,
 #ifdef WITH_LIBAFF
         printf("  libaff support: YES (version %s)\n",af_version());
 #else
-        printf("  libaaf support: NO\n");
+        printf("  libaff support: NO\n");
 #endif
         printf("\n");
         exit(0);
@@ -2508,7 +2509,7 @@ int main(int argc, char *argv[])
     case TVirtImageType_VMDKS:
       // When mounting as VMDK, we need to construct the VMDK descriptor file
       if(!InitVirtualVmdkFile()) {
-        LOG_ERROR("Couldn't initilaize virtual VMDK file!\n")
+        LOG_ERROR("Couldn't initialize virtual VMDK file!\n")
         return 1;
       }
       break;
@@ -2517,7 +2518,7 @@ int main(int argc, char *argv[])
   if(XMountConfData.Writable) {
     // Init cache file and cache file block index
     if(!InitCacheFile()) {
-      LOG_ERROR("Couldn't initilaize cache file!\n")
+      LOG_ERROR("Couldn't initialize cache file!\n")
       return 1;
     }
     LOG_DEBUG("Cache file initialized successfully\n")
@@ -2742,4 +2743,5 @@ int main(int argc, char *argv[])
               error message when trying to add a VDI file to VirtualBox 3.2.8.
   20110210: * Adding subtype and fsname FUSE options in order to display mounted
               source in mount command output.
+  20110211: v0.4.5 released
 */

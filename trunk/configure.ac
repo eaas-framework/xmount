@@ -30,7 +30,7 @@ AC_CHECK_HEADER([pthread.h],,AC_MSG_ERROR([No pthread.h header file found!]))
 #AC_CHECK_HEADER([fuse/fuse.h],,AC_MSG_WARN([No fuse.h header file found! This could be a false positive!]))
 PKG_CHECK_MODULES([fuse],[fuse])
 #AC_CHECK_HEADER([libewf.h],,AC_MSG_WARN([No libewf.h header file found! EWF input support will be disabled.]))
-#AC_CHECK_HEADER([afflib.h],,AC_MSG_WARN([No afflib.h header file found! AFF input support will be disabled.]))
+#AC_CHECK_HEADER([afflib/afflib.h],,AC_MSG_WARN([No afflib.h header file found! AFF input support will be disabled.]))
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
