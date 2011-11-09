@@ -42,6 +42,8 @@
 typedef enum TVirtImageType {
   /** Virtual image is a DD file */
   TVirtImageType_DD,
+  /** Virtual image is a DMG file */
+  TVirtImageType_DMG,
   /** Virtual image is a VDI file */
   TVirtImageType_VDI,
   /** Virtual image is a VMDK file (IDE bus)*/
@@ -326,4 +328,5 @@ typedef struct TCacheFileHeader_v1 {
               XMOUNT_STRNAPP macros.
   20100324: * Added "__attribute__ ((packed))" to all header structs to prevent
               different sizes on i386 and amd64.
+  20111109: * Added TVirtImageType_DMG type.
 */

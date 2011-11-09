@@ -6,3 +6,4 @@ xmount_CFLAGS = -fno-strict-aliasing -D_LARGEFILE64_SOURCE $(fuse_CFLAGS)
 LIBS += $(fuse_LIBS)
 # Link against the not installed static libaff and libewf
 xmount_LDADD = libaff/lib/.libs/libafflib.a libewf/libewf/.libs/libewf.a -lstdc++
+xmount_CFLAGS += -Ilibewf/include

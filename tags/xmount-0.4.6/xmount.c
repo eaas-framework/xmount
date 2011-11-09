@@ -202,11 +202,15 @@ static void PrintUsage(char *pProgramName) {
 #endif
   printf(".\n");
   printf("    --info : Print out some infos about used compiler and libraries.\n");
-  printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"vdi\", \"vmdk(s)\".\n");
+  printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"dmg\", \"vdi\", \"vmdk(s)\".\n");
   printf("    --owcache <file> : Same as --cache <file> but overwrites existing cache.\n");
   printf("    --rw <file> : Same as --cache <file>.\n");
   printf("    --version : Same as --info.\n");
+#ifndef __APPLE__
   printf("    INFO: Input and output image type defaults to \"dd\" if not specified.\n");
+#else
+  printf("    INFO: Input image type defaults to \"dd\" and output image type defaults to \"dmg\" if not specified.\n");
+#endif
   printf("    WARNING: Output image type \"vmdk(s)\" should be considered experimental!\n");
   printf("  ifile:\n");
   printf("    Input image file.");
@@ -398,6 +402,9 @@ static int ParseCmdLine(const int argc,
           if(strcmp(argv[i],"dd")==0) {
             XMountConfData.VirtImageType=TVirtImageType_DD;
             LOG_DEBUG("Setting virtual image type to DD\n")
+          } else if(strcmp(argv[i],"dmg")==0) {
+            XMountConfData.VirtImageType=TVirtImageType_DMG;
+            LOG_DEBUG("Setting virtual image type to DMG\n")
           } else if(strcmp(argv[i],"vdi")==0) {
             XMountConfData.VirtImageType=TVirtImageType_VDI;
             LOG_DEBUG("Setting virtual image type to VDI\n")
@@ -565,6 +572,9 @@ static int ExtractVirtFileNames(char *pOrigName) {
     case TVirtImageType_DD:
       XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".dd")
       break;
+    case TVirtImageType_DMG:
+      XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".dmg")
+      break;
     case TVirtImageType_VDI:
       XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".vdi")
       break;
@@ -668,10 +678,11 @@ static int GetVirtImageSize(uint64_t *size) {
   }
 
   switch(XMountConfData.VirtImageType) {
+    case TVirtImageType_DD:
+    case TVirtImageType_DMG:
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
-    case TVirtImageType_DD:
-      // Virtual image is a DD or VMDK file. Just return the size of the
+      // Virtual image is a DD, DMG or VMDK file. Just return the size of the
       // original image
       if(!GetOrigImageSize(size)) {
         LOG_ERROR("Couldn't get size of input image!\n")
@@ -870,6 +881,7 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
   // Read virtual image type specific data
   switch(XMountConfData.VirtImageType) {
     case TVirtImageType_DD:
+    case TVirtImageType_DMG:
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
       break;
@@ -2392,7 +2404,11 @@ int main(int argc, char *argv[])
 
   // Init XMountConfData
   XMountConfData.OrigImageType=TOrigImageType_DD;
+#ifndef __APPLE__
   XMountConfData.VirtImageType=TVirtImageType_DD;
+#else
+  XMountConfData.VirtImageType=TVirtImageType_DMG;
+#endif
   XMountConfData.Debug=FALSE;
   XMountConfData.pVirtualImagePath=NULL;
   XMountConfData.pVirtualVmdkPath=NULL;
@@ -2566,6 +2582,7 @@ int main(int argc, char *argv[])
   // Do some virtual image type specific initialisations
   switch(XMountConfData.VirtImageType) {
     case TVirtImageType_DD:
+    case TVirtImageType_DMG:
       break;
     case TVirtImageType_VDI:
       // When mounting as VDI, we need to construct a vdi header
@@ -2820,4 +2837,8 @@ int main(int argc, char *argv[])
               source in mount command output.
   20110211: v0.4.5 released
   20111011: * Changes to deal with libewf v2 API (Thx to Joachim Metz)
+  20111109: v0.4.6 released
+            * Added support for DMG output type (actually a DD with .dmg file
+              extension). This type is used as default output type when
+              using xmount under Mac OS X.
 */

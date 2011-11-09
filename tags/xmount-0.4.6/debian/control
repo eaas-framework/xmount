@@ -2,7 +2,7 @@ Source: xmount
 Section: unknown
 Priority: low
 Maintainer: Gillen Daniel <gillen.dan@pinguin.lu>
-Build-Depends: debhelper (>= 5), automake (>= 1.10), autoconf (>= 2.13), libfuse-dev (>= 2.7.1-2~bpo40+1), libewf-dev (>= 20080501-1)
+Build-Depends: debhelper (>= 5), automake (>= 1.10), autoconf (>= 2.13), libfuse-dev (>= 2.7.1-2~bpo40+1)
 Standards-Version: 3.7.3
 
 Package: xmount
