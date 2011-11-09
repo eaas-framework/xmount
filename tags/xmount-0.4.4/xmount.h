@@ -29,6 +29,13 @@
 #define FALSE 0
 #define TRUE 1
 
+#ifndef __APPLE__
+  #define FOPEN fopen64
+#else
+  // Apple does use fopen for fopen64 too
+  #define FOPEN fopen
+#endif
+
 /*
  * Virtual image types
  */

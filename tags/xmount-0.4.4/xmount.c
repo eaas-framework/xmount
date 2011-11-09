@@ -224,7 +224,7 @@ static void PrintUsage(char *pProgramName) {
 static int CheckFuseAllowOther() {
   if(geteuid()!=0) {
     // Not running xmount as root. Try to read FUSE's config file /etc/fuse.conf
-    FILE *hFuseConf=(FILE*)fopen64("/etc/fuse.conf","r");
+    FILE *hFuseConf=(FILE*)FOPEN("/etc/fuse.conf","r");
     if(hFuseConf==NULL) {
       LogWarnMessage("FUSE will not allow other users nor root to access your "
                      "virtual harddisk image. To change this behavior, please "
@@ -1040,7 +1040,9 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
   // All important data has been written, now flush all buffers to make
   // sure data is written to cache file
   fflush(hCacheFile);
+#ifndef __APPLE__
   ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
   return size;
 }
 
@@ -1213,7 +1215,9 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
       // All important data for this cache block has been written,
       // flush all buffers and mark cache block as assigned
       fflush(hCacheFile);
+#ifndef __APPLE__
       ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
       pCacheFileBlockIndex[CurBlock].Assigned=1;
       // Update cache block index entry in cache file
       fseeko(hCacheFile,
@@ -1233,7 +1237,9 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
     }
     // Flush buffers
     fflush(hCacheFile);
+#ifndef __APPLE__
     ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
     BlockOff=0;
     CurBlock++;
     WriteBuf+=CurToWrite;
@@ -2161,13 +2167,13 @@ static int InitCacheFile() {
 
   if(!XMountConfData.OverwriteCache) {
     // Try to open an existing cache file or create a new one
-    hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"rb+");
+    hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"rb+");
     if(hCacheFile==NULL) {
       // As the c lib seems to have no possibility to open a file rw wether it
       // exists or not (w+ does not work because it truncates an existing file),
       // when r+ returns NULL the file could simply not exist
       LOG_DEBUG("Cache file does not exist. Creating new one\n")
-      hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"wb+");
+      hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"wb+");
       if(hCacheFile==NULL) {
         // There is really a problem opening the file
         LOG_ERROR("Couldn't open cache file \"%s\"!\n",
@@ -2177,7 +2183,7 @@ static int InitCacheFile() {
     }
   } else {
     // Overwrite existing cache file or create a new one
-    hCacheFile=(FILE*)fopen64(XMountConfData.pCacheFile,"wb+");
+    hCacheFile=(FILE*)FOPEN(XMountConfData.pCacheFile,"wb+");
     if(hCacheFile==NULL) {
       LOG_ERROR("Couldn't open cache file \"%s\"!\n",
                 XMountConfData.pCacheFile)
@@ -2408,7 +2414,7 @@ int main(int argc, char *argv[])
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
       // Input image is a DD file
-      hDdFile=(FILE*)fopen64(ppInputFilenames[0],"rb");
+      hDdFile=(FILE*)FOPEN(ppInputFilenames[0],"rb");
       if(hDdFile==NULL) {
         LOG_ERROR("Couldn't open DD file \"%s\"\n",ppInputFilenames[0])
         return 1;
