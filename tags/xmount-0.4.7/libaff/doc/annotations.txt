@@ -1,0 +1,27 @@
+AFF sector annotations.
+
+Why? Becuase there are many cases where we want to annotate on a sector-by-sector basis:
+     * Bad blocks
+     * Blank sectors
+     * Accessed sectors.
+
+Functionality we want:
+ * Set annotation
+ * Query
+ * Find sectors with an annotation?
+
+Model: A 1TB disk has 2 billion sectors and 62,500 AFF pages (wow;
+       what happens to AFF performance when all of that is stored in a
+       sequential, unsorted list?)
+
+       If we store these annotations as a byte array, that's 2GB for the 1TB disk. Not acceptable.
+       Storing it as bits is 256MB; still pretty harsh. 
+
+       Store the annotations per page and you have 4096 bytes with a 1-bit annotation.
+       	     - That's okay for a bad block list.
+	    for a byte annotation per sector, there are 32K 512-byte sectors on a page.         
+
+       Another option: Store as a sequence of [start block, run length, annotation]
+       	       - Good for sparse, bad for filled.
+	       - So you would need a way to turn the sparse into non-sparse
+       

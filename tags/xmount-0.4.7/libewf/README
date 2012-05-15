@@ -1,0 +1,25 @@
+Dependencies
+libewf requires:
+* zlib
+
+ewftools require:
+* libcrypto (OpenSSL) or Windows Crypto API from the Windows Platform SDK
+  (optional but recommended)
+* libuuid or Windows RPC API
+  (optional but recommended)
+
+ewfmount requires:
+* libfuse
+  (optional but recommended)
+
+
+Solaris
+To build libewf on Solaris make sure that /usr/ccs/bin and /usr/swf/bin are defined in the PATH environment variable
+
+
+Also see:
+* README.dll
+* README.macosx
+* README.mingw
+* README.static
+
