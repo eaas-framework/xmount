@@ -2,7 +2,7 @@ xmount (0.4.7) stable; urgency=low
 
   * Made InitVirtImageInfoFile less picky about missing EWF infos.
 
- -- Gillen Daniel <gillen.dan@pinguin.lu>  Mon, 30 Jan 2012 12:00:00 +0100
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Mon, 30 Jan 2012 11:00:00 +0100
 
 xmount (0.4.6) stable; urgency=low
 

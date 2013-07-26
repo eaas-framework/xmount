@@ -53,7 +53,9 @@ am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_xmount_OBJECTS = xmount-md5.$(OBJEXT) xmount-xmount.$(OBJEXT)
 xmount_OBJECTS = $(am_xmount_OBJECTS)
-xmount_LDADD = $(LDADD)
+xmount_DEPENDENCIES = libaff/lib/.libs/libafflib.a \
+	libewf/libewf/.libs/libewf.a /usr/lib/libssl.a \
+	/usr/lib/libcrypto.a
 xmount_LINK = $(CCLD) $(xmount_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
@@ -196,7 +198,10 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 man_MANS = xmount.1
 xmount_SOURCES = md5.c xmount.c
-xmount_CFLAGS = -fno-strict-aliasing -D_LARGEFILE64_SOURCE $(fuse_CFLAGS)
+xmount_CFLAGS = -fno-strict-aliasing -D_LARGEFILE64_SOURCE \
+	$(fuse_CFLAGS) -Ilibewf/include
+# Link against the not installed static libaff and libewf
+xmount_LDADD = libaff/lib/.libs/libafflib.a libewf/libewf/.libs/libewf.a /usr/lib/libssl.a /usr/lib/libcrypto.a -lstdc++ -lz
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -720,9 +725,6 @@ uninstall-man: uninstall-man1
 	uninstall-am uninstall-binPROGRAMS uninstall-man \
 	uninstall-man1
 
-# Link against the not installed static libaff and libewf
-#xmount_LDADD = libaff/lib/.libs/libafflib.a libewf/libewf/.libs/libewf.a /usr/lib/libssl.a /usr/lib/libcrypto.a -lstdc++ -lz
-#xmount_CFLAGS += -Ilibewf/include
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

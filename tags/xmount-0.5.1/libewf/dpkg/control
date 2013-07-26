@@ -1,0 +1,36 @@
+Source: libewf
+Section: unknown
+Priority: extra
+Maintainer: Joachim Metz <jbmetz@users.sourceforge.net>
+Build-Depends: debhelper (>= 7), autotools-dev
+Standards-Version: 3.8.3
+Homepage: https://sourceforge.net/projects/libewf/
+
+Package: libewf
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Library to support the Expert Witness Compression Format (EWF)
+ libewf is a library to support the Expert Witness Compression Format (EWF).
+
+Package: libewf-dev
+Section: libdevel
+Architecture: any
+Depends: libewf (= ${Source-Version})
+Description: Header files and libraries for developing applications for libewf
+ Header files and libraries for developing applications for libewf.
+
+Package: libewf-tools
+Section: utils
+Architecture: any
+Depends: libewf (= ${Source-Version}), ${shlibs:Depends}
+Description: Several tools for reading and writing EWF files
+ Several tools for reading and writing EWF files.
+
+Package: libewf-python
+Section: python
+Architecture: any
+Depends: libewf (= ${Source-Version}), ${shlibs:Depends}
+Description: Python bindings for libewf
+ Python bindings for libewf.
+

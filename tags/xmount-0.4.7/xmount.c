@@ -18,8 +18,8 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#undef HAVE_LIBAFF_STATIC
-#undef HAVE_LIBEWF_STATIC
+#define HAVE_LIBAFF_STATIC
+#define HAVE_LIBEWF_STATIC
 
 #include "config.h"
 
