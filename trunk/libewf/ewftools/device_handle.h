@@ -1,8 +1,7 @@
-/* 
+/*
  * Device handle
  *
- * Copyright (C) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,186 +25,271 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include <libsystem.h>
-
-#if defined( WINAPI )
-#include <windows.h>
-#endif
-
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libodraw.h"
+#include "ewftools_libsmdev.h"
+#include "ewftools_libsmraw.h"
 #include "storage_media_buffer.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
+/* The device handle type definitions
+ */
 enum DEVICE_HANDLE_TYPES
 {
-	DEVICE_HANDLE_TYPE_DEVICE	= (int) 'd',
-	DEVICE_HANDLE_TYPE_FILE		= (int) 'f'
+	DEVICE_HANDLE_TYPE_DEVICE			= (uint8_t) 'd',
+	DEVICE_HANDLE_TYPE_FILE				= (uint8_t) 'f',
+	DEVICE_HANDLE_TYPE_OPTICAL_DISC_FILE		= (uint8_t) 'o'
 };
 
-enum DEVICE_TYPES
+/* The media type definitions
+ */
+enum DEVICE_HANDLE_MEDIA_TYPES
 {
-	DEVICE_TYPE_HARDDISK		= (int) 'h',
-	DEVICE_TYPE_OPTICAL_DISK	= (int) 'o'
+	DEVICE_HANDLE_MEDIA_TYPE_REMOVABLE		= 0x00,
+	DEVICE_HANDLE_MEDIA_TYPE_FIXED			= 0x01,
+	DEVICE_HANDLE_MEDIA_TYPE_OPTICAL		= 0x03,
+	DEVICE_HANDLE_MEDIA_TYPE_MEMORY			= 0x10
+};
+
+/* The (optical disc) track type definitions
+ */
+enum DEVICE_HANDLE_TRACK_TYPES
+{
+	DEVICE_HANDLE_TRACK_TYPE_UNKNOWN,
+	DEVICE_HANDLE_TRACK_TYPE_AUDIO,
+	DEVICE_HANDLE_TRACK_TYPE_CDG,
+	DEVICE_HANDLE_TRACK_TYPE_MODE1_2048,
+	DEVICE_HANDLE_TRACK_TYPE_MODE1_2352,
+	DEVICE_HANDLE_TRACK_TYPE_MODE2_2048,
+	DEVICE_HANDLE_TRACK_TYPE_MODE2_2324,
+	DEVICE_HANDLE_TRACK_TYPE_MODE2_2336,
+	DEVICE_HANDLE_TRACK_TYPE_MODE2_2352,
+	DEVICE_HANDLE_TRACK_TYPE_CDI_2336,
+	DEVICE_HANDLE_TRACK_TYPE_CDI_2352,
 };
 
 typedef struct device_handle device_handle_t;
 
 struct device_handle
 {
+	/* The user input buffer
+	 */
+	libcstring_system_character_t *input_buffer;
+
 	/* The device handle type
 	 */
-	int type;
+	uint8_t type;
 
-#if defined( WINAPI )
-	/* File handle
+	/* The TOC filename
 	 */
-	HANDLE file_handle;
-#else
-	/* File descriptor
-	 */
-	int file_descriptor;
-#endif
+	libcstring_system_character_t *toc_filename;
 
-	/* The amount of bytes per sector
+	/* The TOC filename size
 	 */
-	uint32_t bytes_per_sector;
+	size_t toc_filename_size;
 
-	/* Value to indicate the bytes per sector value was set
+	/* libodraw input handle
 	 */
-	uint8_t bytes_per_sector_set;
+	libodraw_handle_t *odraw_input_handle;
 
-	/* The media size
+	/* libsmdev input handle
 	 */
-	size64_t media_size;
+	libsmdev_handle_t *smdev_input_handle;
 
-	/* Value to indicate the media size value was set
+	/* libsmraw input handle
 	 */
-	uint8_t media_size_set;
+	libsmdev_handle_t *smraw_input_handle;
 
-	/* The bus type
+	/* The number of error retries
 	 */
-	uint8_t bus_type;
+	uint8_t number_of_error_retries;
 
-	/* The device type
+	/* Value to indicate the buffer should be zeroed on error
 	 */
-	uint8_t device_type;
+	uint8_t zero_buffer_on_error;
 
-	/* Value to indicate if the device is removable
+	/* The nofication output stream
 	 */
-	uint8_t removable;
-
-	/* The vendor string
-	 */
-	uint8_t vendor[ 64 ];
-
-	/* The model string
-	 */
-	uint8_t model[ 64 ];
-
-	/* The serial number string
-	 */
-	uint8_t serial_number[ 64 ];
-
-	/* The amount of sessions for an optical disc
-	 */
-	uint16_t amount_of_sessions;
-
-	/* Value to indicate the media information values were set
-	 */
-	uint8_t media_information_set;
-
-	/* The amount of read error retries
-	 */
-	int8_t read_error_retry;
-
-	/* The amount of bytes to skip on a read error
-	 */
-	uint32_t byte_error_granularity;
-
-	/* Value to indicate if the block that is made up by the
-	 * byte error granularity should be wiped on read error
-	 */
-	uint8_t wipe_block_on_read_error;
+	FILE *notify_stream;
 };
+
+const char *device_handle_get_track_type(
+             uint8_t track_type );
 
 int device_handle_initialize(
      device_handle_t **device_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int device_handle_free(
      device_handle_t **device_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int device_handle_signal_abort(
+     device_handle_t *device_handle,
+     libcerror_error_t **error );
 
 int device_handle_open_input(
      device_handle_t *device_handle,
-     const libsystem_character_t *filename,
-     liberror_error_t **error );
+     libcstring_system_character_t * const * filenames,
+     int number_of_filenames,
+     libcerror_error_t **error );
+
+int device_handle_open_smdev_input(
+     device_handle_t *device_handle,
+     libcstring_system_character_t * const * filenames,
+     int number_of_filenames,
+     libcerror_error_t **error );
+
+int device_handle_open_odraw_input(
+     device_handle_t *device_handle,
+     libcstring_system_character_t * const * filenames,
+     int number_of_filenames,
+     libcerror_error_t **error );
+
+int device_handle_open_smraw_input(
+     device_handle_t *device_handle,
+     libcstring_system_character_t * const * filenames,
+     int number_of_filenames,
+     libcerror_error_t **error );
 
 int device_handle_close(
      device_handle_t *device_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 ssize_t device_handle_read_buffer(
          device_handle_t *device_handle,
          uint8_t *buffer,
          size_t read_size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 off64_t device_handle_seek_offset(
          device_handle_t *device_handle,
          off64_t offset,
          int whence,
-         liberror_error_t **error );
+         libcerror_error_t **error );
+
+int device_handle_prompt_for_string(
+     device_handle_t *device_handle,
+     const libcstring_system_character_t *request_string,
+     libcstring_system_character_t **internal_string,
+     size_t *internal_string_size,
+     libcerror_error_t **error );
+
+int device_handle_prompt_for_number_of_error_retries(
+     device_handle_t *device_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int device_handle_prompt_for_zero_buffer_on_error(
+     device_handle_t *device_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int device_handle_get_type(
+     device_handle_t *device_handle,
+     uint8_t *type,
+     libcerror_error_t **error );
 
 int device_handle_get_media_size(
      device_handle_t *device_handle,
      size64_t *media_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int device_handle_get_media_type(
      device_handle_t *device_handle,
      uint8_t *media_type,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int device_handle_get_bytes_per_sector(
      device_handle_t *device_handle,
      uint32_t *bytes_per_sector,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
-int device_handle_trim_copy_from_byte_stream(
-     uint8_t *string,
-     size_t string_size,
-     const uint8_t *byte_stream,
-     size_t byte_stream_size,
-     liberror_error_t **error );
-
-int device_handle_determine_media_information(
+int device_handle_get_information_value(
      device_handle_t *device_handle,
-     liberror_error_t **error );
+     const uint8_t *information_value_identifier,
+     size_t information_value_identifier_length,
+     libcstring_system_character_t *information_value,
+     size_t information_value_size,
+     libcerror_error_t **error );
 
-int device_handle_get_media_information_value(
+int device_handle_get_number_of_sessions(
      device_handle_t *device_handle,
-     char *media_information_value_identifier,
-     size_t media_information_value_identifier_length,
-     libsystem_character_t *media_information_value,
-     size_t media_information_value_size,
-     liberror_error_t **error );
+     int *number_of_sessions,
+     libcerror_error_t **error );
 
-int device_handle_set_read_error_values(
+int device_handle_get_session(
      device_handle_t *device_handle,
-     int8_t read_error_retry,
-     uint32_t byte_error_granularity,
-     uint8_t wipe_block_on_read_error,
-     liberror_error_t **error );
+     int index,
+     uint64_t *start_sector,
+     uint64_t *number_of_sectors,
+     libcerror_error_t **error );
+
+int device_handle_get_number_of_tracks(
+     device_handle_t *device_handle,
+     int *number_of_tracks,
+     libcerror_error_t **error );
+
+int device_handle_get_track(
+     device_handle_t *device_handle,
+     int index,
+     uint64_t *start_sector,
+     uint64_t *number_of_sectors,
+     uint8_t *type,
+     libcerror_error_t **error );
+
+int device_handle_set_string(
+     device_handle_t *device_handle,
+     const libcstring_system_character_t *string,
+     libcstring_system_character_t **internal_string,
+     size_t *internal_string_size,
+     libcerror_error_t **error );
+
+int device_handle_set_number_of_error_retries(
+     device_handle_t *device_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int device_handle_set_error_values(
+     device_handle_t *device_handle,
+     size_t error_granularity,
+     libcerror_error_t **error );
+
+int device_handle_get_number_of_read_errors(
+     device_handle_t *device_handle,
+     int *number_of_errors,
+     libcerror_error_t **error );
+
+int device_handle_get_read_error(
+     device_handle_t *device_handle,
+     int index,
+     off64_t *offset,
+     size64_t *size,
+     libcerror_error_t **error );
 
 int device_handle_media_information_fprint(
      device_handle_t *device_handle,
      FILE *stream,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int device_handle_read_errors_fprint(
+     device_handle_t *device_handle,
+     FILE *stream,
+     libcerror_error_t **error );
+
+int device_handle_sessions_fprint(
+     device_handle_t *device_handle,
+     FILE *stream,
+     libcerror_error_t **error );
+
+int device_handle_tracks_fprint(
+     device_handle_t *device_handle,
+     FILE *stream,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

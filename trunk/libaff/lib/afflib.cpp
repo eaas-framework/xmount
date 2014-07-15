@@ -1,41 +1,6 @@
 /*
- * Copyright (c) 2005, 2006, 2007
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * afflib.cpp
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -392,6 +357,10 @@ AFFILE *af_open_with(const char *url,int flags,int mode, struct af_vnode *v)
 AFFILE *af_open(const char *filename,int flags,int mode)
 {
     if(!aff_initialized) af_initialize();
+    if(ends_with(filename,".E01") || ends_with(filename,".e01")){
+	return 0;
+    }
+
     if(flags & O_WRONLY){
 	errno = EINVAL;
 	return 0;			// this flag not supported
@@ -627,13 +596,13 @@ int64_t af_get_imagesize(AFFILE *af)
  */
 int af_make_badflag(AFFILE *af)
 {
-#ifdef HAVE_OPENSSL_RAND_H
+#ifdef HAVE_RAND_pseudo_bytes
     /* Use a good random number generator if we have it */
     RAND_pseudo_bytes(af->badflag,af->image_sectorsize);
     strcpy((char *)af->badflag,"BAD SECTOR");
 #else
     /* Otherwise use a bad one */
-    for(int i=0;i<af->image_sectorsize;i++){
+    for(uint32_t i=0;i<af->image_sectorsize;i++){
       af->badflag[i] = rand() & 0xff;
     }
 #endif
@@ -684,8 +653,8 @@ void af_aes_decrypt(AFFILE *af,const char *segname,unsigned char *data,size_t *d
     if(datalen==0) return;		// can't decrypt; no clue how long it is
 
     /* An encrypted segment was retrieved; decrypt and trunc the length as necessary */
-    unsigned int extra = (*datalen) % AES_BLOCK_SIZE;
-    unsigned int pad = (AES_BLOCK_SIZE - extra) % AES_BLOCK_SIZE;
+    uint32_t extra = (*datalen) % AES_BLOCK_SIZE;
+    uint32_t pad = (AES_BLOCK_SIZE - extra) % AES_BLOCK_SIZE;
     
     if(data==0){			// just wants to find out new length
 	if(extra>0){
@@ -719,7 +688,7 @@ void af_aes_decrypt(AFFILE *af,const char *segname,unsigned char *data,size_t *d
 }
 
 
-int af_get_seg(AFFILE *af,const char *segname,unsigned long *arg,unsigned char *data,size_t *datalen)
+int af_get_seg(AFFILE *af,const char *segname,uint32_t *arg,unsigned char *data,size_t *datalen)
 {
     AF_READLOCK(af);
     if(af->v->get_seg==0){
@@ -766,7 +735,7 @@ int af_get_seg(AFFILE *af,const char *segname,unsigned long *arg,unsigned char *
     return ret;
 }
 
-int af_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+int af_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen)
 {
     size_t datalen_orig = datalen ? *datalen : 0;
@@ -825,9 +794,10 @@ int af_rewind_seg(AFFILE *af)
  */
 
 int af_update_segf(AFFILE *af, const char *segname,
-		  unsigned long arg,const u_char *data,unsigned int datalen,u_int flag)
+		  uint32_t arg,const u_char *data,uint32_t datalen,uint32_t flag)
 {
-    if(af_trace) fprintf(af_trace,"af_update_segf(%p,segname=%s,arg=%lu,datalen=%d)\n",af,segname,arg,datalen);
+    if(af_trace) fprintf(af_trace,"af_update_segf(%p,segname=%s,arg=%"PRIu32",datalen=%d)\n",
+			 af,segname,arg,datalen);
     AF_WRLOCK(af);
     if(af->v->update_seg==0){
 	errno = ENOTSUP;
@@ -859,8 +829,8 @@ int af_update_segf(AFFILE *af, const char *segname,
 
 	/* Figure out if we need to padd out for encryption. Allocate space and 
 	 */
-	unsigned int extra = (datalen) % AES_BLOCK_SIZE;
-	unsigned int pad = (AES_BLOCK_SIZE - extra) % AES_BLOCK_SIZE;
+	uint32_t extra = (datalen) % AES_BLOCK_SIZE;
+	uint32_t pad = (AES_BLOCK_SIZE - extra) % AES_BLOCK_SIZE;
 	newdata = (unsigned char *)malloc(datalen+pad+extra);
 	memset(newdata+datalen,pad+extra,pad); // PKCS7 uses 01 for one pad byte, 02 02 for two, etc.
 	/* Encrypt */
@@ -912,14 +882,14 @@ int af_update_segf(AFFILE *af, const char *segname,
 
 /* Requires no locking because locking is done in af_update_segf */
 int af_update_seg(AFFILE *af, const char *segname,
-		  unsigned long arg,const u_char *data,unsigned int datalen)
+		  uint32_t arg,const u_char *data,uint32_t datalen)
 {
     return af_update_segf(af,segname,arg,data,datalen,0);
 }
 
 #ifdef HAVE_OPENSSL_BIO_H
 /* Requires no locking */
-int	af_update_seg_frombio(AFFILE *af,const char *segname,unsigned long arg,BIO *bio)
+int	af_update_seg_frombio(AFFILE *af,const char *segname,uint32_t arg,BIO *bio)
 {
     /* Get the buffer to write out */
     u_char *buf=0;

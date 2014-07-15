@@ -1,7 +1,6 @@
 Acknowledgements: libewf
 
-Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
-Hoffmann Investigations.
+Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
 
 This code is derived from information and software contributed by:
 - Expert Witness Compression Format specification by Andrew Rosen
@@ -10,11 +9,12 @@ This code is derived from information and software contributed by:
   (http://pyflag.sourceforge.net/)
 - Zlib for the implementation of the Zlib compression and optimized
   Adler32 function
-- Open SSL for the implementation of the MD5 hash algorithm
-- libuuid for the implementation of GUID (UUID) calculation
+- OpenSSL for the implementation of the MD5 and SHA1 hash algorithm
+- libuuid for the implementation of GUID/UUID calculation
 - Wietse Venema for an example of the initial error handling code
 
 Additional credits go to:
+- Kees Mastwijk, Hoffmann Invesigations for writing the initial man pages
 - Robert Jan Mora, Hoffmann Invesigations for testing and other contribution
   (http://www.hoffmannbv.nl/)
 - Rob Meijer, KLPD for providing libtool and header installation,
@@ -28,7 +28,10 @@ Additional credits go to:
 - David Loveall <sourceforge@loveall.org> for creating mount-ewf,
   a MacOS-X installation package and the providing for the delta segment file idea
 - David Collett <david.collett@gmail.com> for providing the Python bindings (pyewf)
+- Simson Garfinkel for providing the MinGW compilation adjustments, Digital
+  Forensics XML (DFXML) output for the ewftools and various input and support
+  e.g. for autoconf/automake optimization.
 - Several others for pointing out flaws within the product and its related
   documentation. Refer to the project website for more information:
-  http://libewf.sourceforge.net/
+  http://code.google.com/p/libewf/
 

@@ -1,8 +1,7 @@
 /*
  * IO handle functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
+#include "libewf_libcerror.h"
 
 #include "libewf_libbfio.h"
 
@@ -38,25 +37,13 @@ typedef struct libewf_io_handle libewf_io_handle_t;
 
 struct libewf_io_handle
 {
-	/* The flags
+	/* The access flags
 	 */
-	uint8_t flags;
+	int access_flags;
 
-	/* The file io pool
+	/* The current (storage media) offset
 	 */
-	libbfio_pool_t *file_io_pool;
-
-	/* Value to indicate if the pool was created inside the library
-	 */
-	uint8_t pool_created_in_library;
-
-	/* The current chunk
-	 */
-	uint32_t current_chunk;
-
-	/* The current chunk offset
-	 */
-	uint32_t current_chunk_offset;
+	off64_t current_offset;
 
 	/* Value to indicate which file format is used
 	 */
@@ -74,15 +61,28 @@ struct libewf_io_handle
 	 * like empty block compression
 	 */
 	uint8_t compression_flags;
+
+	/* The header codepage
+	 */
+	int header_codepage;
+
+	/* Value to indicate if abort was signalled
+	 */
+	int abort;
 };
 
 int libewf_io_handle_initialize(
      libewf_io_handle_t **io_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_io_handle_free(
      libewf_io_handle_t **io_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int libewf_io_handle_clone(
+     libewf_io_handle_t **destination_io_handle,
+     libewf_io_handle_t *source_io_handle,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

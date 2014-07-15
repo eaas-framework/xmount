@@ -1,10 +1,12 @@
-/**
- ** AFF/qemu glue
- **
- ** 2008 by Simson L. Garfinkel
- **
- **
- **/
+/*
+ * AFF/qemu glue
+ *
+ * 2008 by Simson L. Garfinkel
+ *
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
+ *
+ */
 
 #include "affconfig.h"
 #include "afflib.h"
@@ -50,7 +52,11 @@ static int qemu_open(AFFILE *af)
 	bdrv_init_called = 1;
     }
     bs = bdrv_new("");
-    bdrv_open2(bs,af_filename(af),0,drv);
+    if (bs == NULL) return -1;
+    if(bdrv_open2(bs,af_filename(af),0,drv)!=0){
+	bdrv_delete(bs);
+	return -1;
+    }
     bdrv_get_geometry(bs, &total_sectors);
 
     af->image_pagesize   = 1024*1024*1;	// megabyte for now
@@ -83,7 +89,7 @@ static int qemu_rewind_seg(AFFILE *af)
 }
 
 
-static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
+static int qemu_get_seg(AFFILE *af,const char *name, uint32_t *arg,
 		       unsigned char *data,size_t *datalen)
 {
     /* Is the user asking for a page? */
@@ -92,7 +98,7 @@ static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
 	/* Get the segment number */
 	if(data==0){
 	    /* Need to make sure that the segment exists */
-	    if(segnum * (af->image_pagesize+1) > (uint64_t) af->image_size ){
+	    if(segnum * (af->image_pagesize+1) > (int64_t) af->image_size ){
 		return -1; // this segment does not exist
 	    }
 	    if(datalen) *datalen =af->image_pagesize;	// just return the chunk size
@@ -120,8 +126,8 @@ static int qemu_get_seg(AFFILE *af,const char *name, unsigned long *arg,
 	if(*datalen<8) return -2;
 	
 	struct aff_quad  q;
-	q.low  = htonl((unsigned long)(af->image_size & 0xffffffff));
-	q.high = htonl((unsigned long)(af->image_size >> 32));
+	q.low  = htonl((uint32_t)(af->image_size & 0xffffffff));
+	q.high = htonl((uint32_t)(af->image_size >> 32));
 	memcpy(data,&q,8);
 	return 0;
     }
@@ -154,7 +160,7 @@ static const char *emap[] = {
 };
 
 
-static int qemu_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int qemu_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen)
 {
     /* Figure out what the next segment would be, then get it */
@@ -176,7 +182,7 @@ static int qemu_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigne
     }
 
  get_next_data_seg:
-    if(af->cur_page * af->image_pagesize >= (uint64_t)af->image_size) return -1; // end of list
+    if(af->cur_page * af->image_pagesize >= (int64_t)af->image_size) return -1; // end of list
     /* Make the segment name */
     char pagename[AF_MAX_NAME_LEN];		//
     memset(pagename,0,sizeof(pagename));

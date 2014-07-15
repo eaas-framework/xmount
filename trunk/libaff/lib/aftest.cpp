@@ -1,6 +1,8 @@
 /*
  * atest.cpp:
  * test suite for the AFF Library.
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
 
 #include "affconfig.h"
@@ -8,10 +10,6 @@
 #include "afflib_i.h"
 #include "base64.h"
 #include "aftimer.h"
-
-#ifdef HAVE_THREADED_HASH_H
-#include "threaded_hash.h"
-#endif
 
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
@@ -253,20 +251,20 @@ int random_read_test(int total_bytes,int data_page_size)
 
     /* Now try lots of seeks and reads */
     for(int i=0;i<MAX_FMTS;i++){
-	unsigned int loc = rand() % total_bytes;
-	unsigned int len = rand() % total_bytes;
+	uint32_t loc = rand() % total_bytes;
+	uint32_t len = rand() % total_bytes;
 	memset(buf,0,total_bytes);
 	memset(buf2,0,total_bytes);
 
-	if(i%250==0) printf("\r#%d  reading %u bytes at %u    ...",i,loc,len);
+	if(i%250==0) printf("\r#%d  reading %"PRIu32" bytes at %"PRIu32"    ...",i,loc,len);
 	fflush(stdout);
 
-	unsigned long l1 = (unsigned long)lseek(fd,loc,SEEK_SET);
-	unsigned long l2 = (unsigned long)af_seek(af,loc,SEEK_SET);
+	uint32_t l1 = (uint32_t)lseek(fd,loc,SEEK_SET);
+	uint32_t l2 = (uint32_t)af_seek(af,loc,SEEK_SET);
 
 
 	if(l1!=l2){
-	    err(1,"l1 (%lu) != l2 (%lu)",l1,l2);
+	    err(1,"l1 (%"PRIu32") != l2 (%"PRIu32")",l1,l2);
 	}
 
 	int r1 = read(fd,buf,len);
@@ -480,7 +478,7 @@ void lzma_test()
     printf("size=%qd\n",(long long)buflen);
     unsigned char *buf = (unsigned char *)malloc(buflen);
     if(buf==0) errx(1,"malloc");
-    if(fread(buf,1,st.st_size,f)!=(unsigned long long)st.st_size) err(1,"read");
+    if(fread(buf,1,st.st_size,f)!=(size_t)st.st_size) err(1,"read");
 
     /* Allocate memory for the compressed buffer */
     size_t cbufsize = (int)(buflen*1.05);
@@ -702,8 +700,30 @@ void zap(const char *fn)
     af_close(af);
 }
 
+const char *fnames[] = {"foo.000","foo.001",
+			"foo.100","foo.101",
+			"bizmark.999","bizmark.A00",
+			"nutter.A99","nutter.AA0",
+			"bizmark.AZ9","bizmark.B00",
+			"glutten.afj","glutten.afk",
+			0,0};
+
 void bugs_test()
 {
+    for(int i=0;fnames[i];i+=2){
+	char buf[256];
+	strcpy(buf,fnames[i]);
+	if(split_raw_increment_fname(buf)){
+	    err(1,"split_raw_increment_fname(%s) failed",fnames[i]);
+	}
+	printf("%s=>%s\n",fnames[i],buf);
+	if(strcmp(buf,fnames[i+1])!=0){
+	    err(1,"split_raw_increment_fname(%s) should have returned %s",
+		fnames[i],fnames[i+1]);
+	}
+    }
+
+
     const char *buf = "This is a test\n";
     int len = strlen(buf);
 
@@ -720,44 +740,6 @@ void xmltest(const char *fn);
 
 void time_test()
 {
-#ifdef HAVE_THREADED_HASH_H
-    int size = 1024*1024*256;
-    unsigned char *buf1 = (u_char *)calloc(size,1);
-    int threaded=0;
-
-    printf("sha1 is 3b4417fc421cee30a9ad0fd9319220a8dae32da2\n");
-    for(int count=0;count<2;count++){
-	buf1[0]= count;
-	for(threaded=0;threaded<2;threaded++){
-	    aftimer t;
-	    threaded_hash h_md5(EVP_get_digestbyname("md5"),threaded);
-	    threaded_hash h_sha1(EVP_get_digestbyname("sha1"),threaded);
-	    threaded_hash h_sha2(EVP_get_digestbyname("sha1"),threaded);
-	    threaded_hash h_sha3(EVP_get_digestbyname("sha1"),threaded);
-	    threaded_hash h_sha256(EVP_get_digestbyname("sha256"),threaded);
-	    
-	    printf("Threaded: %d size: %d\n",threaded,size);
-	    t.start();
-	    h_sha1.update(buf1,size);
-	    h_sha2.update(buf1,size);
-	    h_sha3.update(buf1,size);
-	    h_md5.update(buf1,size);
-	    h_sha256.update(buf1,size);
-	    
-	    unsigned char md[32];
-	    char b[64];
-
-	    h_md5.final(md,sizeof(md)); printf("md5: %s\n",af_hexbuf(b,sizeof(b),md,16,0));
-	    h_sha1.final(md,sizeof(md)); printf("sha1: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
-	    h_sha2.final(md,sizeof(md)); printf("sha2: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
-	    h_sha3.final(md,sizeof(md)); printf("sha3: %s\n",af_hexbuf(b,sizeof(b),md,20,0));
-	    h_sha256.final(md,sizeof(md)); printf("sha256: %s\n",af_hexbuf(b,sizeof(b),md,32,0));
-	    t.stop();
-	    printf("time: %g\n",t.elapsed_seconds());
-	    printf("==============================\n");
-	}
-    }
-#endif
     exit(0);
 }
 
@@ -781,7 +763,7 @@ void rsatest()
     strcpy(ptext,"Simson");
 
     unsigned char sig[1024];
-    unsigned int  siglen = sizeof(sig);
+    uint32_t  siglen = sizeof(sig);
 
     BIO *bp = BIO_new_file("signing_key.pem","r");
 
@@ -891,11 +873,23 @@ void usage()
     printf("    -n nn = sets MAX_FMTS (default %d)\n",MAX_FMTS);
     printf("    -i image write speed test (lots of small pages)\n");
     printf("    -v = verbose\n");
+    printf("    -S filename = perform split-raw tests on filename\n");
 #ifdef HAVE_AES_ENCRYPT
     printf("    -C = just test AES encryption\n");
 #endif
     printf("    -x fn = xml test\n");
     printf("    -z fn = open up fn for writing and zap it.\n");
+}
+
+int split_raw_test(const char *fn)
+{
+    void srp_dump(AFFILE *af);
+    AFFILE *af = af_open(fn,O_RDONLY,0666);
+    if(!af) err(1,"af_open:%s",fn);
+    printf("split_raw imagesize: %"PRId64"\n",af_get_imagesize(af));
+    srp_dump(af);
+    af_close(af);
+    return 0;
 }
 
 int main(int argc,char **argv)
@@ -926,7 +920,7 @@ int main(int argc,char **argv)
 	do_all = 1;
     }
 
-    while ((ch = getopt(argc, argv, "b123456aBLd:h?f:e:c:TCp:rx:R:z:tn:D:")) != -1) {
+    while ((ch = getopt(argc, argv, "b123456aBLd:h?f:e:c:TCp:rx:R:z:tn:D:S:")) != -1) {
 	switch(ch){
 	case 'D': af_trace = fopen(optarg,"w");break;
 	case 'R': readfile_test(optarg); break;
@@ -974,6 +968,7 @@ int main(int argc,char **argv)
 	case 'x': xmltest(optarg);break;
 	case 'C': aestest(); break;
 	case 'i': do_image_test=1;break;
+	case 'S': split_raw_test(optarg);exit(0);
 	case 'h':
 	case '?':
 	default:

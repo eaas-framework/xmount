@@ -6,6 +6,8 @@
  * 
  * Simson L. Garfinkel
  * 2009-09-18: SLG - Added to repository
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
 
 #include <vector>

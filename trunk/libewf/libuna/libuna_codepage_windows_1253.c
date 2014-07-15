@@ -1,8 +1,7 @@
 /*
  * Windows 1253 codepage (Greek) functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *

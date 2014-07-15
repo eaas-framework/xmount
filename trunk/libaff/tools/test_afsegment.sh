@@ -1,6 +1,9 @@
 #!/bin/sh
 # Test the afsegment command
 
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
+
 export PATH=$srcdir:../tools:../../tools:.:$PATH
 BLANK_BASE=`mktemp -t blankXXXXX`
 BLANK_AFF=$BLANK_BASE.aff

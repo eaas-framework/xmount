@@ -1,8 +1,7 @@
 /*
  * GUID functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,8 +23,6 @@
 #include <byte_stream.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #if defined( WINAPI )
 #include <rpcdce.h>
 
@@ -33,8 +30,8 @@
 #include <uuid/uuid.h>
 #endif
 
-#include <libsystem.h>
-
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
 #include "guid.h"
 
 #if defined( HAVE_GUID_SUPPORT ) || defined( WINAPI )
@@ -46,7 +43,7 @@ int guid_generate(
      uint8_t *guid,
      size_t guid_size,
      uint8_t guid_type,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
 #if defined( WINAPI )
 	UUID uuid             = { 0, 0, 0, { 0, 0, 0, 0, 0, 0, 0, 0 } };
@@ -56,10 +53,10 @@ int guid_generate(
 
 	if( guid == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid GUID.",
 		 function );
 
@@ -67,10 +64,10 @@ int guid_generate(
 	}
 	if( guid_size < GUID_SIZE )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
 		 "%s: GUID too small.",
 		 function );
 
@@ -78,10 +75,10 @@ int guid_generate(
 	}
 	if( guid_size > (size_t) SSIZE_MAX )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
 		 "%s: invalid GUID size value exceeds maximum.",
 		 function );
 
@@ -90,10 +87,10 @@ int guid_generate(
 	if( ( guid_type != GUID_TYPE_RANDOM )
 	 && ( guid_type != GUID_TYPE_TIME ) )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
 		 "%s: unsupported GUID type.",
 		 function );
 
@@ -112,7 +109,10 @@ int guid_generate(
 	}
 	if( guid_type == GUID_TYPE_TIME )
 	{
-#if defined( WINAPI )
+#if defined( __BORLANDC__ ) && __BORLANDC__ <= 0x0520
+		/* No support for the time type GUID */
+
+#elif defined( WINAPI ) && _WIN32_WINNT >= 0x0500
 		UuidCreateSequential(
 		 &uuid );
 
@@ -161,19 +161,19 @@ int guid_to_string(
      uint8_t *guid,
      size_t guid_size,
      int byte_order,
-     libsystem_character_t *string,
+     libcstring_system_character_t *string,
      size_t string_size,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
 	static char *function = "guid_to_string";
 	int print_count       = 0;
 
 	if( guid == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid guid.",
 		 function );
 
@@ -181,10 +181,10 @@ int guid_to_string(
 	}
 	if( guid_size < GUID_SIZE )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
 		 "%s: GUID too small.",
 		 function );
 
@@ -192,10 +192,10 @@ int guid_to_string(
 	}
 	if( guid_size > (size_t) SSIZE_MAX )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
 		 "%s: invalid GUID size value exceeds maximum.",
 		 function );
 
@@ -204,10 +204,10 @@ int guid_to_string(
 	if( ( byte_order != _BYTE_STREAM_ENDIAN_BIG )
 	 && ( byte_order != _BYTE_STREAM_ENDIAN_LITTLE ) )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
 		 "%s: unsupported byte order.",
 		 function );
 
@@ -215,21 +215,21 @@ int guid_to_string(
 	}
 	if( string == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid string.",
 		 function );
 
 		return( -1 );
 	}
-	if( string_size < GUID_STRING_SIZE )
+	if( string_size < 37 )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
 		 "%s: string too small.",
 		 function );
 
@@ -237,10 +237,10 @@ int guid_to_string(
 	}
 	if( string_size > (size_t) SSIZE_MAX )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
 		 "%s: invalid string size value exceeds maximum.",
 		 function );
 
@@ -251,25 +251,25 @@ int guid_to_string(
 	 */
 	if( byte_order == _BYTE_STREAM_ENDIAN_BIG )
 	{
-		print_count = libsystem_string_snprintf(
+		print_count = libcstring_system_string_sprintf(
 			       string,
 			       string_size,
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 ),
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 ),
 			       guid[ 0 ], guid[ 1 ], guid[ 2 ], guid[ 3 ],
 			       guid[ 4 ], guid[ 5 ],
 			       guid[ 6 ], guid[ 7 ],
@@ -278,25 +278,25 @@ int guid_to_string(
 	}
 	else if( byte_order == _BYTE_STREAM_ENDIAN_LITTLE )
 	{
-		print_count = libsystem_string_snprintf(
+		print_count = libcstring_system_string_sprintf(
 			       string,
 			       string_size,
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "-%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 )
-			       _LIBSYSTEM_CHARACTER_T_STRING( "%.2" ) _LIBSYSTEM_CHARACTER_T_STRING( PRIx8 ),
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "-%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 )
+			       _LIBCSTRING_SYSTEM_STRING( "%.2" ) _LIBCSTRING_SYSTEM_STRING( PRIx8 ),
 			       guid[ 3 ], guid[ 2 ], guid[ 1 ], guid[ 0 ],
 			       guid[ 5 ], guid[ 4 ],
 			       guid[ 7 ], guid[ 6 ],
@@ -307,10 +307,10 @@ int guid_to_string(
 	if( ( print_count < 0 )
 	 || ( (size_t) print_count > string_size ) )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_SET_FAILED,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_SET_FAILED,
 		 "%s: unable to set string.",
 		 function );
 

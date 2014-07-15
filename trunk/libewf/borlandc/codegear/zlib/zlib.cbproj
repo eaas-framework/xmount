@@ -13,6 +13,8 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
+			<DCC_DebugInformation>false</DCC_DebugInformation>
+			<_TCHARMapping>wchar_t</_TCHARMapping>
 			<BCC_SmartPCHCache>false</BCC_SmartPCHCache>
 			<BCC_PCHUsage>None</BCC_PCHUsage>
 			<FinalOutputDir>..\Release</FinalOutputDir>
@@ -29,8 +31,8 @@
 			<DCC_CBuilderOutput>JPHNE</DCC_CBuilderOutput>
 			<Defines>NO_STRICT;ZLIB_DLL;ZLIB_WINAPI;$(Defines)</Defines>
 			<DynamicRTL>true</DynamicRTL>
-			<IncludePath>..\..\..\libewf;..\..\zlib-1.2.3;$(CG_BOOST_ROOT)\boost\tr1\tr1;$(BDS)\include;$(BDS)\include\dinkumware;$(BDS)\include\vcl;$(CG_BOOST_ROOT);$(IncludePath)</IncludePath>
-			<ILINK_LibraryPath>..\..\..\libewf;..\..\zlib-1.2.3;..\Release;$(BDS)\lib\obj;$(BDS)\lib\psdk;$(ILINK_LibraryPath)</ILINK_LibraryPath>
+			<IncludePath>..\..\..\..\zlib;$(CG_BOOST_ROOT)\boost\tr1\tr1;$(BDS)\include;$(BDS)\include\dinkumware;$(BDS)\include\vcl;$(CG_BOOST_ROOT);$(IncludePath)</IncludePath>
+			<ILINK_LibraryPath>..\..\..\..\zlib;..\Release;$(BDS)\lib\obj;$(BDS)\lib\psdk;$(ILINK_LibraryPath)</ILINK_LibraryPath>
 			<BCC_wpar>false</BCC_wpar>
 			<BCC_OptimizeForSpeed>true</BCC_OptimizeForSpeed>
 		</PropertyGroup>
@@ -41,71 +43,83 @@
 			<TASM_Debugging>None</TASM_Debugging>
 		</PropertyGroup>
 		<ItemGroup>
-			<None Include="..\..\zlib-1.2.3\zutil.h">
+			<None Include="..\..\..\..\zlib\deflate.h">
 				<BuildOrder>0</BuildOrder>
 			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\adler32.c">
+			<None Include="..\..\..\..\zlib\gzguts.h">
 				<BuildOrder>1</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\zlib-1.2.3\compress.c">
+			</None>
+			<None Include="..\..\..\..\zlib\inffast.h">
 				<BuildOrder>2</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\zlib-1.2.3\crc32.c">
+			</None>
+			<CppCompile Include="..\..\..\..\zlib\uncompr.c">
 				<BuildOrder>3</BuildOrder>
 			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\crc32.h">
+			<CppCompile Include="..\..\..\..\zlib\zutil.c">
 				<BuildOrder>4</BuildOrder>
-			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\deflate.c">
-				<BuildOrder>5</BuildOrder>
 			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\deflate.h">
+			<None Include="..\..\..\..\zlib\crc32.h">
+				<BuildOrder>5</BuildOrder>
+			</None>
+			<None Include="..\..\..\..\zlib\inffixed.h">
 				<BuildOrder>6</BuildOrder>
 			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\gzio.c">
+			<None Include="..\..\..\..\zlib\zconf.h">
 				<BuildOrder>7</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\zlib-1.2.3\infback.c">
+			</None>
+			<None Include="..\..\..\..\zlib\zlib.h">
 				<BuildOrder>8</BuildOrder>
-			</CppCompile>
-			<CppCompile Include="..\..\zlib-1.2.3\inffast.c">
+			</None>
+			<None Include="..\..\..\..\zlib\zutil.h">
 				<BuildOrder>9</BuildOrder>
-			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\inffast.h">
+			</None>
+			<None Include="..\..\..\..\zlib\inflate.h">
 				<BuildOrder>10</BuildOrder>
 			</None>
-			<None Include="..\..\zlib-1.2.3\inffixed.h">
+			<None Include="..\..\..\..\zlib\inftrees.h">
 				<BuildOrder>11</BuildOrder>
 			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\inflate.c">
+			<None Include="..\..\..\..\zlib\trees.h">
 				<BuildOrder>12</BuildOrder>
-			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\inflate.h">
-				<BuildOrder>13</BuildOrder>
 			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\inftrees.c">
+			<CppCompile Include="..\..\..\..\zlib\deflate.c">
+				<BuildOrder>13</BuildOrder>
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\gzclose.c">
 				<BuildOrder>14</BuildOrder>
 			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\inftrees.h">
+			<CppCompile Include="..\..\..\..\zlib\gzlib.c">
 				<BuildOrder>15</BuildOrder>
-			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\trees.c">
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\adler32.c">
 				<BuildOrder>16</BuildOrder>
 			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\trees.h">
+			<CppCompile Include="..\..\..\..\zlib\compress.c">
 				<BuildOrder>17</BuildOrder>
-			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\uncompr.c">
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\crc32.c">
 				<BuildOrder>18</BuildOrder>
 			</CppCompile>
-			<None Include="..\..\zlib-1.2.3\zconf.h">
+			<CppCompile Include="..\..\..\..\zlib\gzread.c">
 				<BuildOrder>19</BuildOrder>
-			</None>
-			<None Include="..\..\zlib-1.2.3\zlib.h">
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\inflate.c">
 				<BuildOrder>20</BuildOrder>
-			</None>
-			<CppCompile Include="..\..\zlib-1.2.3\zutil.c">
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\inftrees.c">
 				<BuildOrder>21</BuildOrder>
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\trees.c">
+				<BuildOrder>22</BuildOrder>
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\gzwrite.c">
+				<BuildOrder>23</BuildOrder>
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\infback.c">
+				<BuildOrder>24</BuildOrder>
+			</CppCompile>
+			<CppCompile Include="..\..\..\..\zlib\inffast.c">
+				<BuildOrder>25</BuildOrder>
 			</CppCompile>
 			<BuildConfiguration Include="Base">
 				<Key>Base</Key>

@@ -1,8 +1,7 @@
 /*
  * Features of libewf
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -33,6 +32,16 @@
 
 #if defined( HAVE_LIBBFIO ) || ( !defined( WINAPI ) && @HAVE_LIBBFIO@ )
 #define LIBEWF_HAVE_BFIO			1
+#endif
+
+#if !defined( LIBEWF_DEPRECATED )
+#if defined( __GNUC__ ) && __GNUC__ >= 3
+#define LIBEWF_DEPRECATED	__attribute__ ((__deprecated__))
+#elif defined( _MSC_VER )
+#define LIBEWF_DEPRECATED	__declspec(deprecated)
+#else
+#define LIBEWF_DEPRECATED
+#endif
 #endif
 
 #endif

@@ -1,5 +1,9 @@
 #include "affconfig.h"
 
+/*
+ * Distributed under the Berkeley 4-part license
+ */
+
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -292,7 +296,7 @@ static string canonical_string(string method,string path,curl_slist *headers, ti
 static string encode(const char *aws_secret_access_key,string str)
 {
     unsigned char md[20];
-    unsigned int md_len = sizeof(md);
+    uint32_t md_len = sizeof(md);
 
     /* Note: This MUST be sha1() */
     HMAC(EVP_sha1(),aws_secret_access_key,strlen(aws_secret_access_key),

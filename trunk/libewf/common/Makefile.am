@@ -8,10 +8,11 @@ EXTRA_DIST = \
 	config_msc.h \
 	file_stream.h \
 	memory.h \
-	narrow_string.h \
 	types.h \
-	types.h.in \
-	wide_string.h
+	types.h.in
+
+MAINTAINERCLEANFILES = \
+	Makefile.in
 
 distclean: clean
 	/bin/rm -f config.h

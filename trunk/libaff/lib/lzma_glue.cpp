@@ -2,6 +2,12 @@
 #include "afflib.h"
 #include "afflib_i.h"
 
+/*
+ * Distributed under the Berkeley 4-part license
+ * Simson L. Garfinkel, March 12, 2012
+ */
+
+
 #include "../../../Common/MyWindows.h"
 #include "../../../Common/MyInitGuid.h"
 #include "../../Common/FileStreams.h"
@@ -14,7 +20,6 @@
 extern "C" {
 #include "LzmaRamDecode.h"
 }
-
 
 class CInMemoryStream: public ISequentialInStream, public CMyUnknownImp {
 public:

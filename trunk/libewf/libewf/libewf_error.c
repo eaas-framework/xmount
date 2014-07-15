@@ -1,8 +1,7 @@
 /*
  * Error functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -23,7 +22,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
+#include "libewf_libcerror.h"
 
 #include <stdio.h>
 
@@ -36,58 +35,60 @@
 void libewf_error_free(
       libewf_error_t **error )
 {
-	liberror_error_free(
-	 (liberror_error_t **) error );
+	libcerror_error_free(
+	 (libcerror_error_t **) error );
 }
 
 /* Prints a descriptive string of the error to the stream
- * Returns the amount of printed characters if successful or -1 on error
+ * Returns the number of printed characters if successful or -1 on error
  */
 int libewf_error_fprint(
      libewf_error_t *error,
      FILE *stream )
 {
-	return( liberror_error_fprint(
-	         (liberror_error_t *) error,
+	return( libcerror_error_fprint(
+	         (libcerror_error_t *) error,
 	         stream ) );
 }
 
 /* Prints a descriptive string of the error to the string
- * Returns the amount of printed characters if successful or -1 on error
+ * The end-of-string character is not included in the return value
+ * Returns the number of printed characters if successful or -1 on error
  */
 int libewf_error_sprint(
      libewf_error_t *error,
      char *string,
      size_t size )
 {
-	return( liberror_error_sprint(
-	         (liberror_error_t *) error,
+	return( libcerror_error_sprint(
+	         (libcerror_error_t *) error,
 	         string,
 	         size ) );
 }
 
 /* Prints a backtrace of the error to the stream
- * Returns the amount of printed characters if successful or -1 on error
+ * Returns the number of printed characters if successful or -1 on error
  */
 int libewf_error_backtrace_fprint(
      libewf_error_t *error,
       FILE *stream )
 {
-	return( liberror_error_backtrace_fprint(
-	         (liberror_error_t *) error,
+	return( libcerror_error_backtrace_fprint(
+	         (libcerror_error_t *) error,
 	         stream ) );
 }
 
 /* Prints a backtrace of the error to the string
- * Returns the amount of printed characters if successful or -1 on error
+ * The end-of-string character is not included in the return value
+ * Returns the number of printed characters if successful or -1 on error
  */
 int libewf_error_backtrace_sprint(
      libewf_error_t *error,
      char *string,
      size_t size )
 {
-	return( liberror_error_backtrace_sprint(
-	         (liberror_error_t *) error,
+	return( libcerror_error_backtrace_sprint(
+	         (libcerror_error_t *) error,
 	         string,
 	         size ) );
 }

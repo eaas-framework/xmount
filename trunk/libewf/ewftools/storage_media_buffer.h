@@ -1,8 +1,7 @@
-/* 
+/*
  * Storage media buffer
  *
- * Copyright (C) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
+#include "ewftools_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -44,9 +43,9 @@ struct storage_media_buffer
 	 */
 	size_t raw_buffer_size;
 
-	/* The amount used of the raw buffer
+	/* The size of the data in the raw buffer
 	 */
-	ssize_t raw_buffer_amount;
+	size_t raw_buffer_data_size;
 
 #if defined( HAVE_LOW_LEVEL_FUNCTIONS )
         /* Value to indicate if the compression buffer
@@ -66,44 +65,44 @@ struct storage_media_buffer
 	 */
 	size_t compression_buffer_size;
 
-	/* The amount used of the compression buffer
+	/* The size of the data in the compression buffer
 	 */
-	ssize_t compression_buffer_amount;
+	size_t compression_buffer_data_size;
 
-	/* The CRC buffer
+	/* The checksum buffer
 	 */
-	uint8_t *crc_buffer;
+	uint8_t *checksum_buffer;
 
-	/* Value to indicate if the crc should be processed
+	/* Value to indicate if the checksum should be processed
 	 * read or written
 	 */
-	int8_t process_crc;
+	int8_t process_checksum;
 
-	/* The crc of the data within the buffer
+	/* The checksum of the data within the buffer
 	 */
-	uint32_t crc;
+	uint32_t checksum;
 #endif
 };
 
 int storage_media_buffer_initialize(
      storage_media_buffer_t **buffer,
      size_t size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int storage_media_buffer_free(
      storage_media_buffer_t **buffer,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int storage_media_buffer_resize(
      storage_media_buffer_t *buffer,
      size_t size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int storage_media_buffer_get_data(
      storage_media_buffer_t *buffer,
      uint8_t **data,
-     size_t *size,
-     liberror_error_t **error );
+     size_t *data_size,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

@@ -1,8 +1,7 @@
 /*
  * Type and type-support defintions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -10,12 +9,12 @@
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -25,7 +24,7 @@
 
 #include "common.h"
 
-#if defined( HAVE_LIMITS_H )
+#if defined( HAVE_LIMITS_H ) || defined( WINAPI )
 #include <limits.h>
 #endif
 
@@ -252,7 +251,11 @@
 /* The maximum signed 64-bit integer is 9223372036854775807 (0x7fffffffffffffff)
  */
 #if !defined( INT64_MAX )
-#define INT64_MAX (0x7fffffffffffffffLL)
+#if defined( __BORLANDC__ ) && ( __BORLANDC__ < 0x0560 )
+#define INT64_MAX (0x7fffffffffffffffUL)
+#else
+#define INT64_MAX (0x7fffffffffffffffULL)
+#endif
 #endif
 
 /* The maximum signed integer

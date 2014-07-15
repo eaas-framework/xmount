@@ -6,3 +6,7 @@ Install this file with:
 To disable optimization, do this:
 
       ./configure 'CXXFLAGS=-O0 -g' 'CFLAGS=-O0 -g'
+
+
+Optimization is automatically disabled if the environment variable
+AFF_NOOPT is set.

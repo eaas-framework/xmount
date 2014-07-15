@@ -1,3 +1,5 @@
+/* Distributed under the 4-part Berkeley License */ 
+
 /*
  * afflib_db.cpp:
  * 
@@ -22,7 +24,7 @@
 int af_probe_next_seg(AFFILE *af,
 		       char *segname,
 		       size_t segname_len,
-		       unsigned long *arg_, // optional arg
+		       uint32_t *arg_, // optional arg
 		       size_t *datasize_, // optional get datasize
 		       size_t *segsize_, // optional get size of entire segment
 		       int do_rewind) // optional rewind af->aseg, otherwise leave at start of segment data
@@ -45,10 +47,10 @@ int af_probe_next_seg(AFFILE *af,
 	return AF_ERROR_SEGH;
     }
 
-    unsigned long name_len = ntohl(segh.name_len);
-    unsigned long datasize = ntohl(segh.data_len);
+    uint32_t name_len = ntohl(segh.name_len);
+    uint32_t datasize = ntohl(segh.data_len);
     if(name_len>AF_MAX_NAME_LEN){
-	snprintf(af->error_str,sizeof(af->error_str),"afflib: name_len=%lu (an outrageous value)",name_len);
+	snprintf(af->error_str,sizeof(af->error_str),"afflib: name_len=%"PRIu32" (an outrageous value)",name_len);
 	return AF_ERROR_NAME;
     }
 
@@ -65,7 +67,7 @@ int af_probe_next_seg(AFFILE *af,
 
     if(do_rewind) fseeko(af->aseg,start,SEEK_SET); // rewind
 
-    unsigned long segsize = sizeof(struct af_segment_head)
+    uint32_t segsize = sizeof(struct af_segment_head)
 	+ sizeof(struct af_segment_tail)
 	+ name_len + datasize;
 
@@ -117,14 +119,14 @@ int af_backspace(AFFILE *af)
  * Return -1 if segment is not found, and leave pointer at the end
  */
 int	aff_find_seg(AFFILE *af,const char *segname,
-		    unsigned long *arg,
+		    uint32_t *arg,
 		    size_t *datasize,
 		    size_t *segsize)
 {
     char   next_segment_name[AF_MAX_NAME_LEN];
     size_t next_segsize = 0;
     size_t next_datasize = 0;
-    unsigned long next_arg;
+    uint32_t next_arg;
 
     /* Try to use the TOC to find the segment in question */
     struct aff_toc_mem *adm = aff_toc(af,segname);
@@ -176,8 +178,8 @@ int af_get_segq(AFFILE *af,const char *name,int64_t *aff_quad)
 int af_update_segq(AFFILE *af, const char *name, int64_t value)
 {
     struct aff_quad  q;
-    q.low  = htonl((unsigned long)(value & 0xffffffff));
-    q.high = htonl((unsigned long)(value >> 32));
+    q.low  = htonl((uint32_t)(value & 0xffffffff));
+    q.high = htonl((uint32_t)(value >> 32));
     return af_update_seg(af,name,AF_SEG_QUADWORD,(const u_char *)&q,8);
 }
 

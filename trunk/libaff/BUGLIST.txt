@@ -1,4 +1,4 @@
-AFFLIB Buglist and future development plans
+AFFLIB Buglist and roadmap.
 
 
 PERFORMANCE IMPROVEMENTS:
@@ -10,7 +10,6 @@ PERFORMANCE IMPROVEMENTS:
   - move to scatter/gather writing.
   - look at the TOC to know how much space is available. 
   - Make the TOC always used. Trust the TOC.
-
 
 BUGS:
 * Test all programs with file://-style URLs. You can't test for existence of a file with
@@ -73,4 +72,4 @@ afconvert:
 afupload:
  * Uploading shouldn't decrypt first.
 
-================================================================
+

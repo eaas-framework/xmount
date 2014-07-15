@@ -1,8 +1,7 @@
 /*
- * Segment file handle
+ * Segment file handle functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,9 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include "libewf_list_type.h"
+#include "libewf_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -38,35 +35,24 @@ typedef struct libewf_segment_file_handle libewf_segment_file_handle_t;
 
 struct libewf_segment_file_handle
 {
-	/* The file io pool entry
+	/* The segment file index
 	 */
-	int file_io_pool_entry;
-
-	/* The amount of chunks
-	 */
-	uint32_t amount_of_chunks;
-
-        /* The list of all the sections
-         */
-        libewf_list_t *section_list;
-
-	/* The segment file type
-	 */
-	uint8_t file_type;
-
-	/* Value to indicate that the segment file is open for writing
-	 */
-	uint8_t write_open;
+	int segment_file_index;
 };
 
 int libewf_segment_file_handle_initialize(
      libewf_segment_file_handle_t **segment_file_handle,
      int file_io_pool_entry,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_segment_file_handle_free(
      libewf_segment_file_handle_t **segment_file_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int libewf_segment_file_handle_clone(
+     libewf_segment_file_handle_t **destination_segment_file_handle,
+     libewf_segment_file_handle_t *source_segment_file_handle,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

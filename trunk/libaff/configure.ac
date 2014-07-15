@@ -4,17 +4,21 @@
 # See http://autotoolset.sourceforge.net/tutorial.html
 # and http://www.openismus.com/documents/linux/automake/automake.shtml
 
-
-AC_INIT([AFFLIB],[3.6.2],[bugs@afflib.org])
+AC_INIT([AFFLIB],[3.7.0],[bugs@afflib.org])
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
 
+AC_CONFIG_FILES([Makefile lib/Makefile tools/Makefile lzma443/Makefile 
+			  tests/Makefile doc/Makefile pyaff/Makefile man/Makefile lib/version.h])
+AC_CONFIG_FILES([afflib.spec])
+AM_CONFIG_HEADER([affconfig.h])
 
 # Where we get installed
 AC_PREFIX_PROGRAM
 
 # Programs that we will be using
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_INSTALL
 
 # Turn off shared libraries during beta-testing, since they
@@ -26,7 +30,6 @@ AC_CONFIG_MACRO_DIR([m4])
 m4_include([m4/acx_pthread.m4])
 m4_include([m4/acinclude.m4])
 ACX_PTHREAD()
-
 
 if test x"${cross_compiling}" = "xno" ; then
   # Bring additional directories where things might be found into our
@@ -44,10 +47,18 @@ if test x"${cross_compiling}" = "xno" ; then
   AC_MSG_NOTICE([ LDFLAGS = ${LDFLAGS} ])        
 else
   AC_MSG_NOTICE([Cross Compiling --- will not update CPPFALGS or LDFLAGS with /usr/local, /opt/local or /sw])
+  LIBS="$LIBS -lws2_32 -lgdi32"
 fi
         
-
-AC_DEFINE([IN_AFFLIB],1,[Defined if we are inside AFFLIB])
+if test -r /bin/uname.exe ; then
+  if test `uname -o` == "Msys" ; then
+    AC_MSG_NOTICE([Compiling with Msys. Setting flags appropriately.])
+    enable_qemu="no"
+    #CPPFLAGS="$CPPFLAGS -D__USE_MINGW_ANSI_STDIO"
+    LIBS="$LIBS -lws2_32 -lgdi32"
+    #LDFLAGS="$LDFLAGS -Wl,--enable-auto-import"
+  fi
+fi
 
 # Special features that I use
 AC_FUNC_ALLOCA
@@ -70,7 +81,7 @@ AC_STRUCT_ST_RDEV
 
 
 # Specific headers that I plan to use
-AC_CHECK_HEADERS([arpa/inet.h assert.h ctype.h dmalloc.h err.h errno.h fcntl.h getopt.h inttypes.h linux/fs.h malloc.h ncurses/term.h netinet/in.h regex.h signal.h stdint.h stdio.h stdlib.h string.h sys/cdefs.h sys/disk.h sys/file.h sys/ioctl.h sys/ioctl.h sys/param.h sys/param.h sys/socket.h sys/signal.h sys/stat.h sys/time.h sys/types.h sys/vfs.h sysexits.h term.h time.h unistd.h zlib.h])
+AC_CHECK_HEADERS([arpa/inet.h assert.h ctype.h dmalloc.h err.h errno.h fcntl.h getopt.h inttypes.h linux/fs.h malloc.h ncurses/term.h netinet/in.h regex.h signal.h stdint.h stdio.h stdlib.h string.h sys/cdefs.h sys/disk.h sys/file.h sys/ioctl.h sys/ioctl.h sys/param.h sys/param.h sys/socket.h sys/signal.h sys/stat.h sys/time.h sys/types.h sys/vfs.h sysexits.h term.h time.h unistd.h zlib.h _mingw.h])
 
 AC_CHECK_LIB([regex],[regcomp])        # see if we need -lregex
 
@@ -94,17 +105,21 @@ AC_ARG_WITH([noopt], AC_HELP_STRING([--with-noopt],[Drop -O C flags]))
 AC_PROG_CXX
 AC_LANG_PUSH([C++])
 AC_CHECK_HEADERS([cstring])
+AC_CHECK_HEADERS([string],
+  AC_DEFINE([HAVE_STL],1,[STL Present])
+  AC_MSG_NOTICE([STL Present]))
 AC_LANG_POP([C++])
 
 ################################################################
 # For AFF tools
-AC_CHECK_FUNCS(tputs tgoto tgetstr tgetnum gotorc beep endwin setupterm printw)
 AC_CHECK_HEADERS([readline/readline.h])
 AC_CHECK_HEADERS([curses.h termcap.h])
 AC_CHECK_LIB([readline],[readline],, AC_MSG_RESULT([readline not installed]))
 AC_CHECK_LIB([ncurses],[initscr],, AC_MSG_RESULT([ncurses not installed]))
 AC_CHECK_LIB([z],[uncompress],, AC_MSG_ERROR([zlib not installed; cannot continue. Try adding zlib-dev or zlib1g-dev.]))
 AC_CHECK_LIB([rt],[aio_error64])
+AC_SEARCH_LIBS(tgetent, termlib termcap tinfo curses ncurses)
+AC_CHECK_FUNCS(putp tputs tgoto tgetstr tgetnum gotorc beep endwin setupterm printw)
 
 ################################################################
 ## Expat
@@ -157,12 +172,13 @@ AM_CONDITIONAL([MAYBE_S3],[test "x${enable_s3}" = "xyes"])   # used by automake
 AC_ARG_ENABLE([qemu])
 
 echo "disable_qemu: " ${disable_qemu}
-echo "enable_qemu: " ${enable_qemu}
+echo "enable_qemu:  " ${enable_qemu}
 
 if test x"${cross_compiling}" = "xyes" ; then
   AC_MSG_NOTICE([cross-compiling: Disabling QEMU])
   enable_qemu="no";
 fi
+
 
 if test "x${enable_qemu}" = "xno" ; then
    enable_qemu="no"
@@ -196,27 +212,22 @@ AM_CONDITIONAL(HAVE_PYTHON, test "$enable_python" = yes)
 ################################################################
 ################################################################
 ## Crypto (must follow S3)
+## Note: -lssl is needed on Linux
+##       -lcrypto is needed on MacOS
+##       -lmd is needed on some older systems
+## Always check for headers, then libs, then functions
 ###
-
-# If we are cross-compiling, then add the specail libs that OpenSSL requires
-
-if test x"${cross_compiling}" == "xyes" ; then
-  LIBS="$LIBS -lws2_32 -lgdi32"
-fi
-
-
-AC_CHECK_LIB([crypto],[MD5_Update],,
-	AC_MSG_ERROR([OpenSSL developer library 'libcrypto' not installed; cannot continue.]))	
-
-AC_CHECK_LIB([ssl],[ssl3_new],,
-	AC_MSG_ERROR([OpenSSL developer library 'libssl-dev' or 'openssl-devel' not installed; cannot continue.]))
-
 
 AC_CHECK_HEADERS([openssl/aes.h openssl/bio.h openssl/evp.h openssl/hmac.h openssl/md5.h openssl/rand.h openssl/rsa.h openssl/sha.h openssl/pem.h openssl/x509.h])
 
-AC_CHECK_FUNCS([MD5 SHA1 AES_encrypt RAND_pseudo_bytes des_read_pw_string EVP_read_pw_string EVP_MD_size])
+
+AC_CHECK_LIB([ssl],[SSL_library_init],,
+	AC_MSG_ERROR([OpenSSL developer library 'libssl-dev' or 'openssl-devel' not installed; cannot continue.]))
+
+AC_CHECK_LIB([crypto],[EVP_get_digestbyname])
 AC_CHECK_LIB([md],[MD5])		# if libmd is available, get it
 
+AC_CHECK_FUNCS([MD5 SHA1 AES_encrypt RAND_pseudo_bytes des_read_pw_string EVP_read_pw_string EVP_MD_size])
 AC_CHECK_FUNCS([PEM_read_bio_RSA_PUBKEY])
 
 ################################################################
@@ -246,6 +257,8 @@ if test "${enable_fuse}" = "yes"; then
 fi
 AC_SUBST(AFFUSE_BIN)
 AM_PROG_CC_C_O			dnl for affuse
+##
+################################################################
 
 ############## drop optimization flags if requeted ################
 
@@ -259,8 +272,8 @@ if test "${with_noopt}" = "yes" ; then
 fi
 
 # I am a glutten for punishment and this is security-critical software
-CFLAGS="$CFLAGS -D_FORTIFY_SOURCE=2 -Wall"
-CXXFLAGS="$CXXFLAGS -D_FORTIFY_SOURCE=2 -Wall"
+CFLAGS="$CFLAGS -D_FORTIFY_SOURCE=2 -Wall -g"
+CXXFLAGS="$CXXFLAGS -D_FORTIFY_SOURCE=2 -Wall -g"
 
 
 ################ drop threading if requested ################
@@ -283,7 +296,6 @@ AC_MSG_NOTICE([*****************************************])
 AC_MSG_NOTICE([AFFLIB ${PACKAGE_VERSION} configuration])
 AC_MSG_NOTICE([Amazon S3 Support:  ${enable_s3}])
 AC_MSG_NOTICE([LZMA Compression:   yes])
-AC_MSG_NOTICE([LIBEWF:             ${enable_libewf} (requires uuid-dev on Linux)])
 AC_MSG_NOTICE([PYTHON Bindings:    ${enable_python}])
 AC_MSG_NOTICE([QEMU Image Drivers: ${enable_qemu}])
 AC_MSG_NOTICE([FUSE:               ${enable_fuse}])
@@ -299,14 +311,6 @@ AC_MSG_NOTICE([])
 
 # AC_PROG_RANLIB not needed if you are using AC_PROG_LIBTOOL
 # AC_PROG_RANLIB
-AC_CONFIG_FILES([Makefile lib/Makefile tools/Makefile lzma443/Makefile 
-			  tests/Makefile doc/Makefile pyaff/Makefile man/Makefile lib/version.h])
-dnl Have configure make distribution specific files
-AC_CONFIG_FILES([afflib.spec])
-
-dnl Have configure write its configuration
-AM_CONFIG_HEADER([affconfig.h])
-
 AC_OUTPUT([afflib.pc])
 
 

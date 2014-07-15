@@ -1,42 +1,8 @@
 /*
- * Copyright (c) 2005, 2006, 2007
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
+
 
 #include "affconfig.h"
 #include "afflib.h"
@@ -48,16 +14,18 @@
 #include <openssl/bio.h>
 #endif
 
+#ifdef HAVE_STL
 #include <vector>
 #include <set>
 #include <string>
+using namespace std;
+#endif
 
 #ifdef HAVE_CSTRING
 #include <cstring>
 #endif
 
 
-using namespace std;
 
 
 
@@ -113,7 +81,7 @@ int af_SHA256(const unsigned char *data,size_t datalen,unsigned char md[32])
     const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
     if(!sha256) return -1;
 
-    unsigned int sha256_buflen = 32;
+    uint32_t sha256_buflen = 32;
     EVP_MD_CTX ctx;
     EVP_DigestInit(&ctx,sha256);
     EVP_DigestUpdate(&ctx,data,datalen);
@@ -219,7 +187,7 @@ int af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_c
 /** MacOS 10.5 with GCC 4.0.1 packed affkey at 52 bytes.
  ** Linux GCC 4.1.2 packed affkey at 56 bytes. It should be 52 bytes
  ** --- 4 bytes for the version number, 32 bytes for the affkey, 16 bytes for encryption of zeros.
- ** original code specified the version as unsigned long version:32, for which the 
+ ** original code specified the version as uint32_t version:32, for which the 
  ** compiler allocated 64 bits...
  ** So this code needs to be willing to accept a 52-byte or 56-byte affkey.
  **/
@@ -228,7 +196,7 @@ int af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_c
  * in which the affkey structure was too large.
  */
 struct affkey_legacy {
-    unsigned long version:32;
+    uint32_t version:32;
     u_char affkey_aes256[32]; // AFF key encrypted with SHA-256 of passphrase
                               // encrypted as two codebooks in a row; no need for CBC
     u_char zeros_aes256[16];  // all zeros encrypted with SHA-256 of passphrase
@@ -341,6 +309,7 @@ int  af_establish_aes_passphrase(AFFILE *af,const char *passphrase)
  */
 int  af_use_aes_passphrase(AFFILE *af,const char *passphrase)
 {
+    af_invalidate_vni_cache(af);
     if(passphrase==0 && !(af->openflags & O_RDWR)){
 	af->crypto->sealing_key_set = 0;
 	return 0;
@@ -413,7 +382,7 @@ static int check_keys(EVP_PKEY *privkey,EVP_PKEY *pubkey)
 {
     char ptext[16];			/* plaintext of a 128-bit message */
     unsigned char sig[1024];		/* signature; bigger than needed */
-    unsigned int siglen = sizeof(sig);	/* length of signature */
+    uint32_t siglen = sizeof(sig);	/* length of signature */
 
     const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
     if(!sha256) return -1;		// no SHA256.
@@ -498,8 +467,8 @@ int  af_set_sign_files(AFFILE *af,const char *keyfile,const char *certfile)
  * segment data
  */
 int af_sign_seg3(AFFILE *af,const char *segname,
-		 unsigned long arg,const unsigned char *data,unsigned int datalen,
-		 unsigned long signmode)
+		 uint32_t arg,const unsigned char *data,uint32_t datalen,
+		 uint32_t signmode)
 {
     const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
     if(!sha256){
@@ -521,9 +490,9 @@ int af_sign_seg3(AFFILE *af,const char *segname,
 	return 0;
     }
 
-    unsigned long arg_net = htonl(arg);
+    uint32_t arg_net = htonl(arg);
     unsigned char sig[1024];		/* signature; bigger than needed */
-    unsigned int siglen = sizeof(sig);	/* length of signature */
+    uint32_t siglen = sizeof(sig);	/* length of signature */
 
     EVP_MD_CTX md;			/* EVP message digest */
     EVP_SignInit(&md,sha256);
@@ -548,7 +517,7 @@ int af_sign_seg(AFFILE *af,const char *segname)
     unsigned char *data=(unsigned char *)malloc(datalen);
     if(data==0) return AF_ERROR_SIG_MALLOC;
 
-    unsigned long arg=0;
+    uint32_t arg=0;
     if(af_get_seg(af,segname,&arg,data,&datalen)){
 	free(data);
 	return AF_ERROR_SIG_DATAREAD_ERROR; // can't read the segment length
@@ -563,6 +532,7 @@ int af_sign_seg(AFFILE *af,const char *segname)
 }
 
 
+#ifdef HAVE_STL
 /** Returns number of segments that were signed.
  * Returns -1 if there is an error.
  */
@@ -600,6 +570,7 @@ int af_sign_all_unsigned_segments(AFFILE *af)
     }
     return count;
 }
+#endif
 
 /* Verify a segment against a particular signature and public key */
 int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t sigbuf_len_,int sigmode)
@@ -613,7 +584,7 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
     /* Now get the data to verify */
     size_t seglen = 0;
     unsigned char *segbuf = 0;
-    unsigned long arg=0;
+    uint32_t arg=0;
 
     /* Do we need to get the page */
     if(sigmode==AF_SIGNATURE_MODE1){
@@ -644,9 +615,9 @@ int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t si
     }
 
     /* Verify the signature*/
-    u_char sigbuf[1024];
-    u_int sigbuf_len = sizeof(sigbuf);
-    u_long arg_net = htonl(arg);
+    uint8_t sigbuf[1024];
+    uint32_t sigbuf_len = sizeof(sigbuf);
+    uint32_t arg_net = htonl(arg);
     EVP_MD_CTX md;			/* EVP message digest */
     EVP_DigestInit(&md,sha256);
     EVP_DigestUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
@@ -674,7 +645,7 @@ int af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *s
     /* Now get the data to verify */
     size_t seglen = 0;
     unsigned char *segbuf = 0;
-    unsigned long arg=0;
+    uint32_t arg=0;
 
     /* Do we need to get the page */
     if(sigmode==AF_SIGNATURE_MODE1){
@@ -705,7 +676,7 @@ int af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *s
     }
 
     /* Verify the signature*/
-    unsigned long arg_net = htonl(arg);
+    uint32_t arg_net = htonl(arg);
     EVP_MD_CTX md;			/* EVP message digest */
     EVP_VerifyInit(&md,sha256);
     EVP_VerifyUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
@@ -749,7 +720,7 @@ int af_sig_verify_seg(AFFILE *af,const char *segname)
     /* Get the signature (it says how we need to handle the data) */
     unsigned char sigbuf[2048];		// big enough to hold any conceivable signature
     size_t sigbuf_len=sizeof(sigbuf);
-    unsigned long sigmode=0;
+    uint32_t sigmode=0;
     if(af_get_seg(af,sigseg,&sigmode,sigbuf,&sigbuf_len)){
 	return AF_ERROR_SIG_READ_ERROR;
     }

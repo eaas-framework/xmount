@@ -1,3 +1,6 @@
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
+
 Design for the encryption system:
 
 Encryption on AFF will be implemented by AFF Base Encryption

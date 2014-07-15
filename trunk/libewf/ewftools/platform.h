@@ -1,8 +1,7 @@
 /*
  * Platform functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,18 +25,17 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include <libsystem.h>
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
 int platform_get_operating_system(
-     libsystem_character_t *operating_system_string,
+     libcstring_system_character_t *operating_system_string,
      size_t operating_system_string_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

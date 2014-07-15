@@ -1,8 +1,7 @@
 /*
  * UTF-32 stream functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,72 +25,79 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #include "libuna_extern.h"
 #include "libuna_inline.h"
+#include "libuna_libcerror.h"
 #include "libuna_types.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
-LIBUNA_EXTERN LIBUNA_INLINE int libuna_utf32_stream_copy_byte_order_mark(
-                                 uint8_t *utf32_stream,
-                                 size_t utf32_stream_size,
-                                 size_t *utf32_stream_index,
-                                 uint8_t byte_order,
-                                 liberror_error_t **error );
+LIBUNA_EXTERN \
+LIBUNA_INLINE \
+int libuna_utf32_stream_copy_byte_order_mark(
+     uint8_t *utf32_stream,
+     size_t utf32_stream_size,
+     size_t *utf32_stream_index,
+     int byte_order,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_utf32_stream_size_from_utf8(
-                   const libuna_utf8_character_t *utf8_string,
-                   size_t utf8_string_size,
-                   size_t *utf32_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_size_from_utf8(
+     const libuna_utf8_character_t *utf8_string,
+     size_t utf8_string_size,
+     size_t *utf32_stream_size,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_utf32_stream_copy_from_utf8(
-                   uint8_t *utf32_stream,
-                   size_t utf32_stream_size,
-                   uint8_t byte_order,
-                   const libuna_utf8_character_t *utf8_string,
-                   size_t utf8_string_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_copy_from_utf8(
+     uint8_t *utf32_stream,
+     size_t utf32_stream_size,
+     int byte_order,
+     const libuna_utf8_character_t *utf8_string,
+     size_t utf8_string_size,
+     libcerror_error_t **error );
 
 /* The functionality for libuna_utf32_stream_copy_to_utf8 is implemented by
  * libuna_utf8_string_copy_from_utf32_stream
  */
 
-LIBUNA_EXTERN int libuna_utf32_stream_size_from_utf16(
-                   const libuna_utf16_character_t *utf16_string,
-                   size_t utf16_string_size,
-                   size_t *utf32_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_size_from_utf16(
+     const libuna_utf16_character_t *utf16_string,
+     size_t utf16_string_size,
+     size_t *utf32_stream_size,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_utf32_stream_copy_from_utf16(
-                   uint8_t *utf32_stream,
-                   size_t utf32_stream_size,
-                   uint8_t byte_order,
-                   const libuna_utf16_character_t *utf16_string,
-                   size_t utf16_string_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_copy_from_utf16(
+     uint8_t *utf32_stream,
+     size_t utf32_stream_size,
+     int byte_order,
+     const libuna_utf16_character_t *utf16_string,
+     size_t utf16_string_size,
+     libcerror_error_t **error );
 
 /* The functionality for libuna_utf32_stream_copy_to_utf16 is implemented by
  * libuna_utf16_string_copy_from_utf32_stream
  */
 
-LIBUNA_EXTERN int libuna_utf32_stream_size_from_utf32(
-                   const libuna_utf32_character_t *utf32_string,
-                   size_t utf32_string_size,
-                   size_t *utf32_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_size_from_utf32(
+     const libuna_utf32_character_t *utf32_string,
+     size_t utf32_string_size,
+     size_t *utf32_stream_size,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_utf32_stream_copy_from_utf32(
-                   uint8_t *utf32_stream,
-                   size_t utf32_stream_size,
-                   uint8_t byte_order,
-                   const libuna_utf32_character_t *utf32_string,
-                   size_t utf32_string_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_utf32_stream_copy_from_utf32(
+     uint8_t *utf32_stream,
+     size_t utf32_stream_size,
+     int byte_order,
+     const libuna_utf32_character_t *utf32_string,
+     size_t utf32_string_size,
+     libcerror_error_t **error );
 
 /* The functionality for libuna_utf32_stream_copy_to_utf32 is implemented by
  * libuna_utf32_string_copy_from_utf32_stream

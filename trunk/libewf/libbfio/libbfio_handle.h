@@ -1,8 +1,7 @@
 /*
- * The internal handle functions
+ * The handle functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,11 +25,18 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #include "libbfio_extern.h"
-#include "libbfio_list_type.h"
+#include "libbfio_libcdata.h"
+#include "libbfio_libcerror.h"
 #include "libbfio_types.h"
+
+#if defined( _MSC_VER ) || defined( __BORLANDC__ ) || defined( __MINGW32_VERSION ) || defined( __MINGW64_VERSION_MAJOR )
+
+/* This inclusion is needed otherwise some linkers
+ * mess up exporting the legacy functions
+ */
+#include "libbfio_legacy.h"
+#endif
 
 #if defined( __cplusplus )
 extern "C" {
@@ -40,13 +46,17 @@ typedef struct libbfio_internal_handle libbfio_internal_handle_t;
 
 struct libbfio_internal_handle
 {
-	/* The io handle
+	/* The IO handle
 	 */
 	intptr_t *io_handle;
 
 	/* The flags
 	 */
-	int flags;
+	uint8_t flags;
+
+	/* The access flags
+	 */
+	int access_flags;
 
 	/* The current offset
 	 */
@@ -67,7 +77,7 @@ struct libbfio_internal_handle
 
 	/* Reference to the pool last used list element
 	 */
-	libbfio_list_element_t *pool_last_used_list_element;
+	libcdata_list_element_t *pool_last_used_list_element;
 
 	/* Value to indicate to track offsets read
 	 */
@@ -75,33 +85,37 @@ struct libbfio_internal_handle
 
 	/* The offset ranges that were read
 	 */
-	libbfio_list_t *offsets_read;
+	libcdata_range_list_t *offsets_read;
 
-	/* The free io handle function
+	/* The narrow string codepage
+	 */
+	int narrow_string_codepage;
+
+	/* The free IO handle function
 	 */
 	int (*free_io_handle)(
-	       intptr_t *io_handle,
-	       liberror_error_t **error );
+	       intptr_t **io_handle,
+	       libcerror_error_t **error );
 
-	/* The clone (duplicate) io handle function
+	/* The clone (duplicate) IO handle function
 	 */
 	int (*clone_io_handle)(
 	       intptr_t **destination_io_handle,
 	       intptr_t *source_io_handle,
-	       liberror_error_t **error );
+	       libcerror_error_t **error );
 
 	/* The open function
 	 */
 	int (*open)(
 	       intptr_t *io_handle,
-	       int flags,
-	       liberror_error_t **error );
+	       int access_flags,
+	       libcerror_error_t **error );
 
 	/* The close function
 	 */
 	int (*close)(
 	       intptr_t *io_handle,
-	       liberror_error_t **error );
+	       libcerror_error_t **error );
 
 	/* The read function
 	 */
@@ -109,15 +123,15 @@ struct libbfio_internal_handle
 	           intptr_t *io_handle,
 	           uint8_t *buffer,
 	           size_t size,
-	           liberror_error_t **error );
+	           libcerror_error_t **error );
 
 	/* The write function
 	 */
 	ssize_t (*write)(
 	           intptr_t *io_handle,
-	           uint8_t *buffer,
+	           const uint8_t *buffer,
 	           size_t size,
-	           liberror_error_t **error );
+	           libcerror_error_t **error );
 
 	/* The seek offset function
 	 */
@@ -125,134 +139,189 @@ struct libbfio_internal_handle
 	           intptr_t *io_handle,
 	           off64_t offset,
 	           int whence,
-	           liberror_error_t **error );
+	           libcerror_error_t **error );
 
 	/* The exists function
 	 */
 	int (*exists)(
 	       intptr_t *io_handle,
-	       liberror_error_t **error );
+	       libcerror_error_t **error );
 
 	/* The is open function
 	 */
 	int (*is_open)(
 	       intptr_t *io_handle,
-	       liberror_error_t **error );
+	       libcerror_error_t **error );
 
 	/* The get size function
 	 */
 	int (*get_size)(
 	       intptr_t *io_handle,
 	       size64_t *size,
-	       liberror_error_t **error );
+	       libcerror_error_t **error );
 
 };
 
-LIBBFIO_EXTERN int libbfio_handle_initialize(
-                    libbfio_handle_t **handle,
-                    intptr_t *io_handle,
-                    int (*free_io_handle)( intptr_t *io_handle, liberror_error_t **error ),
-                    int (*clone_io_handle)( intptr_t **destination_io_handle, intptr_t *source_io_handle, liberror_error_t **error ),
-                    int (*open)( intptr_t *io_handle, int flags, liberror_error_t **error ),
-                    int (*close)( intptr_t *io_handle, liberror_error_t **error ),
-                    ssize_t (*read)( intptr_t *io_handle, uint8_t *buffer, size_t size, liberror_error_t **error ),
-                    ssize_t (*write)( intptr_t *io_handle, uint8_t *buffer, size_t size, liberror_error_t **error ),
-                    off64_t (*seek_offset)( intptr_t *io_handle, off64_t offset, int whence, liberror_error_t **error ),
-                    int (*exists)( intptr_t *io_handle, liberror_error_t **error ),
-                    int (*is_open)( intptr_t *io_handle, liberror_error_t **error ),
-                    int (*get_size)( intptr_t *io_handle, size64_t *size, liberror_error_t **error ),
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_initialize(
+     libbfio_handle_t **handle,
+     intptr_t *io_handle,
+     int (*free_io_handle)(
+            intptr_t **io_handle,
+            libcerror_error_t **error ),
+     int (*clone_io_handle)(
+            intptr_t **destination_io_handle,
+            intptr_t *source_io_handle,
+            libcerror_error_t **error ),
+     int (*open)(
+            intptr_t *io_handle,
+            int access_flags,
+            libcerror_error_t **error ),
+     int (*close)(
+            intptr_t *io_handle,
+            libcerror_error_t **error ),
+     ssize_t (*read)(
+                intptr_t *io_handle,
+                uint8_t *buffer,
+                size_t size,
+                libcerror_error_t **error ),
+     ssize_t (*write)(
+                intptr_t *io_handle,
+                const uint8_t *buffer,
+                size_t size,
+                libcerror_error_t **error ),
+     off64_t (*seek_offset)(
+                intptr_t *io_handle,
+                off64_t offset,
+                int whence,
+                libcerror_error_t **error ),
+     int (*exists)(
+            intptr_t *io_handle,
+            libcerror_error_t **error ),
+     int (*is_open)(
+            intptr_t *io_handle,
+            libcerror_error_t **error ),
+     int (*get_size)(
+            intptr_t *io_handle,
+            size64_t *size,
+            libcerror_error_t **error ),
+     uint8_t flags,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_free(
-                    libbfio_handle_t **handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_free(
+     libbfio_handle_t **handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_clone(
-                    libbfio_handle_t **destination_handle,
-                    libbfio_handle_t *source_handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_clone(
+     libbfio_handle_t **destination_handle,
+     libbfio_handle_t *source_handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_open(
-                    libbfio_handle_t *handle,
-                    int flags,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_open(
+     libbfio_handle_t *handle,
+     int access_flags,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_reopen(
-                    libbfio_handle_t *handle,
-                    int flags,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_reopen(
+     libbfio_handle_t *handle,
+     int access_flags,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_close(
-                    libbfio_handle_t *handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_close(
+     libbfio_handle_t *handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN ssize_t libbfio_handle_read(
-                        libbfio_handle_t *handle,
-                        uint8_t *buffer,
-                        size_t size,
-                        liberror_error_t **error );
+LIBBFIO_EXTERN \
+ssize_t libbfio_handle_read_buffer(
+         libbfio_handle_t *handle,
+         uint8_t *buffer,
+         size_t size,
+         libcerror_error_t **error );
 
-LIBBFIO_EXTERN ssize_t libbfio_handle_write(
-                        libbfio_handle_t *handle,
-                        uint8_t *buffer,
-                        size_t size,
-                        liberror_error_t **error );
+LIBBFIO_EXTERN \
+ssize_t libbfio_handle_write_buffer(
+         libbfio_handle_t *handle,
+         const uint8_t *buffer,
+         size_t size,
+         libcerror_error_t **error );
 
-LIBBFIO_EXTERN off64_t libbfio_handle_seek_offset(
-                        libbfio_handle_t *handle,
-                        off64_t offset,
-                        int whence,
-                        liberror_error_t **error );
+LIBBFIO_EXTERN \
+off64_t libbfio_handle_seek_offset(
+         libbfio_handle_t *handle,
+         off64_t offset,
+         int whence,
+         libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_exists(
-                    libbfio_handle_t *handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_exists(
+     libbfio_handle_t *handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_is_open(
-                    libbfio_handle_t *handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_is_open(
+     libbfio_handle_t *handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_get_flags(
-                    libbfio_handle_t *handle,
-                    int *flags,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_get_io_handle(
+     libbfio_handle_t *handle,
+     intptr_t **io_handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_set_flags(
-                    libbfio_handle_t *handle,
-                    int flags,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_get_access_flags(
+     libbfio_handle_t *handle,
+     int *access_flags,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_get_size(
-                    libbfio_handle_t *handle,
-                    size64_t *size,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_set_access_flags(
+     libbfio_handle_t *handle,
+     int access_flags,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_get_offset(
-                    libbfio_handle_t *handle,
-                    off64_t *offset,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_get_size(
+     libbfio_handle_t *handle,
+     size64_t *size,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_set_open_on_demand(
-                    libbfio_handle_t *handle,
-                    uint8_t open_on_demand,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_get_offset(
+     libbfio_handle_t *handle,
+     off64_t *offset,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_set_track_offsets_read(
-                    libbfio_handle_t *handle,
-                    uint8_t track_offsets_read,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_set_open_on_demand(
+     libbfio_handle_t *handle,
+     uint8_t open_on_demand,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_get_amount_of_offsets_read(
-                    libbfio_handle_t *handle,
-                    int *amount_of_read_offsets,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_set_track_offsets_read(
+     libbfio_handle_t *handle,
+     uint8_t track_offsets_read,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_handle_get_offset_read(
-                    libbfio_handle_t *handle,
-                    int index,
-                    off64_t *offset,
-                    size64_t *size,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_handle_get_number_of_offsets_read(
+     libbfio_handle_t *handle,
+     int *number_of_read_offsets,
+     libcerror_error_t **error );
+
+LIBBFIO_EXTERN \
+int libbfio_handle_get_offset_read(
+     libbfio_handle_t *handle,
+     int index,
+     off64_t *offset,
+     size64_t *size,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

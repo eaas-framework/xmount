@@ -1,8 +1,7 @@
 /*
  * Hash sections functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include "libewf_values_table.h"
+#include "libewf_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -73,11 +72,16 @@ struct libewf_hash_sections
 
 int libewf_hash_sections_initialize(
      libewf_hash_sections_t **hash_sections,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_hash_sections_free(
      libewf_hash_sections_t **hash_sections,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int libewf_hash_sections_clone(
+     libewf_hash_sections_t **destination_hash_sections,
+     libewf_hash_sections_t *source_hash_sections,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

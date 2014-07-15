@@ -4,46 +4,8 @@
  * Convert raw -> aff
  *         aff -> raw
  *         aff -> aff (recompressing/uncompressing)
- */
-
-/*
- * Copyright (c) 2005--2008
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
  *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Simson L. Garfinkel, 
- *      Basis Technology, and its contributors.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * Distributed under the Berkeley 4-part license
  */
 
 
@@ -418,7 +380,7 @@ int convert(const char *infile,char *outfile)
 	    i++){
 	    strlcpy(segname,i->c_str(),sizeof(segname));
 	    size_t data_len = 0;
-	    unsigned long arg;
+	    uint32_t arg;
 
 	    /* First find out how big the segment is */
 	    if(af_get_seg(a_in,segname,&arg,0,&data_len)){
@@ -550,11 +512,13 @@ int convert(const char *infile,char *outfile)
     }
 
     /* Make a copy of the a_out filename if we can get it */
+#ifdef HAVE_UTIMES
     char *a_out_fn=0;			 // output filename, to remember for utimes
     const char *a_ = af_filename(a_out); // remember the output filename
     if(a_){
 	a_out_fn = strdup(a_);	// make a copy of it
     }
+#endif
     if(af_close(a_out)) err(1,"af_close(a_out)");
 
     if(!opt_quiet){

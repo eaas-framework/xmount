@@ -1,8 +1,7 @@
 /*
  * The internal type definitions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -35,10 +34,6 @@
 /* Unicode character definitions
  */
 typedef uint32_t libuna_unicode_character_t;
-
-/* UTF-7 character definitions
- */
-typedef uint8_t libuna_utf7_character_t;
 
 /* UTF-8 character definitions
  */

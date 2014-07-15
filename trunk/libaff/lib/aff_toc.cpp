@@ -1,3 +1,5 @@
+/* Distributed under the 4-part Berkeley License */
+
 /*
  * afflib_dir.cpp:
  * 

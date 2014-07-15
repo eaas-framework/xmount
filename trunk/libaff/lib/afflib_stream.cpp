@@ -1,48 +1,8 @@
 /*
  * The AFFLIB data stream interface.
  * Supports the page->segment name translation, and the actual file pointer.
+ * Distributed under the Berkeley 4-part license.
  */
-
-/*
- * Copyright (c) 2005, 2006
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
- */
-
 
 #include "affconfig.h"
 #include "afflib.h"
@@ -52,6 +12,13 @@
 /****************************************************************
  *** Internal Functions.
  ****************************************************************/
+
+#ifdef _WIN32
+#define ASIZE SSIZE_T
+#else
+#define ASIZE ssize_t 
+#endif
+
 
 /*
  * af_set_maxsize
@@ -101,12 +68,12 @@ int af_purge(AFFILE *af)
     return ret;
 }
 
-ssize_t af_read(AFFILE *af,unsigned char *buf,ssize_t count)
+extern "C" ASIZE af_read(AFFILE *af,unsigned char *buf,ASIZE count)
 {
     int total = 0;
 
     AF_WRLOCK(af);			// wrlock because cache may change
-    if (af_trace) fprintf(af_trace,"af_read(%p,%p,%zd) (pos=%"I64d")\n",af,buf,count,af->pos);
+    if (af_trace) fprintf(af_trace,"af_read(%p,%p,%d) (pos=%"I64d")\n",af,buf,(int)count,af->pos);
     if (af->v->read){			// check for bypass
 	int r = (af->v->read)(af, buf, af->pos, count);
 	if(r>0) af->pos += r;
@@ -200,7 +167,7 @@ int af_write(AFFILE *af,unsigned char *buf,size_t count)
 {
     AF_WRLOCK(af);
     if (af_trace){
-	fprintf(af_trace,"af_write(af=%p,buf=%p,count=%zd) pos=%"I64d"\n", af,buf,count,af->pos);
+	fprintf(af_trace,"af_write(af=%p,buf=%p,count=%d) pos=%"I64d"\n", af,buf,(int)count,af->pos);
     }
     /* Invalidate caches */
     af_invalidate_vni_cache(af);

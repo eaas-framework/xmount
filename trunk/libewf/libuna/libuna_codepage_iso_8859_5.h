@@ -1,8 +1,7 @@
 /*
  * ISO 8859-5 codepage (Cyrillic) functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -33,17 +32,6 @@ extern "C" {
 extern const uint16_t libuna_codepage_iso_8859_5_byte_stream_to_unicode_base_0xa0[ 96 ];
 
 extern const uint8_t libuna_codepage_iso_8859_5_unicode_to_byte_stream_base_0x0400[ 96 ];
-
-#define libuna_codepage_iso_8859_5_byte_stream_to_unicode( byte_stream_character ) \
-	( byte_stream_character < 0xa0 ) ? byte_stream_character : libuna_codepage_iso_8859_5_byte_stream_to_unicode_base_0xa0[ byte_stream_character - 0xa0 ]
-
-#define libuna_codepage_iso_8859_5_unicode_to_byte_stream( unicode_character ) \
-	( unicode_character < 0x00a1 ) ? (uint8_t) unicode_character : \
-	( unicode_character == 0x00a7 ) ? 0xfd : \
-	( unicode_character == 0x00ad ) ? 0xad : \
-	( ( unicode_character >= 0x0400 ) && ( unicode_character < 0x0460 ) ) ? libuna_codepage_iso_8859_5_unicode_to_byte_stream_base_0x0400[ unicode_character - 0x0400 ] : \
-	( unicode_character == 0x2116 ) ? 0xf0 : \
-	0x1a
 
 #if defined( __cplusplus )
 }

@@ -1,8 +1,7 @@
 /*
  * Codepage functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -10,12 +9,12 @@
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -42,7 +41,7 @@ extern "C" {
 
 /* The codepage definitions
  */
-enum LIBEWF_CODEPAGE
+enum LIBEWF_CODEPAGES
 {
 	LIBEWF_CODEPAGE_ASCII				= 20127,
 
@@ -62,7 +61,14 @@ enum LIBEWF_CODEPAGE
 	LIBEWF_CODEPAGE_ISO_8859_15			= 28605,
 	LIBEWF_CODEPAGE_ISO_8859_16			= 28606,
 
+	LIBEWF_CODEPAGE_KOI8_R				= 20866,
+	LIBEWF_CODEPAGE_KOI8_U				= 21866,
+
 	LIBEWF_CODEPAGE_WINDOWS_874			= 874,
+	LIBEWF_CODEPAGE_WINDOWS_932			= 932,
+	LIBEWF_CODEPAGE_WINDOWS_936			= 936,
+	LIBEWF_CODEPAGE_WINDOWS_949			= 949,
+	LIBEWF_CODEPAGE_WINDOWS_950			= 950,
 	LIBEWF_CODEPAGE_WINDOWS_1250			= 1250,
 	LIBEWF_CODEPAGE_WINDOWS_1251			= 1251,
 	LIBEWF_CODEPAGE_WINDOWS_1252			= 1252,

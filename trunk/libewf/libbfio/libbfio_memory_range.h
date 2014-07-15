@@ -1,8 +1,7 @@
 /*
  * Memory range functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,10 +25,8 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #include "libbfio_extern.h"
-#include "libbfio_system_string.h"
+#include "libbfio_libcerror.h"
 #include "libbfio_types.h"
 
 #if defined( __cplusplus )
@@ -52,79 +49,86 @@ struct libbfio_memory_range_io_handle
 	 */
 	size_t range_offset;
 
-	/* Value to indicate the current access flags
+	/* Value to indicate the memory range is open
+	 */
+	uint8_t is_open;
+
+	/* The current access flags
 	 */
 	int access_flags;
 };
 
 int libbfio_memory_range_io_handle_initialize(
      libbfio_memory_range_io_handle_t **memory_range_io_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_memory_range_initialize(
-                    libbfio_handle_t **handle,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_memory_range_initialize(
+     libbfio_handle_t **handle,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_io_handle_free(
-     intptr_t *io_handle,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t **memory_range_io_handle,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_io_handle_clone(
-     intptr_t **destination_io_handle,
-     intptr_t *source_io_handle,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t **destination_memory_range_io_handle,
+     libbfio_memory_range_io_handle_t *source_memory_range_io_handle,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_memory_range_get(
-                    libbfio_handle_t *handle,
-                    uint8_t **range_start,
-                    size_t *range_size,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_memory_range_get(
+     libbfio_handle_t *handle,
+     uint8_t **range_start,
+     size_t *range_size,
+     libcerror_error_t **error );
 
-LIBBFIO_EXTERN int libbfio_memory_range_set(
-                    libbfio_handle_t *handle,
-                    uint8_t *range_start,
-                    size_t range_size,
-                    liberror_error_t **error );
+LIBBFIO_EXTERN \
+int libbfio_memory_range_set(
+     libbfio_handle_t *handle,
+     uint8_t *range_start,
+     size_t range_size,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_open(
-     intptr_t *io_handle,
-     int flags,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t *memory_range_io_handle,
+     int access_flags,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_close(
-     intptr_t *io_handle,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t *memory_range_io_handle,
+     libcerror_error_t **error );
 
 ssize_t libbfio_memory_range_read(
-         intptr_t *io_handle,
+         libbfio_memory_range_io_handle_t *memory_range_io_handle,
          uint8_t *buffer,
          size_t size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 ssize_t libbfio_memory_range_write(
-         intptr_t *io_handle,
-         uint8_t *buffer,
+         libbfio_memory_range_io_handle_t *memory_range_io_handle,
+         const uint8_t *buffer,
          size_t size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 off64_t libbfio_memory_range_seek_offset(
-         intptr_t *io_handle,
+         libbfio_memory_range_io_handle_t *memory_range_io_handle,
          off64_t offset,
          int whence,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 int libbfio_memory_range_exists(
-     intptr_t *io_handle,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t *memory_range_io_handle,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_is_open(
-     intptr_t *io_handle,
-     liberror_error_t **error );
+     libbfio_memory_range_io_handle_t *memory_range_io_handle,
+     libcerror_error_t **error );
 
 int libbfio_memory_range_get_size(
-     intptr_t *io_handle,
+     libbfio_memory_range_io_handle_t *memory_range_io_handle,
      size64_t *size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

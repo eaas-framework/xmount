@@ -2,6 +2,9 @@
 # 
 # test the signing tools
 
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
+
 unset AFFLIB_PASSPHRASE
 
 BASE=`mktemp -t baseXXXXX`
@@ -9,6 +12,7 @@ AGENT_PEM=$BASE.agent.pem
 ANALYST_PEM=$BASE.analyst.pem
 ARCHIVES_PEM=$BASE.archives.pem
 EVIDENCE=$BASE.evidence.aff
+EVIDENCE1=$BASE.evidence1.aff
 EVIDENCE2=$BASE.evidence2.aff
 EVIDENCE3=$BASE.evidence3.aff
 
@@ -44,13 +48,15 @@ echo affverify $EVIDENCE
 if ! affverify $EVIDENCE ; then echo affverify failed ; exit 1 ; fi ; 
 
 echo Signature test 1 passed
-
 echo Testing chain-of-custody signatures
-echo Copying original raw file to evidence1.aff
 
-if ! affcopy -z -k $AGENT_PEM rawevidence.iso evidence1.aff ; then exit 1; fi
+echo Step 10: Copying original raw file to evidence1.aff
+if ! affcopy -k $AGENT_PEM rawevidence.iso evidence1.aff ; then exit 1; fi
+echo Step 11: Running affinfo on evidence1.aff
 if ! affinfo -a evidence1.aff ; then exit 1 ; fi
+echo Step 12: Comparing rawevidence.iso to evidence1.aff
 if ! affcompare rawevidence.iso evidence1.aff ; then exit 1 ; fi
+echo Step 13: Verifying evidence1
 if ! affverify evidence1.aff ; then exit 1 ; fi
 
 echo

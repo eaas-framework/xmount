@@ -1,8 +1,7 @@
 /*
  * The libbfio header wrapper
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -31,7 +30,10 @@
 
 #include <libbfio_definitions.h>
 #include <libbfio_file.h>
+#include <libbfio_file_pool.h>
+#include <libbfio_file_range.h>
 #include <libbfio_handle.h>
+#include <libbfio_memory_range.h>
 #include <libbfio_pool.h>
 #include <libbfio_types.h>
 

@@ -1,8 +1,7 @@
 /*
  * EWF degest section
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -50,11 +49,11 @@ struct ewf_digest
 	 */
 	uint8_t padding1[ 40 ];
 
-	/* The section crc of all (previous) digest data
+	/* The section checksum of all (previous) digest data
 	 * consists of 4 bytes (32 bits)
 	 * starts with offset 76
 	 */
-	uint8_t crc[ 4 ];
+	uint8_t checksum[ 4 ];
 };
 
 #if defined( __cplusplus )

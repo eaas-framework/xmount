@@ -1,46 +1,9 @@
 /*
  * AFFLIB(tm)
  *
- * Copyright (c) 2005, 2006
- *	Simson L. Garfinkel and Basis Technology Corp.
- *      All rights reserved.
- *
- * This code is derrived from software contributed by Simson L. Garfinkel
- *
- * Support for split raw files and .afm files written by Joel N. Weber II
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson L. Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON L. GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON L. GARFINKEL, BASIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
- *
  * AFF and AFFLIB is a trademark of Simson Garfinkel and Basis Technology Corp.
+ *
+ * Distributed under the Berkeley 4-part license
  */
 #include "affconfig.h"
 #include "afflib.h"
@@ -77,13 +40,12 @@ static inline struct split_raw_private *SPLIT_RAW_PRIVATE(AFFILE *af)
     return (struct split_raw_private *)(af->vnodeprivate);
 }
 
-/* Return 1 if a file is a split raw file... */
+/* Return 1 if a file is the first of a split-raw series*/
 static int split_raw_identify_file(const char *filename,int exists)
 {
     if(exists && access(filename,R_OK)!=0) return 0;	// needs to exist and it doesn't
-    return af_ext_is(filename,"000") ||
-	af_ext_is(filename,"001") ||
-	af_ext_is(filename,"aaa");
+    return af_ext_is(filename,"000") || af_ext_is(filename,"001") ||
+	af_ext_is(filename,"aaa") || af_ext_is(filename,"AAA");
 }
 
 /* split_raw_close:
@@ -95,7 +57,10 @@ static int split_raw_close(AFFILE *af)
     struct split_raw_private *srp = SPLIT_RAW_PRIVATE(af);
 
     for (uint64_t i = 0; i < srp->num_raw_files; i++){
-	close (srp->fds[i]);
+	if(srp->fds[i]){
+	    close(srp->fds[i]);
+	    srp->fds[i] = 0;
+	}
     }
     if (srp->fds)    free (srp->fds);
     if (srp->pos)    free (srp->pos);
@@ -107,42 +72,84 @@ static int split_raw_close(AFFILE *af)
 }
 
 
-/* increment_fname():
- * takes filesname.000 and turns it into filename.001
- * takes filename.aaa and makes it filename.aab
- * fn must be at least 3 characters long.
- * Returns 0 if successful, or -1  if it runs out of namespace.
+/**
+ * increment_fname(filename):
+ * "filename.000" => "filename.001"
+ * "filename.123" => "filename.124"
+ * "filename.999" => "filename.AAA"
+ * "filename.AZZ" => "filename.BAA"
+ * "filename.aaa" => "filename.aab" (legacy support)
+ * fn must be at least 4 characters long and must have a 3-character extension
+ *
+ * @param fn filename to increment (modified in place)
+ * @return 0 if successful.
+ *         -1 for invalid filename or no more namespace.
  */
-static int increment_fname (char *fn)
+/** increase the character and return true if carry */
+static bool incval(char &ch,int base)
 {
-    /* Scan to the end of the string, minus 3 */
-    while (fn[3]) fn++;
-    if (fn[2] == '9') {
-	fn[2] = '0';
-	if (fn[1] == '9') {
-	    fn[1] = '0';
-	    if (fn[0] == '9')
-		return -1;
-	    fn[0]++;
-	} else {
-	    fn[1]++;
+    if(base==10){
+	if(ch=='9'){
+	    ch='0';
+	    return true;
 	}
-    } else if (isdigit (fn[2])) {
-	fn[2]++;
-    } else if ((fn[2] == 'Z') || (fn[2] == 'z')) {
-	fn[2] -= 25;
-	fn[1]++;
-    } else if ((fn[2] == 'L') || (fn[2] == 'l')) {
-	/* We don't want to treat .afm as a valid raw file, since it is an
-	 * AFF metadata file.  So if we would end up with .afm as the name of the
-	 * raw file, report being out of namespace instead.
-	 */
-	if ((fn[1] == 'F') || (fn[1] == 'f'))
-	    errno = EINVAL;
-	    return -1;
-	fn[2]++;
-    } else {
-	fn[2]++;
+	ch++;
+	return false;
+    }
+
+    /* Assume base 36 */
+    switch(ch){
+    case 'Z':
+	ch='0';				// go back to 0
+	return true;			// and carry
+    case '9':
+	ch='A';
+	return false;
+    default:
+	ch++;				// normal increment
+	return false;
+    }
+}
+
+int split_raw_increment_fname (char *fn)
+{
+    size_t len = strlen(fn);
+    if(len<4 || fn[len-4]!='.') return -1;
+    char *ext = fn+len-3;
+
+    /* See if it is a number */
+    if(isdigit(ext[0]) && isdigit(ext[1]) && isdigit(ext[2])){
+	int num = atoi(ext);
+	if(num==999){
+	    strcpy(ext,"A00");
+	    return 0;
+	}
+	snprintf(ext,4,"%03d",num+1);
+	return 0;
+    }
+
+    /* First digit goes A-Z, second and third go 0-9A-Z */
+
+    /* Get the case */
+    int lower = islower(ext[0]);
+	
+    /* Convert to all uppercase */
+    for(int i=0;i<3;i++){
+	if(isalpha(ext[i])) ext[i] = toupper(ext[i]);
+    }
+    
+    /* Increment */
+    if(incval(ext[2],10)){
+	if(incval(ext[1],36)){
+	    if(incval(ext[0],36)){
+		return EINVAL;
+	    }
+	}
+    }
+
+    /* Convert back to lowercase if necessary */
+    for(int i=0;i<3;i++){
+	if(isalpha(ext[i]) && lower) ext[i] = tolower(ext[i]);
     }
     return 0;
 }
@@ -151,15 +158,17 @@ static int increment_fname (char *fn)
 void srp_validate(AFFILE *af)
 {
     struct split_raw_private *srp = SPLIT_RAW_PRIVATE(af);
-    for(unsigned int i=0;i<srp->num_raw_files;i++){
+    for(uint32_t i=0;i<srp->num_raw_files;i++){
 	assert(srp->fds[i]!=0);
     }
 }    
 
+/** Debugging routine.
+ */
 void srp_dump(AFFILE *af)
 {
     struct split_raw_private *srp = SPLIT_RAW_PRIVATE(af);
-    for(unsigned int i=0;i<srp->num_raw_files;i++){
+    for(uint32_t i=0;i<srp->num_raw_files;i++){
 	fprintf(stderr,"   fds[%d]=%d   pos[%d]=%"I64d"\n",i,srp->fds[i],i,srp->pos[i]);
     }
     srp_validate(af);
@@ -215,8 +224,8 @@ static int split_raw_open_internal(AFFILE *af, uint64_t *image_size)
     int current_file_must_be_last = 0;
 
     do {
-	if (increment_fname (srp->next_raw_fname) != 0) {
-	    fprintf (stderr, "split_raw_open_internal: too many files\n");
+	if (split_raw_increment_fname (srp->next_raw_fname) != 0) {
+	    (*af->error_reporter)("split_raw_open_internal: too many files\n");
 	    errno = EINVAL;
 	    return -1;
 	}
@@ -234,9 +243,8 @@ static int split_raw_open_internal(AFFILE *af, uint64_t *image_size)
 	}
 	srp_add_fd(af,fd);
 	if (current_file_must_be_last) {
-	    fprintf(stderr,
-		    "split_raw_open_internal: %s exists, "
-		    "but previous file didn't match expected file size\n",af->fname);
+	    (*af->error_reporter)("split_raw_open_internal: %s exists, "
+				  "but previous file didn't match expected file size\n",af->fname);
 	    return -1;
 	}
 	/* Set af->maxsize to the size of the first file, but only
@@ -279,9 +287,8 @@ static int split_raw_open(AFFILE *af)
 	af->image_pagesize *= 2;
 
     if ((ret == 0) && (af->maxsize % af->image_pagesize!=0)) {
-	fprintf (stderr,
-		 "split_raw_open: %s: raw_file_size (%"I64d" not a multiple of pagesize %lu\n",
-		 af->fname, af->maxsize,af->image_pagesize);
+	(*af->error_reporter)("split_raw_open: %s: raw_file_size (%"I64d" not a multiple of pagesize %lu\n",
+			      af->fname, af->maxsize,af->image_pagesize);
 	split_raw_close (af);
 	return -1;
     }
@@ -382,7 +389,7 @@ int split_raw_write_internal2(AFFILE *af, unsigned char *buf, uint64_t pos,size_
 		    else return -1;
 		}
 		srp_add_fd(af,fd);
-		if (increment_fname (srp->next_raw_fname) != 0) {
+		if (split_raw_increment_fname (srp->next_raw_fname) != 0) {
 		  (*af->error_reporter)("split_raw_write: too many files\n");
 		    if (ret)
 			return ret;
@@ -483,11 +490,43 @@ int split_raw_write(AFFILE *af, unsigned char *buf, uint64_t pos,size_t count)
  * Otherwise, return an error.
  */
 
-static int split_raw_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned char *data,
+static int split_raw_get_seg(AFFILE *af,const char *name,uint32_t *arg,unsigned char *data,
 		       size_t *datalen)
 {
     int64_t page_num = af_segname_page_number(name);
     if(page_num<0){
+	/* See if PAGESIZE or IMAGESIZE is being requested; we can fake those */
+	if(strcmp(name,AF_PAGESIZE)==0){
+	    if(arg) *arg = af->image_pagesize;
+	    if(datalen) *datalen = 0;
+	    return 0;
+	}
+	if(strcmp(name,AF_IMAGESIZE)==0){
+	    struct aff_quad q;
+	    if(data && *datalen>=8){
+		q.low = htonl((uint32_t)(af->image_size & 0xffffffff));
+		q.high = htonl((uint32_t)(af->image_size >> 32));
+		memcpy(data,&q,8);
+		*datalen = 8;
+	    }
+	    return 0;
+	}
+	if(strcmp(name,AF_SECTORSIZE)==0){
+	    if(arg) *arg = af->image_sectorsize;
+	    if(datalen) *datalen = 0;
+	    return 0;
+	}
+	if(strcmp(name,AF_DEVICE_SECTORS)==0){
+	    int64_t devicesectors = af->image_size / af->image_sectorsize;
+	    struct aff_quad q;
+	    if(data && *datalen>=8){
+		q.low = htonl((uint32_t)(devicesectors & 0xffffffff));
+		q.high = htonl((uint32_t)(devicesectors >> 32));
+		memcpy(data,&q,8);
+		*datalen = 8;
+	    }
+	    return 0;
+	}
 	errno = ENOTSUP;		// sorry! We don't store metadata
 	return -1;
     }
@@ -495,8 +534,8 @@ static int split_raw_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsi
     uint64_t pos = page_num * af->image_pagesize; // where we are to start reading
     uint64_t bytes_left = af->image_size - pos;	// how many bytes left in the file
 
-    unsigned int bytes_to_read = af->image_pagesize; // copy this many bytes, unless
-    if(bytes_to_read > bytes_left) bytes_to_read = (unsigned int)bytes_left; // only this much is left
+    uint32_t bytes_to_read = af->image_pagesize; // copy this many bytes, unless
+    if(bytes_to_read > bytes_left) bytes_to_read = (uint32_t)bytes_left; // only this much is left
     
     if(arg) *arg = 0;			// arg is always 0
     if(datalen){
@@ -526,7 +565,7 @@ static int split_raw_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsi
  * create the next virtual segment
  */
 
-static int split_raw_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int split_raw_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 				  unsigned char *data,size_t *datalen_)
 {
     struct split_raw_private *srp = SPLIT_RAW_PRIVATE(af);
@@ -564,7 +603,7 @@ static int split_raw_rewind_seg(AFFILE *af)
 }
 
 static int split_raw_update_seg(AFFILE *af, const char *name,
-				unsigned long arg,const u_char *value,unsigned int vallen)
+				uint32_t arg,const u_char *value,uint32_t vallen)
     
 {
     int64_t page_num = af_segname_page_number(name);

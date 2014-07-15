@@ -1,8 +1,7 @@
 /*
  * The internal inline definition
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -25,16 +24,10 @@
 
 #include <common.h>
 
-/* Define HAVE_LOCAL_LIBUNA for local use of libuna
- */
-#if !defined( HAVE_LOCAL_LIBUNA )
-
-#include <libuna/inline.h>
-
-#elif defined( _MSC_VER )
+#if defined( _MSC_VER )
 #define LIBUNA_INLINE _inline
 
-#elif defined( __BORLANDC__ )
+#elif defined( __BORLANDC__ ) || defined( __clang__ )
 #define LIBUNA_INLINE /* inline */
 
 #else

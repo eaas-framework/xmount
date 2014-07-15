@@ -1,8 +1,7 @@
 /*
  * The internal extern definition
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -29,7 +28,7 @@
  */
 #if !defined( HAVE_LOCAL_LIBEWF )
 
-/* If libtool DLL support is enabled set LIBEWF_DLL_EXPORT
+/* If Cygwin libtool DLL support is enabled set LIBEWF_DLL_EXPORT
  * before including libewf/extern.h
  */
 #if defined( _WIN32 ) && defined( DLL_EXPORT )

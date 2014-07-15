@@ -6,6 +6,9 @@
  * have "ls" use Delimiter option to just list the drives
  * Give "ls" an option to list just the AFF files.
  * Have implementation read a list of all the segments on open, and cache this. 
+ *
+ * Distributed under the Berkeley 4-part license.
+ * Simson L. Garfinkel, March 12, 2012
  */
 
 #include "affconfig.h"

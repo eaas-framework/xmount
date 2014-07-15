@@ -2,7 +2,14 @@
  * afverify.cpp:
  *
  * Verify the digital signature on a signed file
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
+
+#ifdef WIN32
+#  include <winsock2.h>
+#  include <windows.h>			
+#endif
 
 #include "affconfig.h"
 #include "afflib.h"
@@ -443,10 +450,11 @@ int hash_verify(AFFILE *af)
     t.start();
     printf("\n");
     do {
-	char tbuf[64];
 	double frac = (double)total_read / af_get_imagesize(af);
 	printf("  Read %14zd/%14"PRId64" bytes; done in %s\n",
-	       total_read,af_get_imagesize(af),t.eta_text(tbuf,frac));
+	       total_read,
+	       af_get_imagesize(af),
+	       t.eta_text(frac).c_str());
 	readsize = af_read(af,buf,af_get_pagesize(af));
 	if(readsize<1) break;
 	if(md5_evp) EVP_DigestUpdate(&md5,buf,readsize);
@@ -508,9 +516,8 @@ int process(const char *fn)
 
 int main(int argc,char **argv)
 {
-    int bflag, ch;
+    int ch;
 
-    bflag = 0;
     while ((ch = getopt(argc, argv, "ach?vV")) != -1) {
 	switch (ch) {
 	case 'a': opt_all = 1;    break;

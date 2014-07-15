@@ -3,10 +3,9 @@
  * The "master include file" of the AFF Library.
  * Includes many fucntions that are not designed 
  * to be used by application programmers.
- */
-
-/*
- * Copyright (c) 2005-2008
+ *
+ *
+ * Copyright (c) 2005-2006
  *	Simson L. Garfinkel and Basis Technology, Inc. 
  *      All rights reserved.
  *
@@ -47,6 +46,17 @@
 
 #ifndef AFFLIB_I_H
 #define AFFLIB_I_H
+
+#ifdef KERNEL_LIBRARY
+#ifdef __cplusplus
+extern "C" {
+#endif
+void __cdecl AFDbgPrint (PCSTR Format,...);
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 
 /* Should we disable threading? */
 #ifdef DISABLE_PTHREAD
@@ -115,7 +125,7 @@
 #endif
 
 #ifdef WIN32
-#if !defined(__MINGW_H)
+#if !defined(HAVE__MINGW_H)
 #pragma warning(disable: 4996)  /* Don't warn on Windows about using POSIX open() instead of _open() */
 #endif
 #include <malloc.h>
@@ -125,10 +135,13 @@
 #define snprintf _snprintf
 #define strcasecmp _stricmp
 #define mkdir(path,mode) _mkdir(path)
-#define ENOTSUP 65536		/* made up number */
 #define random() rand()
 #define access _access
 #define strdup _strdup
+
+#ifndef ENOTSUP
+#define ENOTSUP 65536		/* made up number */
+#endif
 
 #ifndef _MODE_T_
 #define _MODE_T_
@@ -136,16 +149,29 @@ typedef unsigned short mode_t;
 typedef unsigned short _mode_t;
 #endif
 
-typedef unsigned int uint32_t ;
-
 #ifndef S_ISDIR
 #define S_ISDIR(m)(((m) & 0170000) == 0040000)
 #endif
 
-#if !defined(__MINGW_H)
+#if !defined(HAVE__MINGW_H)
 #define ftruncate(fd,size) _chsize_s(fd,size)
 #define MAXPATHLEN 1024
 #endif
+
+#if defined(HAVE__MINGW_H)
+#ifndef ftello
+#define ftello ftello64
+#endif
+
+#ifndef fseeko
+#define fseeko fseeko64
+#endif
+
+#else
+#define ftello _ftelli64			/* replaces ftello64 in VC2008 */
+#define fseeko _fseeki64
+#endif
+
 #endif
 /** END OF WIN32 DEFINES **/
 
@@ -225,7 +251,7 @@ void	warnx(const char *fmt, ...);
 #endif
 
 
-#if defined(WIN32) && !defined(__MINGW_H)
+#if defined(WIN32) && !defined(HAVE__MINGW_H)
 /****************************************************************
  *** Windows emulation of opendir()/readdir()
  *** From php
@@ -312,8 +338,8 @@ struct _AFFILE {
     /* Implement a stream abstraction */
     uint64_t    image_size;		// last mappable byte of disk image
     uint64_t    image_size_in_file;	// see if it was changed...
-    u_long	image_pagesize;	// the size of image data segments in this file
-    u_long	image_sectorsize;
+    uint32_t	image_pagesize;	// the size of image data segments in this file
+    uint32_t	image_sectorsize;
     uint64_t	pos;			// location in stream; should be signed because of comparisons
 
     /* Page buffer cache */
@@ -400,9 +426,9 @@ void af_crypto_allocate(AFFILE *af);
 void af_crypto_deallocate(AFFILE *af);
 
 struct af_crypto {
-    u_int sealing_key_set:1;		// encryption key has been set
-    u_int auto_encrypt:1;		// encrypt segments when we write
-    u_int auto_decrypt:1;		// automatically decrypto when we read
+    uint32_t sealing_key_set:1;		// encryption key has been set
+    uint32_t auto_encrypt:1;		// encrypt segments when we write
+    uint32_t auto_decrypt:1;		// automatically decrypto when we read
 #ifdef AES_BLOCK_SIZE
     AES_KEY	ekey;			// encrypt key
     AES_KEY	dkey;			// decrypt key
@@ -425,15 +451,15 @@ struct af_vnode {
     int (*open)(AFFILE *af);
     int (*close)(AFFILE *af);
     int (*vstat)(AFFILE *af,struct af_vnode_info *);	// returns info about the vnode image file
-    int (*get_seg)(AFFILE *af,const char *name,unsigned long *arg, u_char *data,size_t *datalen);
+    int (*get_seg)(AFFILE *af,const char *name,uint32_t *arg, uint8_t *data,size_t *datalen);
     int	(*get_next_seg)(AFFILE *af,char *segname,size_t segname_len,
-			unsigned long *arg, u_char *data, size_t *datalen);
+			uint32_t *arg, uint8_t *data, size_t *datalen);
     int (*rewind_seg)(AFFILE *af);
-    int (*update_seg)(AFFILE *af,const char *name,unsigned long arg,
-		      const u_char *value,u_int vallen);
+    int (*update_seg)(AFFILE *af,const char *name,uint32_t arg,
+		      const uint8_t *value,uint32_t vallen);
     int (*del_seg)(AFFILE *af,const char *name);
-    int (*read)(AFFILE *af,u_char *buf,uint64_t offset,size_t count);
-    int (*write)(AFFILE *af,u_char *buf,uint64_t offset,size_t count);
+    int (*read)(AFFILE *af,uint8_t *buf,uint64_t offset,size_t count);
+    int (*write)(AFFILE *af,uint8_t *buf,uint64_t offset,size_t count);
 };
 
 /* VNODE Flags */
@@ -461,9 +487,9 @@ struct af_head {
 #define AF_SEGHEAD "AFF\000"
 struct af_segment_head {
     char magic[4];			// "AFF\000"
-    unsigned long name_len:32;		// length of segment name
-    unsigned long data_len:32;		// length of segment data, if any
-    unsigned long flag:32;		// argument for name;
+    uint32_t name_len:32;		// length of segment name
+    uint32_t data_len:32;		// length of segment data, if any
+    uint32_t flag:32;		// argument for name;
     /* name follows, then data */
 };
 
@@ -471,15 +497,15 @@ struct af_segment_head {
 #define AF_SEGTAIL "ATT\000"
 struct af_segment_tail {
     char magic[4];			// "ATT\000"
-    unsigned long segment_len:32;      // includes head, tail, name & length
+    uint32_t segment_len:32;      // includes head, tail, name & length
 };
 
 
 /* How 64-bit values are stored in a segment */
 #pragma pack(1)
 struct aff_quad {
-    unsigned long low:32;
-    unsigned long high:32;
+    uint32_t low:32;
+    uint32_t high:32;
 };
 #pragma pack()
 
@@ -493,10 +519,10 @@ struct aff_toc_mem {
 
 /* How encryption keys are stored */
 struct affkey {
-    u_char version[4];
-    u_char affkey_aes256[32]; // AFF key encrypted with SHA-256 of passphrase
+    uint8_t version[4];
+    uint8_t affkey_aes256[32]; // AFF key encrypted with SHA-256 of passphrase
                               // encrypted as two codebooks in a row; no need for CBC
-    u_char zeros_aes256[16];  // all zeros encrypted with SHA-256 of passphrase
+    uint8_t zeros_aes256[16];  // all zeros encrypted with SHA-256 of passphrase
 };
 #define AFFKEY_SIZE 4+32+16
 
@@ -507,6 +533,7 @@ void af_initialize();			// initialize the AFFLIB
 /* Internal identification routines */
 int af_identify_file_type(const char *filename,int exists); // returns type of a file; if exists=1, file must exist
 const char *af_identify_file_name(const char *filename,int exists); // returns name of a file type; 
+int split_raw_increment_fname (char *fn); /* exposed for testing in aftest */
 
 /* AFF implementation types returned by af_identify_type() and af_identify_name()*/
 
@@ -574,17 +601,10 @@ int	af_figure_media(int fd,struct af_figure_media_buf *);
  */
 
 int	af_probe_next_seg(AFFILE *af,char *segname,size_t segname_len,
-			   unsigned long *arg,size_t *datasize, size_t *segsize,int do_rewind);
+			   uint32_t *arg,size_t *datasize, size_t *segsize,int do_rewind);
 int	af_backspace(AFFILE *af);	// back up one segment
 
 
-
-/* find the given segment and return 0 if found, filling in the fields.
- * Leave the file pointer positioned at the start of the segment.
- * Return -1 if segment is not found, and leave pointer at the end
- */
-int	af_get_seg(AFFILE *af,const char *name,unsigned long *arg,
-		    u_char *data,size_t *datalen);
 
 /****************************************************************
  *** Reading functions
@@ -595,15 +615,15 @@ int	af_get_seg(AFFILE *af,const char *name,unsigned long *arg,
  * Note: pagename to string translation happens inside afflib.cpp, not inside
  * the vnode driver. 
  */
-#define af_page_size(af) (af_get_pagesize(af)) /* backwards compatability */
+int	af_page_size(AFFILE *af);	// legacy (now is af_get_pagesize)
 void	af_read_sizes(AFFILE *af);	// sets up values if we can get them.
-int	af_set_pagesize(AFFILE *af,u_long pagesize); // sets the pagesize; fails with -1 if imagesize >=0
+int	af_set_pagesize(AFFILE *af,uint32_t pagesize); // sets the pagesize; fails with -1 if imagesize >=0
 int	af_set_sectorsize(AFFILE *AF,int sectorsize); // fails with -1 if imagesize>=0
 int	af_get_sectorsize(AFFILE *AF);	// returns sector size
 int	af_has_pages(AFFILE *af);	// does the underlying system support pages?
 int	af_get_pagesize(AFFILE *af);	// returns page size, or -1
-int	af_get_page_raw(AFFILE *af,int64_t pagenum,unsigned long *arg,u_char *data,size_t *bytes);
-int	af_get_page(AFFILE *af,int64_t pagenum,u_char *data,size_t *bytes);
+int	af_get_page_raw(AFFILE *af,int64_t pagenum,uint32_t *arg,uint8_t *data,size_t *bytes);
+int	af_get_page(AFFILE *af,int64_t pagenum,uint8_t *data,size_t *bytes);
 #define AF_SIGFLAG_NOSIG 0x0001	// do not write signatures with af_update_segf()
 #define AF_SIGFLAG_NOSEAL 0x0002	// do not encrypt an af_update_segf()
 
@@ -613,13 +633,13 @@ int	af_get_page(AFFILE *af,int64_t pagenum,u_char *data,size_t *bytes);
 
 extern  int af_cache_debug;			 // sets level of verbosity */
 int	af_set_maxsize(AFFILE *af,int64_t size); // sets maximum AFF file size
-int	af_update_page(AFFILE *af,int64_t pagenum,u_char *data,int datalen);
+int	af_update_page(AFFILE *af,int64_t pagenum,uint8_t *data,int datalen);
 int	af_update_segf(AFFILE *af,const char *name,
-		       unsigned long arg,const u_char *value,u_int vallen,u_int sigflag);
+		       uint32_t arg,const uint8_t *value,uint32_t vallen,uint32_t sigflag);
 
 void	af_invalidate_vni_cache(AFFILE *af);
 void	af_cache_writethrough(AFFILE *af,int64_t pagenum,
-			      const u_char *buf,int bufflen);
+			      const uint8_t *buf,int bufflen);
 int	af_cache_flush(AFFILE *af);		// write buffers to disk
 struct aff_pagebuf *af_cache_alloc(AFFILE *af,int64_t pagenum);
 
@@ -629,7 +649,7 @@ struct aff_pagebuf *af_cache_alloc(AFFILE *af,int64_t pagenum);
 
 /* afflib_util.cpp
  */
-uint64_t   af_decode_q(u_char buf[8]); // return buf[8] into an unsigned quad
+uint64_t   af_decode_q(uint8_t buf[8]); // return buf[8] into an unsigned quad
 const char *af_commas(char buf[64],int64_t val);
 int       af_hasmeta(const char *buf);	// return 1 if buf has shell metacharacters
 int	  af_is_filestream(const char *filename); // return 1 if file:// or filename
@@ -662,7 +682,6 @@ size_t strlcat(char *dest,const char *src,size_t dest_size);
 int	aff_segment_overhead(const char *segname);	
 int	aff_toc_free(AFFILE *af);
 void	aff_toc_print(AFFILE *af);
-//int	aff_toc_append(AFFILE *af,const char *segname,int64_t offset);
 int	aff_toc_build(AFFILE *af);	// build by scanning the AFFILE
 struct aff_toc_mem *aff_toc(AFFILE *af,const char *segname);
 int	aff_toc_del(AFFILE *af,const char *segname);
@@ -671,8 +690,8 @@ void	aff_toc_update(AFFILE *af,const char *segname,uint64_t offset,uint64_t data
 /* lzma_glue.cpp:
  * For the LZMA compression engine
  */
-int lzma_compress(u_char *dest,size_t *destLen, const u_char *data,size_t datalen,int level);
-int lzma_uncompress(u_char *buf,size_t *buflen, const u_char *cbuf,size_t cbuf_size);
+int lzma_compress(uint8_t *dest,size_t *destLen, const uint8_t *data,size_t datalen,int level);
+int lzma_uncompress(uint8_t *buf,size_t *buflen, const uint8_t *cbuf,size_t cbuf_size);
 
 #ifdef NEVER_DEFINED
 {

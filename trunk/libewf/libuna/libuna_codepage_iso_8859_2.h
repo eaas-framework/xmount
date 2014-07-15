@@ -1,8 +1,7 @@
 /*
  * ISO 8859-2 codepage (Central European) functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -35,17 +34,6 @@ extern const uint16_t libuna_codepage_iso_8859_2_byte_stream_to_unicode_base_0xa
 extern const uint8_t libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x00a0[ 128 ];
 extern const uint8_t libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x0138[ 72 ];
 extern const uint8_t libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x02d8[ 8 ];
-
-#define libuna_codepage_iso_8859_2_byte_stream_to_unicode( byte_stream_character ) \
-	( byte_stream_character < 0xa0 ) ? byte_stream_character : libuna_codepage_iso_8859_2_byte_stream_to_unicode_base_0xa0[ byte_stream_character - 0xa0 ]
-
-#define libuna_codepage_iso_8859_2_unicode_to_byte_stream( unicode_character ) \
-	( unicode_character < 0x00a0 ) ? (uint8_t) unicode_character : \
-	( ( unicode_character >= 0x00a0 ) && ( unicode_character < 0x0120 ) ) ? libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x00a0[ unicode_character - 0x00a0 ] : \
-	( ( unicode_character >= 0x0138 ) && ( unicode_character < 0x0180 ) ) ? libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x0138[ unicode_character - 0x0138 ] : \
-	( unicode_character == 0x02c7 ) ? 0xb7 : \
-	( ( unicode_character >= 0x02d8 ) && ( unicode_character < 0x02e0 ) ) ? libuna_codepage_iso_8859_2_unicode_to_byte_stream_base_0x02d8[ unicode_character - 0x02d8 ] : \
-	0x1a
 
 #if defined( __cplusplus )
 }

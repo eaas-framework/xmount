@@ -1,8 +1,7 @@
 /*
  * Compression handling functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -23,14 +22,14 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-#include <libnotify.h>
+#include "libewf_libcerror.h"
+#include "libewf_libcnotify.h"
 
 #if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
 #endif
 
-#if defined( HAVE_ZLIB_H ) || defined( ZLIB_DLL )
+#if defined( HAVE_ZLIB ) || defined( ZLIB_DLL )
 #include <zlib.h>
 #endif
 
@@ -47,19 +46,19 @@ int libewf_compress(
      uint8_t *uncompressed_data,
      size_t uncompressed_size,
      int8_t compression_level,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
-	static char *function        = "libewf_compress";
-	uLongf safe_compressed_size  = 0;
-	int zlib_compression_level   = 0;
-	int result                   = 0;
+	static char *function       = "libewf_compress";
+	uLongf safe_compressed_size = 0;
+	int zlib_compression_level  = 0;
+	int result                  = 0;
 
 	if( compressed_data == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid compressed data buffer.",
 		 function );
 
@@ -67,10 +66,10 @@ int libewf_compress(
 	}
 	if( uncompressed_data == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid uncompressed data buffer.",
 		 function );
 
@@ -78,10 +77,10 @@ int libewf_compress(
 	}
 	if( compressed_data == uncompressed_data )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid uncompressed data buffer equals compressed data buffer.",
 		 function );
 
@@ -89,10 +88,10 @@ int libewf_compress(
 	}
 	if( compressed_size == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid compressed size.",
 		 function );
 
@@ -116,10 +115,10 @@ int libewf_compress(
 	}
 	else
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_UNSUPPORTED_VALUE,
 		 "%s: unsupported compression level.",
 		 function );
 
@@ -142,13 +141,15 @@ int libewf_compress(
 	}
 	else if( result == Z_BUF_ERROR )
 	{
-#if defined( HAVE_VERBOSE_OUTPUT )
-		libnotify_verbose_printf(
-		 "%s: unable to write compressed data: target buffer too small.\n",
-		 function );
+#if defined( HAVE_DEBUG_OUTPUT )
+		if( libcnotify_verbose != 0 )
+		{
+			libcnotify_printf(
+		 	"%s: unable to write compressed data: target buffer too small.\n",
+			 function );
+		}
 #endif
-
-#if defined( HAVE_COMPRESS_BOUND )
+#if defined( HAVE_COMPRESS_BOUND ) || defined( WINAPI )
 		/* Use compressBound to determine the size of the uncompressed buffer
 		 */
 		safe_compressed_size = compressBound( (uLong) uncompressed_size );
@@ -161,10 +162,10 @@ int libewf_compress(
 	}
 	else if( result == Z_MEM_ERROR )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_MEMORY,
-		 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_INSUFFICIENT,
 		 "%s: unable to write compressed data: insufficient memory.",
 		 function );
 
@@ -172,10 +173,10 @@ int libewf_compress(
 	}
 	else
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_COMPRESSION,
-		 LIBERROR_COMPRESSION_ERROR_COMPRESS_FAILED,
+		 LIBCERROR_ERROR_DOMAIN_COMPRESSION,
+		 LIBCERROR_COMPRESSION_ERROR_COMPRESS_FAILED,
 		 "%s: zlib returned undefined error: %d.",
 		 function,
 		 result );
@@ -185,26 +186,26 @@ int libewf_compress(
 	return( -1 );
 }
 
-/* Uncompresses data, wraps zlib uncompress function
+/* Decompresses data, wraps zlib uncompress function
  * Returns 1 on success, 0 on failure or -1 on error
  */
-int libewf_uncompress(
+int libewf_decompress(
      uint8_t *uncompressed_data,
      size_t *uncompressed_size,
      uint8_t *compressed_data,
      size_t compressed_size,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
-	static char *function         = "libewf_uncompress";
+	static char *function         = "libewf_decompress";
 	uLongf safe_uncompressed_size = 0;
 	int result                    = 0;
 
 	if( uncompressed_data == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid uncompressed data buffer.",
 		 function );
 
@@ -212,10 +213,10 @@ int libewf_uncompress(
 	}
 	if( compressed_data == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid compressed data buffer.",
 		 function );
 
@@ -223,10 +224,10 @@ int libewf_uncompress(
 	}
 	if( uncompressed_data == compressed_data )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid compressed data buffer equals uncompressed data buffer.",
 		 function );
 
@@ -234,10 +235,10 @@ int libewf_uncompress(
 	}
 	if( uncompressed_size == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid uncompressed size.",
 		 function );
 
@@ -259,34 +260,38 @@ int libewf_uncompress(
 	}
 	else if( result == Z_DATA_ERROR )
 	{
-#if defined( HAVE_VERBOSE_OUTPUT )
-		libnotify_verbose_printf(
-		 "%s: unable to read compressed data: data error.\n",
-		 function );
+#if defined( HAVE_DEBUG_OUTPUT )
+		if( libcnotify_verbose != 0 )
+		{
+			libcnotify_printf(
+			 "%s: unable to read compressed data: data error.\n",
+			 function );
+		}
 #endif
-
 		*uncompressed_size = 0;
 
 		return( 0 );
 	}
 	else if( result == Z_BUF_ERROR )
 	{
-#if defined( HAVE_VERBOSE_OUTPUT )
-		libnotify_verbose_printf(
-		 "%s: unable to read compressed data: target buffer too small.\n",
-		 function );
+#if defined( HAVE_DEBUG_OUTPUT )
+		if( libcnotify_verbose != 0 )
+		{
+			libcnotify_printf(
+		 	"%s: unable to read compressed data: target buffer too small.\n",
+			 function );
+		}
 #endif
-
 		/* Estimate that a factor 2 enlargement should suffice
 		 */
 		*uncompressed_size *= 2;
 	}
 	else if( result == Z_MEM_ERROR )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_MEMORY,
-		 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_INSUFFICIENT,
 		 "%s: unable to read compressed data: insufficient memory.",
 		 function );
 
@@ -294,10 +299,10 @@ int libewf_uncompress(
 	}
 	else
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_COMPRESSION,
-		 LIBERROR_COMPRESSION_ERROR_UNCOMPRESS_FAILED,
+		 LIBCERROR_ERROR_DOMAIN_COMPRESSION,
+		 LIBCERROR_COMPRESSION_ERROR_DECOMPRESS_FAILED,
 		 "%s: zlib returned undefined error: %d.",
 		 function,
 		 result );

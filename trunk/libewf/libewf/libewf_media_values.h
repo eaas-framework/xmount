@@ -1,8 +1,7 @@
 /*
  * Media values functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,7 +26,7 @@
 #include <memory.h>
 #include <types.h>
 
-#include <liberror.h>
+#include "libewf_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -47,23 +46,23 @@ struct libewf_media_values
 	 */
 	size32_t chunk_size;
 
-	/* The amount of sectors per chunk
+	/* The number of sectors per chunk
 	 */
 	uint32_t sectors_per_chunk;
 
-	/* The amount of bytes per sector
+	/* The number of bytes per sector
 	 */
 	uint32_t bytes_per_sector;
 
-        /* The amount of chunks
+        /* The number of chunks
          */
-        uint32_t amount_of_chunks;
+        uint32_t number_of_chunks;
 
-        /* The amount of sectors
+        /* The number of sectors
          */
-        uint64_t amount_of_sectors;
+        uint64_t number_of_sectors;
 
-        /* The amount of sectors to use as error granularity
+        /* The number of sectors to use as error granularity
          */
         uint32_t error_granularity;
 
@@ -82,11 +81,16 @@ struct libewf_media_values
 
 int libewf_media_values_initialize(
      libewf_media_values_t **media_values,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_media_values_free(
      libewf_media_values_t **media_values,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int libewf_media_values_clone(
+     libewf_media_values_t **destination_media_values,
+     libewf_media_values_t *source_media_values,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

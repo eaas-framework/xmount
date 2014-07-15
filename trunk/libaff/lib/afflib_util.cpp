@@ -1,46 +1,7 @@
 /*
  * utility functions used by AFFLIB.
  * These functions do not actually read or write data into the AFF File.
- */
-
-/*
- * Copyright (c) 2005
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * Distributed under the Berkeley 4-part license.
  */
 
 #include "affconfig.h"
@@ -131,8 +92,6 @@ const char *af_hexbuf(char *dst,int dst_len,const unsigned char *bin,int bytes,i
 	bytes--;
 	charcount++;			// how many characters
 	
-	bool add_spaces = false;
-	if(flag & AF_HEXBUF_SPACE2) add_spaces = true;
 	if((flag & AF_HEXBUF_SPACE4) && charcount%2==0){
 	    *dst++ = ' ';
 	    *dst   = '\000';
@@ -196,6 +155,29 @@ uint64_t af_decode_q(unsigned char buf[8])
  */
 int64_t	af_segname_page_number(const char *name)
 {
+#ifdef KERNEL_LIBRARY
+#define PAGE_NAME "page"
+	if(_strnicmp(name,PAGE_NAME,strlen(PAGE_NAME))==0)
+	{
+		int64_t pagenum;
+		for (int i=strlen(PAGE_NAME);i<strlen(name);i++)
+			if (!isdigit(name[i])) return -1;
+
+		pagenum = _atoi64(name+strlen(PAGE_NAME));
+		return pagenum;
+	}
+#define SEG_NAME "seg"
+	if(_strnicmp(name,SEG_NAME,strlen(SEG_NAME))==0)
+	{
+		int64_t pagenum;
+		for (int i=strlen(SEG_NAME);i<strlen(name);i++)
+			if (!isdigit(name[i])) return -1;
+
+		pagenum = _atoi64(name+strlen(SEG_NAME));
+		return pagenum;
+	}
+	return -1;
+#else
     int64_t pagenum;
     char  ch;
     if(sscanf(name,AF_PAGE"%c",&pagenum,&ch)==1){
@@ -205,6 +187,7 @@ int64_t	af_segname_page_number(const char *name)
 	return pagenum;			// old-style page number
     }
     return -1;
+#endif
 }
 
 int64_t	af_segname_hash_page_number(const char *name,char *hash,int hashlen)

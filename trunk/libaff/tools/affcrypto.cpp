@@ -188,7 +188,7 @@ int af_decrypt_encrypted_segments(AFFILE *af, int *count, int mode)
 	    u_char *buf = (u_char *)malloc(si->len);
 	    if(!buf) warn("malloc(%zd) failed", si->len);
 	    else {
-		unsigned long arg;
+		uint32_t arg;
 		size_t datalen = si->len;
 		if(af_get_seg(af,segname,&arg,buf,&datalen)){
 		    warn("Could not read segment '%s'",segname);
@@ -254,7 +254,7 @@ int af_encrypt_unencrypted_nonsignature_segments(AFFILE *af,int *count,int mode)
 	    if(!buf) warn("Cannot encrypt segment '%s' --- too large (%zd bytes) --- malloc failed",
 			  si->name.c_str(),si->len);
 	    else {
-		unsigned long arg;
+		uint32_t arg;
 		size_t datalen = si->len;
 		if(af_get_seg(af,si->name.c_str(),&arg,buf,&datalen)){
 		    warn("Could not read segment '%s'",si->name.c_str());
@@ -291,7 +291,7 @@ void list_openssl_hashes()
 
 int main(int argc,char **argv)
 {
-    int bflag, ch;
+    int ch;
     const char *old_passphrase=0;
     const char *new_passphrase=0;
     const char *check_passphrase = 0;
@@ -319,7 +319,6 @@ int main(int argc,char **argv)
 #endif
     }
     
-    bflag = 0;
     int opt_change = 0;
     const char *home = getenv("HOME");
 
@@ -426,6 +425,9 @@ int main(int argc,char **argv)
 	    }
         }
 
+	if(opt_decrypt && !old_passphrase && getenv(AFFLIB_PASSPHRASE)){
+	    old_passphrase = getenv(AFFLIB_PASSPHRASE);
+	}
 	if(opt_decrypt && old_passphrase){
 	    int r = af_use_aes_passphrase(af, old_passphrase);
 	    switch(r){

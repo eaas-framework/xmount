@@ -1,8 +1,7 @@
 /*
  * Base64 stream functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,80 +25,109 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #include "libuna_extern.h"
 #include "libuna_inline.h"
+#include "libuna_libcerror.h"
 #include "libuna_types.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
-LIBUNA_INLINE int libuna_base64_character_copy_to_sixtet(
-                   uint8_t base64_character,
-                   uint8_t *base64_sixtet,
-                   liberror_error_t **error );
+LIBUNA_INLINE \
+int libuna_base64_character_copy_to_sixtet(
+     uint8_t base64_character,
+     uint8_t *base64_sixtet,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN LIBUNA_INLINE int libuna_base64_triplet_copy_from_base64_stream(
-                                 uint32_t *base64_triplet,
-                                 const uint8_t *base64_stream,
-                                 size_t base64_stream_size,
-                                 size_t *base64_stream_index,
-                                 uint8_t padding_character,
-                                 uint8_t *padding_size,
-                                 liberror_error_t **error );
+LIBUNA_EXTERN \
+LIBUNA_INLINE \
+int libuna_base64_triplet_copy_from_base64_stream(
+     uint32_t *base64_triplet,
+     const uint8_t *base64_stream,
+     size_t base64_stream_size,
+     size_t *base64_stream_index,
+     uint8_t *padding_size,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN LIBUNA_INLINE int libuna_base64_triplet_copy_to_base64_stream(
-                                 uint32_t base64_triplet,
-                                 uint8_t *base64_stream,
-                                 size_t base64_stream_size,
-                                 size_t *base64_stream_index,
-                                 uint8_t padding_character,
-                                 uint8_t padding_size,
-                                 liberror_error_t **error );
+LIBUNA_EXTERN \
+LIBUNA_INLINE \
+int libuna_base64_triplet_copy_to_base64_stream(
+     uint32_t base64_triplet,
+     uint8_t *base64_stream,
+     size_t base64_stream_size,
+     size_t *base64_stream_index,
+     uint8_t padding_size,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN LIBUNA_INLINE int libuna_base64_triplet_copy_from_byte_stream(
-                                 uint32_t *base64_triplet,
-                                 const uint8_t *byte_stream,
-                                 size_t byte_stream_size,
-                                 size_t *byte_stream_index,
-                                 uint8_t *padding_size,
-                                 liberror_error_t **error );
+LIBUNA_EXTERN \
+LIBUNA_INLINE \
+int libuna_base64_triplet_copy_from_byte_stream(
+     uint32_t *base64_triplet,
+     const uint8_t *byte_stream,
+     size_t byte_stream_size,
+     size_t *byte_stream_index,
+     uint8_t *padding_size,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN LIBUNA_INLINE int libuna_base64_triplet_copy_to_byte_stream(
-                                 uint32_t base64_triplet,
-                                 uint8_t *byte_stream,
-                                 size_t byte_stream_size,
-                                 size_t *byte_stream_index,
-                                 uint8_t padding_size,
-                                 liberror_error_t **error );
+LIBUNA_EXTERN \
+LIBUNA_INLINE \
+int libuna_base64_triplet_copy_to_byte_stream(
+     uint32_t base64_triplet,
+     uint8_t *byte_stream,
+     size_t byte_stream_size,
+     size_t *byte_stream_index,
+     uint8_t padding_size,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_base64_stream_decode_size(
-                   uint8_t *base64_stream,
-                   size_t base64_stream_size,
-                   size_t *byte_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_base64_stream_size_to_byte_stream(
+     const uint8_t *base64_stream,
+     size_t base64_stream_size,
+     size_t *byte_stream_size,
+     uint32_t base64_variant,
+     uint8_t flags,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_base64_stream_decode(
-                   uint8_t *base64_stream,
-                   size_t base64_stream_size,
-                   uint8_t *byte_stream,
-                   size_t byte_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_base64_stream_copy_to_byte_stream(
+     const uint8_t *base64_stream,
+     size_t base64_stream_size,
+     uint8_t *byte_stream,
+     size_t byte_stream_size,
+     uint32_t base64_variant,
+     uint8_t flags,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_base64_stream_encode_size(
-                   uint8_t *byte_stream,
-                   size_t byte_stream_size,
-                   size_t *base64_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_base64_stream_size_from_byte_stream(
+     const uint8_t *byte_stream,
+     size_t byte_stream_size,
+     size_t *base64_stream_size,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
 
-LIBUNA_EXTERN int libuna_base64_stream_encode(
-                   uint8_t *base64_stream,
-                   size_t base64_stream_size,
-                   uint8_t *byte_stream,
-                   size_t byte_stream_size,
-                   liberror_error_t **error );
+LIBUNA_EXTERN \
+int libuna_base64_stream_copy_from_byte_stream(
+     uint8_t *base64_stream,
+     size_t base64_stream_size,
+     const uint8_t *byte_stream,
+     size_t byte_stream_size,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
+
+LIBUNA_EXTERN \
+int libuna_base64_stream_with_index_copy_from_byte_stream(
+     uint8_t *base64_stream,
+     size_t base64_stream_size,
+     size_t *base64_stream_index,
+     const uint8_t *byte_stream,
+     size_t byte_stream_size,
+     uint32_t base64_variant,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

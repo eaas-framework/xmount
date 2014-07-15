@@ -2,6 +2,8 @@
  * vnode_aff.cpp:
  * 
  * Functions for the manipulation of AFF files...
+ *
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -142,7 +144,7 @@ static int s3_vstat(AFFILE *af,struct af_vnode_info *vni)
     return 0;
 }
 
-static int s3_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned char *data,
+static int s3_get_seg(AFFILE *af,const char *name,uint32_t *arg,unsigned char *data,
 		       size_t *datalen)
 {
     /* TK: Don't get the whole object if we just want the size or the argument.
@@ -199,7 +201,7 @@ static int s3_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned ch
 }
 
 
-static int s3_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int s3_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen)
 {
     memset(segname,0,segname_len);
@@ -259,7 +261,7 @@ static int s3_rewind_seg(AFFILE *af)
  * S3 implementation ignores append
  */
 static int s3_update_seg(AFFILE *af, const char *name,
-		    unsigned long arg,const u_char *value,unsigned int vallen)
+		    uint32_t arg,const u_char *value,uint32_t vallen)
     
 {
     struct s3_private *sp =S3_PRIVATE(af);

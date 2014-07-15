@@ -1,8 +1,7 @@
 /*
  * Empty block test functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,7 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
+#include "libewf_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -35,7 +34,7 @@ extern "C" {
 int libewf_empty_block_test(
      const uint8_t *block_buffer,
      size_t block_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

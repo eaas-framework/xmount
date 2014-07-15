@@ -1,8 +1,7 @@
 /*
  * Crypographic digest hash
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,28 +25,19 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include <libsystem.h>
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
-#define DIGEST_HASH_SIZE_MD5	(size_t) ( sizeof( digest_hash_t ) * 16 )
-#define DIGEST_HASH_SIZE_SHA1	(size_t) ( sizeof( digest_hash_t ) * 20 )
-
-#define DIGEST_HASH_STRING_SIZE_MD5	33
-#define DIGEST_HASH_STRING_SIZE_SHA1	41
-
-typedef uint8_t digest_hash_t;
-
 int digest_hash_copy_to_string(
-     digest_hash_t *digest_hash,
+     const uint8_t *digest_hash,
      size_t digest_hash_size,
-     libsystem_character_t *string,
+     libcstring_system_character_t *string,
      size_t string_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

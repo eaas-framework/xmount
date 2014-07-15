@@ -1,8 +1,7 @@
 /*
  * The internal type definitions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -34,10 +33,17 @@
 
 /* The following type definitions hide internal data structures
  */
+#if defined( HAVE_DEBUG_OUTPUT ) && !defined( WINAPI )
+typedef struct libbfio_handle {}	libbfio_handle_t;
+typedef struct libbfio_pool {}		libbfio_pool_t;
+
+#else
 typedef intptr_t libbfio_handle_t;
 typedef intptr_t libbfio_pool_t;
 
 #endif
+
+#endif /* defined( HAVE_LOCAL_LIBBFIO ) */
 
 #endif
 

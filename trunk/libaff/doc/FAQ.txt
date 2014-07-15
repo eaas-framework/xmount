@@ -1,3 +1,5 @@
+# This file is distributed under the Berkeley 4-part license
+
 Q: Why a new file format? What's wrong with block-by-block?
 
 A: Raw image files take up a lot of space. In many cases this space

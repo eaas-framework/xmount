@@ -1,9 +1,7 @@
 /*
- * ewfverify
  * Verifies the integrity of the media data within the EWF file
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -25,32 +23,25 @@
 #include <memory.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
 #endif
 
-/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
- * before including libewf.h
- */
-#if defined( _WIN32 ) && defined( DLL_EXPORT )
-#define LIBEWF_DLL_IMPORT
+#if defined( HAVE_SYS_RESOURCE_H )
+#include <sys/resource.h>
 #endif
 
-#include <libewf.h>
-
-#include <libsystem.h>
-
 #include "byte_size_string.h"
-#include "digest_context.h"
+#include "digest_hash.h"
 #include "ewfcommon.h"
-#include "ewfinput.h"
 #include "ewfoutput.h"
-#include "md5.h"
-#include "process_status.h"
-#include "sha1.h"
-#include "storage_media_buffer.h"
+#include "ewftools_libcerror.h"
+#include "ewftools_libclocale.h"
+#include "ewftools_libcnotify.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libcsystem.h"
+#include "ewftools_libewf.h"
+#include "log_handle.h"
 #include "verification_handle.h"
 
 verification_handle_t *ewfverify_verification_handle = NULL;
@@ -65,334 +56,68 @@ void usage_fprint(
 	{
 		return;
 	}
-	fprintf( stream, "Use ewfverify to verify data stored in the EWF format (Expert Witness Compression\n"
-	                 "Format).\n\n" );
+	fprintf( stream, "Use ewfverify to verify data stored in the EWF format (Expert Witness\n"
+	                 "Compression Format).\n\n" );
 
-	fprintf( stream, "Usage: ewfverify [ -A codepage ] [ -d digest_type ] [ -l log_filename ]\n"
-	                 "                 [ -p process_buffer_size ] [ -hqvVw ] ewf_files\n\n" );
+	fprintf( stream, "Usage: ewfverify [ -A codepage ] [ -d digest_type ] [ -f format ]\n"
+	                 "                 [ -l log_filename ] [ -p process_buffer_size ]\n"
+	                 "                 [ -hqvVw ] ewf_files\n\n" );
 
 	fprintf( stream, "\tewf_files: the first or the entire set of EWF segment files\n\n" );
 
-	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default), windows-874,\n"
-	                 "\t           windows-1250, windows-1251, windows-1252, windows-1253, windows-1254,\n"
-	                 "\t           windows-1255, windows-1256, windows-1257, windows-1258\n" );
-	fprintf( stream, "\t-d:        calculate additional digest (hash) types besides md5, options: sha1\n" );
+	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default),\n"
+	                 "\t           windows-874, windows-932, windows-936, windows-949,\n"
+	                 "\t           windows-950, windows-1250, windows-1251, windows-1252,\n"
+	                 "\t           windows-1253, windows-1254, windows-1255, windows-1256,\n"
+	                 "\t           windows-1257 or windows-1258\n" );
+	fprintf( stream, "\t-d:        calculate additional digest (hash) types besides md5,\n"
+	                 "\t           options: sha1, sha256\n" );
+	fprintf( stream, "\t-f:        specify the input format, options: raw (default),\n"
+	                 "\t           files (restricted to logical volume files)\n" );
 	fprintf( stream, "\t-h:        shows this help\n" );
-	fprintf( stream, "\t-l:        logs verification errors and the digest (hash) to the log_filename\n" );
+	fprintf( stream, "\t-l:        logs verification errors and the digest (hash) to the\n"
+	                 "\t           log_filename\n" );
 	fprintf( stream, "\t-p:        specify the process buffer size (default is the chunk size)\n" );
-	fprintf( stream, "\t-q:        quiet shows no status information\n" );
+	fprintf( stream, "\t-q:        quiet shows minimal status information\n" );
 	fprintf( stream, "\t-v:        verbose output to stderr\n" );
 	fprintf( stream, "\t-V:        print version\n" );
-	fprintf( stream, "\t-w:        wipe sectors on CRC error (mimic EnCase like behavior)\n" );
-}
-
-/* Reads the data to calculate the MD5 and SHA1 integrity hashes
- * Returns the amount of bytes read if successful or -1 on error
- */
-ssize64_t ewfverify_read_input(
-           verification_handle_t *verification_handle,
-           uint8_t wipe_chunk_on_error,
-           size_t process_buffer_size,
-           process_status_t *process_status,
-           liberror_error_t **error )
-{
-	storage_media_buffer_t *storage_media_buffer = NULL;
-	static char *function                        = "ewfverify_read_input";
-	size64_t media_size                          = 0;
-	size32_t chunk_size                          = 0;
-	size_t read_size                             = 0;
-	ssize64_t verify_count                       = 0;
-	ssize_t process_count                        = 0;
-	ssize_t read_count                           = 0;
-
-	if( verification_handle == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid verification handle.",
-		 function );
-
-		return( -1 );
-	}
-	if( process_buffer_size > (size_t) SSIZE_MAX )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid process buffer size value exceeds maximum.",
-		 function );
-
-		return( -1 );
-	}
-	if( process_status == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid process status.",
-		 function );
-
-		return( -1 );
-	}
-	if( verification_handle_get_values(
-	     verification_handle,
-	     &media_size,
-	     &chunk_size,
-	     error ) != 1 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_GET_FAILED,
-		 "%s: unable to determine verification handle values.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_size == 0 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
-		 "%s: invalid chunk size.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_size > (uint32_t) INT32_MAX )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid chunk size value exceeds maximum.",
-		 function );
-
-		return( -1 );
-	}
-	if( verification_handle_set_error_handling_values(
-	     verification_handle,
-	     wipe_chunk_on_error,
-	     error ) != 1 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_SET_FAILED,
-		 "%s: unable to set verification handle error handling values.",
-		 function );
-
-		return( -1 );
-	}
-#if defined( HAVE_LOW_LEVEL_FUNCTIONS )
-	process_buffer_size = chunk_size;
-#else
-	if( process_buffer_size == 0 )
-	{
-		process_buffer_size = chunk_size;
-	}
-#endif
-
-	if( storage_media_buffer_initialize(
-	     &storage_media_buffer,
-	     process_buffer_size,
-	     error ) != 1 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
-		 "%s: unable to create storage media buffer.",
-		 function );
-
-		return( -1 );
-	}
-
-	while( verify_count < (ssize64_t) media_size )
-	{
-		read_size = process_buffer_size;
-
-		if( ( media_size - verify_count ) < read_size )
-		{
-			read_size = (size_t) ( media_size - verify_count );
-		}
-		read_count = verification_handle_read_buffer(
-		              verification_handle,
-		              storage_media_buffer,
-		              read_size,
-		              error );
-
-		if( read_count < 0 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_IO,
-			 LIBERROR_IO_ERROR_READ_FAILED,
-			"%s: unable to read data.",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-		if( read_count == 0 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_IO,
-			 LIBERROR_IO_ERROR_READ_FAILED,
-			 "%s: unexpected end of data.",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-		process_count = verification_handle_prepare_read_buffer(
-		                 verification_handle,
-		                 storage_media_buffer,
-		                 error );
-
-		if( process_count < 0 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_IO,
-			 LIBERROR_IO_ERROR_READ_FAILED,
-			"%s: unable to prepare buffer after read.",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-		if( process_count > (ssize_t) read_size )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_IO,
-			 LIBERROR_IO_ERROR_READ_FAILED,
-			 "%s: more bytes read than requested.",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-#if defined( HAVE_LOW_LEVEL_FUNCTIONS )
-		/* Set the amount of chunk data in the buffer
-		 */
-		if( storage_media_buffer->data_in_compression_buffer == 1 )
-		{
-			storage_media_buffer->compression_buffer_amount = process_count;
-		}
-#endif
-		verify_count += (ssize64_t) process_count;
-
-		if( verification_handle_update_integrity_hash(
-		     verification_handle,
-		     storage_media_buffer,
-		     process_count,
-		     error ) != 1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_RUNTIME,
-			 LIBERROR_RUNTIME_ERROR_GENERIC,
-			 "%s: unable to update integrity hash(es).",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-		 if( process_status_update(
-		      process_status,
-		      (size64_t) verify_count,
-		      media_size,
-		      error ) != 1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_RUNTIME,
-			 LIBERROR_RUNTIME_ERROR_SET_FAILED,
-			 "%s: unable to update process status.",
-			 function );
-
-			storage_media_buffer_free(
-			 &storage_media_buffer,
-			 NULL );
-
-			return( -1 );
-		}
-		if( ewfverify_abort != 0 )
-		{
-			break;
-		}
-  	}
-	if( storage_media_buffer_free(
-	     &storage_media_buffer,
-	     error ) != 1 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
-		 "%s: unable to free storage media buffer.",
-		 function );
-
-		return( -1 );
-	}
-	return( verify_count );
+	fprintf( stream, "\t-w:        zero sectors on checksum error (mimic EnCase like behavior)\n" );
 }
 
 /* Signal handler for ewfverify
  */
 void ewfverify_signal_handler(
-      libsystem_signal_t signal )
+      libcsystem_signal_t signal LIBCSYSTEM_ATTRIBUTE_UNUSED )
 {
-	liberror_error_t *error = NULL;
+	libcerror_error_t *error = NULL;
 	static char *function   = "ewfverify_signal_handler";
+
+	LIBCSYSTEM_UNREFERENCED_PARAMETER( signal )
 
 	ewfverify_abort = 1;
 
-	if( ( ewfverify_verification_handle != NULL )
-	 && ( verification_handle_signal_abort(
-	       ewfverify_verification_handle,
-	       &error ) != 1 ) )
+	if( ewfverify_verification_handle != NULL )
 	{
-		libsystem_notify_printf(
-		 "%s: unable to signal verification handle to abort.\n",
-		 function );
+		if( verification_handle_signal_abort(
+		     ewfverify_verification_handle,
+		     &error ) != 1 )
+		{
+			libcnotify_printf(
+			 "%s: unable to signal verification handle to abort.\n",
+			 function );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return;
+			libcnotify_print_error_backtrace(
+			 error );
+			libcerror_error_free(
+			 &error );
+		}
 	}
 	/* Force stdin to close otherwise any function reading it will remain blocked
 	 */
-	if( libsystem_file_io_close(
+	if( libcsystem_file_io_close(
 	     0 ) != 0 )
 	{
-		libsystem_notify_printf(
+		libcnotify_printf(
 		 "%s: unable to close stdin.\n",
 		 function );
 	}
@@ -400,187 +125,138 @@ void ewfverify_signal_handler(
 
 /* The main program
  */
-#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
+#if defined( LIBCSTRING_HAVE_WIDE_SYSTEM_CHARACTER )
 int wmain( int argc, wchar_t * const argv[] )
 #else
 int main( int argc, char * const argv[] )
 #endif
 {
-	liberror_error_t *error                            = NULL;
+#if defined( HAVE_GETRLIMIT )
+	struct rlimit limit_data;
+#endif
+	libcerror_error_t *error                                      = NULL;
 
-	libsystem_character_t * const *argv_filenames      = NULL;
+	libcstring_system_character_t * const *argv_filenames         = NULL;
 
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	libsystem_glob_t *glob                             = NULL;
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	libcsystem_glob_t *glob                                       = NULL;
 #endif
 
-	process_status_t *process_status                   = NULL;
+	libcstring_system_character_t *log_filename                   = NULL;
+	libcstring_system_character_t *program                        = _LIBCSTRING_SYSTEM_STRING( "ewfverify" );
+	libcstring_system_character_t *option_additional_digest_types = NULL;
+	libcstring_system_character_t *option_format                  = NULL;
+	libcstring_system_character_t *option_header_codepage         = NULL;
+	libcstring_system_character_t *option_process_buffer_size     = NULL;
 
-	libsystem_character_t *calculated_md5_hash_string  = NULL;
-	libsystem_character_t *calculated_sha1_hash_string = NULL;
-	libsystem_character_t *log_filename                = NULL;
-	libsystem_character_t *program                     = _LIBSYSTEM_CHARACTER_T_STRING( "ewfverify" );
-	libsystem_character_t *stored_md5_hash_string      = NULL;
-	libsystem_character_t *stored_sha1_hash_string     = NULL;
+	log_handle_t *log_handle                                      = NULL;
 
-	verification_handle_t *verification_handle         = NULL;
+	libcstring_system_integer_t option                            = 0;
+	uint8_t calculate_md5                                         = 1;
+	uint8_t print_status_information                              = 1;
+	uint8_t zero_chunk_on_error                                   = 0;
+	uint8_t verbose                                               = 0;
+	int number_of_filenames                                       = 0;
+	int result                                                    = 0;
 
-	FILE *log_file_stream                              = NULL;
-
-	libsystem_integer_t option                         = 0;
-	ssize64_t verify_count                             = 0;
-	size_t string_length                               = 0;
-	uint64_t process_buffer_size                       = EWFCOMMON_PROCESS_BUFFER_SIZE;
-	uint32_t amount_of_crc_errors                      = 0;
-	uint8_t calculate_md5                              = 1;
-	uint8_t calculate_sha1                             = 0;
-	uint8_t print_status_information                   = 1;
-	uint8_t wipe_chunk_on_error                        = 0;
-	uint8_t verbose                                    = 0;
-	int amount_of_filenames                            = 0;
-	int header_codepage                                = LIBEWF_CODEPAGE_ASCII;
-	int match_md5_hash                                 = 0;
-	int match_sha1_hash                                = 0;
-	int result                                         = 0;
-	int status                                         = 0;
-	int stored_md5_hash_available                      = 0;
-	int stored_sha1_hash_available                     = 0;
-
-	libsystem_notify_set_stream(
+	libcnotify_stream_set(
 	 stderr,
 	 NULL );
-	libsystem_notify_set_verbose(
+	libcnotify_verbose_set(
 	 1 );
 
-	if( libsystem_initialize(
+	if( libclocale_initialize(
+             "ewftools",
+	     &error ) != 1 )
+	{
+		fprintf(
+		 stderr,
+		 "Unable to initialize locale values.\n" );
+
+		goto on_error;
+	}
+	if( libcsystem_initialize(
+	     _IONBF,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
 		 "Unable to initialize system values.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 	ewfoutput_version_fprint(
 	 stdout,
 	 program );
 
-	while( ( option = libsystem_getopt(
+	while( ( option = libcsystem_getopt(
 	                   argc,
 	                   argv,
-	                   _LIBSYSTEM_CHARACTER_T_STRING( "A:d:hl:p:qvVw" ) ) ) != (libsystem_integer_t) -1 )
+	                   _LIBCSTRING_SYSTEM_STRING( "A:d:f:hl:p:qvVw" ) ) ) != (libcstring_system_integer_t) -1 )
 	{
 		switch( option )
 		{
-			case (libsystem_integer_t) '?':
+			case (libcstring_system_integer_t) '?':
 			default:
 				fprintf(
 				 stderr,
-				 "Invalid argument: %" PRIs_LIBSYSTEM "\n",
-				 argv[ optind ] );
+				 "Invalid argument: %" PRIs_LIBCSTRING_SYSTEM "\n",
+				 argv[ optind - 1 ] );
 
 				usage_fprint(
 				 stdout );
 
-				return( EXIT_FAILURE );
+				goto on_error;
 
-			case (libsystem_integer_t) 'A':
-				if( ewfinput_determine_header_codepage(
-				     optarg,
-				     &header_codepage,
-				     &error ) != 1 )
-				{
-					libsystem_notify_print_error_backtrace(
-					 error );
-					liberror_error_free(
-					 &error );
+			case (libcstring_system_integer_t) 'A':
+				option_header_codepage = optarg;
 
-					fprintf(
-					 stderr,
-					 "Unsuported header codepage defaulting to: ascii.\n" );
-
-					header_codepage = LIBEWF_CODEPAGE_ASCII;
-				}
 				break;
 
-			case (libsystem_integer_t) 'd':
-				if( libsystem_string_compare(
-				     optarg,
-				     _LIBSYSTEM_CHARACTER_T_STRING( "sha1" ),
-				     4 ) == 0 )
-				{
-					calculate_sha1 = 1;
-				}
-				else
-				{
-					fprintf(
-					 stderr,
-					 "Unsupported digest type.\n" );
-				}
+			case (libcstring_system_integer_t) 'd':
+				option_additional_digest_types = optarg;
+
 				break;
 
-			case (libsystem_integer_t) 'h':
+			case (libcstring_system_integer_t) 'f':
+				option_format = optarg;
+
+				break;
+
+			case (libcstring_system_integer_t) 'h':
 				usage_fprint(
 				 stdout );
 
 				return( EXIT_SUCCESS );
 
-			case (libsystem_integer_t) 'l':
+			case (libcstring_system_integer_t) 'l':
 				log_filename = optarg;
 
 				break;
 
-			case (libsystem_integer_t) 'p':
-				string_length = libsystem_string_length(
-				                 optarg );
+			case (libcstring_system_integer_t) 'p':
+				option_process_buffer_size = optarg;
 
-				result = byte_size_string_convert(
-				          optarg,
-				          string_length,
-				          &process_buffer_size,
-				          &error );
-
-				if( result != 1 )
-				{
-					libsystem_notify_print_error_backtrace(
-					 error );
-					liberror_error_free(
-					 &error );
-				}
-				if( ( result != 1 )
-				 || ( process_buffer_size > (uint64_t) SSIZE_MAX ) )
-				{
-					process_buffer_size = 0;
-
-					fprintf(
-					 stderr,
-					 "Unsupported process buffer size defaulting to: chunk size.\n" );
-				}
 				break;
 
-			case (libsystem_integer_t) 'q':
+			case (libcstring_system_integer_t) 'q':
 				print_status_information = 0;
 
 				break;
 
-			case (libsystem_integer_t) 'v':
+			case (libcstring_system_integer_t) 'v':
 				verbose = 1;
 
 				break;
 
-			case (libsystem_integer_t) 'V':
+			case (libcstring_system_integer_t) 'V':
 				ewfoutput_copyright_fprint(
 				 stdout );
 
 				return( EXIT_SUCCESS );
 
-			case (libsystem_integer_t) 'w':
-				wipe_chunk_on_error = 1;
+			case (libcstring_system_integer_t) 'w':
+				zero_chunk_on_error = 1;
 
 				break;
 		}
@@ -594,37 +270,117 @@ int main( int argc, char * const argv[] )
 		usage_fprint(
 		 stdout );
 
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-	libsystem_notify_set_verbose(
+	libcnotify_verbose_set(
 	 verbose );
-#if defined( HAVE_V2_API )
+
+#if !defined( HAVE_LOCAL_LIBEWF )
 	libewf_notify_set_verbose(
 	 verbose );
 	libewf_notify_set_stream(
 	 stderr,
 	 NULL );
-#else
-	libewf_set_notify_values(
-	 stderr,
-	 verbose );
 #endif
 
-	if( libsystem_signal_attach(
-	     ewfverify_signal_handler,
+	if( verification_handle_initialize(
+	     &ewfverify_verification_handle,
+	     calculate_md5,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to attach signal handler.\n" );
+		 "Unable to create verification handle.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
+		goto on_error;
 	}
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	if( libsystem_glob_initialize(
+	if( option_header_codepage != NULL )
+	{
+		result = verification_handle_set_header_codepage(
+			  ewfverify_verification_handle,
+		          option_header_codepage,
+			  &error );
+
+		if( result == -1 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to set header codepage.\n" );
+
+			goto on_error;
+		}
+		else if( result == 0 )
+		{
+			fprintf(
+			 stderr,
+			 "Unsupported header codepage defaulting to: ascii.\n" );
+		}
+	}
+	if( option_format != NULL )
+	{
+		result = verification_handle_set_format(
+			  ewfverify_verification_handle,
+			  option_format,
+			  &error );
+
+		if( result == -1 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to set format.\n" );
+
+			goto on_error;
+		}
+		else if( result == 0 )
+		{
+			fprintf(
+			 stderr,
+			 "Unsupported input format defaulting to: raw.\n" );
+		}
+	}
+	if( option_process_buffer_size != NULL )
+	{
+		result = verification_handle_set_process_buffer_size(
+			  ewfverify_verification_handle,
+			  option_process_buffer_size,
+			  &error );
+
+		if( result == -1 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to set process buffer size.\n" );
+
+			goto on_error;
+		}
+		else if( ( result == 0 )
+		      || ( ewfverify_verification_handle->process_buffer_size > (size_t) SSIZE_MAX ) )
+		{
+			ewfverify_verification_handle->process_buffer_size = 0;
+
+			fprintf(
+			 stderr,
+			 "Unsupported process buffer size defaulting to: chunk size.\n" );
+		}
+	}
+	if( option_additional_digest_types != NULL )
+	{
+		result = verification_handle_set_additional_digest_types(
+			  ewfverify_verification_handle,
+			  option_additional_digest_types,
+			  &error );
+
+		if( result == -1 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to set additional digest types.\n" );
+
+			goto on_error;
+		}
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( libcsystem_glob_initialize(
 	     &glob,
 	     &error ) != 1 )
 	{
@@ -632,16 +388,11 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to initialize glob.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-	if( libsystem_glob_resolve(
+	if( libcsystem_glob_resolve(
 	     glob,
-	     &argv[ optind ],
+	     &( argv[ optind ] ),
 	     argc - optind,
 	     &error ) != 1 )
 	{
@@ -649,83 +400,77 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to resolve glob.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 	argv_filenames      = glob->result;
-	amount_of_filenames = glob->amount_of_results;
+	number_of_filenames = glob->number_of_results;
 #else
-	argv_filenames      = &argv[ optind ];
-	amount_of_filenames = argc - optind;
+	argv_filenames      = &( argv[ optind ] );
+	number_of_filenames = argc - optind;
 #endif
 
-	if( verification_handle_initialize(
-	     &verification_handle,
-	     calculate_md5,
-	     calculate_sha1,
+#if defined( HAVE_GETRLIMIT )
+	if( getrlimit(
+            RLIMIT_NOFILE,
+            &limit_data ) != 0 )
+	{
+		fprintf(
+		 stderr,
+		 "Unable to determine limit: number of open file descriptors.\n" );
+	}
+	if( limit_data.rlim_max > (rlim_t) INT_MAX )
+	{
+		limit_data.rlim_max = (rlim_t) INT_MAX;
+	}
+	if( limit_data.rlim_max > 0 )
+	{
+		limit_data.rlim_max /= 2;
+	}
+	if( verification_handle_set_maximum_number_of_open_handles(
+	     ewfverify_verification_handle,
+	     (int) limit_data.rlim_max,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to create verification handle.\n" );
+		 "Unable to set maximum number of open file handles.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-#endif
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-#if defined( HAVE_V2_API )
-	if( verification_handle_set_header_codepage(
-	     verification_handle,
-	     header_codepage,
+#endif
+	if( libcsystem_signal_attach(
+	     ewfverify_signal_handler,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to set header codepage in verification handle.\n" );
+		 "Unable to attach signal handler.\n" );
 
-		libsystem_notify_print_error_backtrace(
+		libcnotify_print_error_backtrace(
 		 error );
-		liberror_error_free(
+		libcerror_error_free(
 		 &error );
-
-		verification_handle_free(
-		 &verification_handle,
-		 NULL );
-
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-#endif
-
-		return( EXIT_FAILURE );
 	}
-#endif
 	result = verification_handle_open_input(
-	          verification_handle,
+	          ewfverify_verification_handle,
 	          argv_filenames,
-	          amount_of_filenames,
+	          number_of_filenames,
 	          &error );
 
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	if( libsystem_glob_free(
+	if( ewfverify_abort != 0 )
+	{
+		goto on_abort;
+	}
+	if( result != 1 )
+	{
+		fprintf(
+		 stderr,
+		 "Unable to open EWF image file(s).\n" );
+
+		goto on_error;
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( libcsystem_glob_free(
 	     &glob,
 	     &error ) != 1 )
 	{
@@ -733,634 +478,201 @@ int main( int argc, char * const argv[] )
 		 stderr,
 		 "Unable to free glob.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 #endif
-
-	if( ( ewfverify_abort == 0 )
-	 && ( result != 1 ) )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to open EWF image file(s).\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		verification_handle_free(
-		 &verification_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
-	}
-	if( ewfverify_abort == 0 )
-	{
-		if( process_status_initialize(
-		     &process_status,
-		     _LIBSYSTEM_CHARACTER_T_STRING( "Verify" ),
-		     _LIBSYSTEM_CHARACTER_T_STRING( "verified" ),
-		     _LIBSYSTEM_CHARACTER_T_STRING( "Read" ),
-		     stdout,
-		     print_status_information,
-		     &error ) != 1 )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to initialize process status.\n" );
-
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-
-			verification_handle_close(
-			 verification_handle,
-			 NULL );
-			verification_handle_free(
-			 &verification_handle,
-			 NULL );
-
-			return( EXIT_FAILURE );
-		}
-		if( process_status_start(
-		     process_status,
-		     &error ) != 1 )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to start process status.\n" );
-
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-
-			process_status_free(
-			 &process_status,
-			 NULL );
-
-			verification_handle_close(
-			 verification_handle,
-			 NULL );
-			verification_handle_free(
-			 &verification_handle,
-			 NULL );
-
-			return( EXIT_FAILURE );
-		}
-		/* Start verifying data
-		 */
-		verify_count = ewfverify_read_input(
-		                verification_handle,
-		                wipe_chunk_on_error,
-		                (size_t) process_buffer_size,
-		                process_status,
-		                &error );
-
-		if( verify_count <= -1 )
-		{
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-
-			status = PROCESS_STATUS_FAILED;
-		}
-		else
-		{
-			status = PROCESS_STATUS_COMPLETED;
-		}
-	}
-	if( ewfverify_abort != 0 )
-	{
-		status = PROCESS_STATUS_ABORTED;
-	}
-	if( process_status_stop(
-	     process_status,
-	     (size64_t) verify_count,
-	     status,
+	if( verification_handle_set_zero_chunk_on_error(
+	     ewfverify_verification_handle,
+	     zero_chunk_on_error,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to stop process status.\n" );
+		 "Unable to set zero on chunk error.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		process_status_free(
-		 &process_status,
-		 NULL );
-
-		verification_handle_close(
-		 verification_handle,
-		 NULL );
-		verification_handle_free(
-		 &verification_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-	if( process_status_free(
-	     &process_status,
-	     &error ) != 1 )
+	if( log_filename != NULL )
 	{
-		fprintf(
-		 stderr,
-		 "Unable to free process status.\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		verification_handle_close(
-		 verification_handle,
-		 NULL );
-		verification_handle_free(
-		 &verification_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
-	}
-	if( status == PROCESS_STATUS_COMPLETED )
-	{
-		if( calculate_md5 == 1 )
-		{
-			stored_md5_hash_string = (libsystem_character_t *) memory_allocate(
-			                                                    sizeof( libsystem_character_t ) * DIGEST_HASH_STRING_SIZE_MD5 );
-
-			if( stored_md5_hash_string == NULL )
-			{
-				fprintf(
-				 stderr,
-				 "Unable to create stored MD5 hash string.\n" );
-
-				verification_handle_close(
-				 verification_handle,
-				 NULL );
-				verification_handle_free(
-				 &verification_handle,
-				 NULL );
-
-				return( EXIT_FAILURE );
-			}
-			calculated_md5_hash_string = (libsystem_character_t *) memory_allocate(
-			                                                        sizeof( libsystem_character_t )* DIGEST_HASH_STRING_SIZE_MD5 );
-
-			if( calculated_md5_hash_string == NULL )
-			{
-				fprintf(
-				 stderr,
-				 "Unable to create calculated MD5 hash string.\n" );
-
-				memory_free(
-				 stored_md5_hash_string );
-
-				verification_handle_close(
-				 verification_handle,
-				 NULL );
-				verification_handle_free(
-				 &verification_handle,
-				 NULL );
-
-				return( EXIT_FAILURE );
-			}
-		}
-		if( calculate_sha1 == 1 )
-		{
-			stored_sha1_hash_string = (libsystem_character_t *) memory_allocate(
-			                                                     sizeof( libsystem_character_t )* DIGEST_HASH_STRING_SIZE_SHA1 );
-
-			if( stored_sha1_hash_string == NULL )
-			{
-				fprintf(
-				 stderr,
-				 "Unable to create stored SHA1 hash string.\n" );
-
-				if( calculate_md5 == 1 )
-				{
-					memory_free(
-					 stored_md5_hash_string );
-					memory_free(
-					 calculated_md5_hash_string );
-				}
-				verification_handle_close(
-				 verification_handle,
-				 NULL );
-				verification_handle_free(
-				 &verification_handle,
-				 NULL );
-
-				return( EXIT_FAILURE );
-			}
-			calculated_sha1_hash_string = (libsystem_character_t *) memory_allocate(
-			                                                         sizeof( libsystem_character_t )* DIGEST_HASH_STRING_SIZE_SHA1 );
-
-			if( calculated_sha1_hash_string == NULL )
-			{
-				fprintf(
-				 stderr,
-				 "Unable to create calculated SHA1 hash string.\n" );
-
-				memory_free(
-				 stored_sha1_hash_string );
-
-				if( calculate_md5 == 1 )
-				{
-					memory_free(
-					 stored_md5_hash_string );
-					memory_free(
-					 calculated_md5_hash_string );
-				}
-				verification_handle_close(
-				 verification_handle,
-				 NULL );
-				verification_handle_free(
-				 &verification_handle,
-				 NULL );
-
-				return( EXIT_FAILURE );
-			}
-		}
-		if( verification_handle_finalize(
-		     verification_handle,
-		     calculated_md5_hash_string,
-		     DIGEST_HASH_STRING_SIZE_MD5,
-		     stored_md5_hash_string,
-		     DIGEST_HASH_STRING_SIZE_MD5,
-		     &stored_md5_hash_available,
-		     calculated_sha1_hash_string,
-		     DIGEST_HASH_STRING_SIZE_SHA1,
-		     stored_sha1_hash_string,
-		     DIGEST_HASH_STRING_SIZE_SHA1,
-		     &stored_sha1_hash_available,
+		if( log_handle_initialize(
+		     &log_handle,
 		     &error ) != 1 )
 		{
 			fprintf(
 			 stderr,
-			 "Unable to finalize verification handle.\n" );
+			 "Unable to create log handle.\n" );
 
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-
-			if( calculate_sha1 == 1 )
-			{
-				memory_free(
-				 stored_sha1_hash_string );
-				memory_free(
-				 calculated_sha1_hash_string );
-			}
-			if( calculate_md5 == 1 )
-			{
-				memory_free(
-				 stored_md5_hash_string );
-				memory_free(
-				 calculated_md5_hash_string );
-			}
-			verification_handle_close(
-			 verification_handle,
-			 NULL );
-			verification_handle_free(
-			 &verification_handle,
-			 NULL );
-
-			return( EXIT_FAILURE );
+			goto on_error;
 		}
-		if( verification_handle_get_amount_of_crc_errors(
-		     verification_handle,
-		     &amount_of_crc_errors,
+		if( log_handle_open(
+		     log_handle,
+		     log_filename,
 		     &error ) != 1 )
 		{
 			fprintf(
 			 stderr,
-			 "Unable to determine the amount of CRC errors.\n" );
+			 "Unable to open log file: %" PRIs_LIBCSTRING_SYSTEM ".\n",
+			 log_filename );
 
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-
-			if( calculate_sha1 == 1 )
-			{
-				memory_free(
-				 stored_sha1_hash_string );
-				memory_free(
-				 calculated_sha1_hash_string );
-			}
-			if( calculate_md5 == 1 )
-			{
-				memory_free(
-				 stored_md5_hash_string );
-				memory_free(
-				 calculated_md5_hash_string );
-			}
-			verification_handle_close(
-			 verification_handle,
-			 NULL );
-			verification_handle_free(
-			 &verification_handle,
-			 NULL );
-
-			return( EXIT_FAILURE );
+			goto on_error;
 		}
-		if( log_filename != NULL )
+	}
+	if( ewfverify_verification_handle->input_format == VERIFICATION_HANDLE_INPUT_FORMAT_FILES )
+	{
+		result = verification_handle_verify_single_files(
+		          ewfverify_verification_handle,
+		          print_status_information,
+		          log_handle,
+		          &error );
+
+		if( result != 1 )
 		{
-			log_file_stream = libsystem_file_stream_open(
-					   log_filename,
-					   _LIBSYSTEM_CHARACTER_T_STRING( "a" ) );
+			fprintf(
+			 stderr,
+			 "Unable to verify single files.\n" );
 
-			if( log_file_stream == NULL )
-			{
-				fprintf(
-				 stderr,
-				 "Unable to open log file: %" PRIs_LIBSYSTEM ".\n",
-				 log_filename );
-			}
+			libcnotify_print_error_backtrace(
+			 error );
+			libcerror_error_free(
+			 &error );
 		}
-		fprintf(
-		 stdout,
-		 "\n" );
+	}
+	else
+	{
+		result = verification_handle_verify_input(
+		          ewfverify_verification_handle,
+		          print_status_information,
+		          log_handle,
+		          &error );
 
-		if( verification_handle_crc_errors_fprint(
-		     verification_handle,
-		     stdout,
+		if( result != 1 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to verify input.\n" );
+
+			libcnotify_print_error_backtrace(
+			 error );
+			libcerror_error_free(
+			 &error );
+		}
+	}
+	if( log_handle != NULL )
+	{
+		if( log_handle_close(
+		     log_handle,
+		     &error ) != 0 )
+		{
+			fprintf(
+			 stderr,
+			 "Unable to close log handle.\n" );
+
+			goto on_error;
+		}
+		if( log_handle_free(
+		     &log_handle,
 		     &error ) != 1 )
 		{
 			fprintf(
 			 stderr,
-			 "Unable to print crc errors.\n" );
+			 "Unable to free log handle.\n" );
 
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-		}
-		if( ( log_file_stream != NULL )
-		 && ( verification_handle_crc_errors_fprint(
-		       verification_handle,
-		       log_file_stream,
-		       &error ) != 1 ) )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to write crc errors in log file.\n" );
-
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-		}
-		if( calculate_md5 == 1 )
-		{
-			if( stored_md5_hash_available == 0 )
-			{
-				fprintf(
-				 stdout,
-				 "MD5 hash stored in file:\tN/A\n" );
-
-				if( log_file_stream != NULL )
-				{
-					fprintf(
-					 log_file_stream,
-					 "MD5 hash stored in file:\tN/A\n" );
-				}
-			}
-			else
-			{
-				fprintf(
-				 stdout,
-				 "MD5 hash stored in file:\t%" PRIs_LIBSYSTEM "\n",
-				 stored_md5_hash_string );
-
-				if( log_file_stream != NULL )
-				{
-					fprintf(
-					 log_file_stream,
-					 "MD5 hash stored in file:\t%" PRIs_LIBSYSTEM "\n",
-					 stored_md5_hash_string );
-				}
-			}
-			fprintf(
-			 stdout,
-			 "MD5 hash calculated over data:\t%" PRIs_LIBSYSTEM "\n",
-			 calculated_md5_hash_string );
-
-			if( log_file_stream != NULL )
-			{
-				fprintf(
-				 log_file_stream,
-				 "MD5 hash calculated over data:\t%" PRIs_LIBSYSTEM "\n",
-				 calculated_md5_hash_string );
-			}
-			match_md5_hash = ( libsystem_string_compare(
-					    stored_md5_hash_string,
-					    calculated_md5_hash_string,
-					    DIGEST_HASH_STRING_SIZE_MD5 ) == 0 );
-		}
-		if( calculate_sha1 == 1 )
-		{
-			if( stored_sha1_hash_available == 0 )
-			{
-				fprintf(
-				 stdout, "SHA1 hash stored in file:\tN/A\n" );
-
-				if( log_file_stream != NULL )
-				{
-					fprintf(
-					 log_file_stream,
-					 "SHA1 hash stored in file:\tN/A\n" );
-				}
-			}
-			else
-			{
-				fprintf(
-				 stdout,
-				 "SHA1 hash stored in file:\t%" PRIs_LIBSYSTEM "\n",
-				 stored_sha1_hash_string );
-
-				if( log_file_stream != NULL )
-				{
-					fprintf(
-					 log_file_stream,
-					 "SHA1 hash stored in file:\t%" PRIs_LIBSYSTEM "\n",
-					 stored_sha1_hash_string );
-				}
-			}
-			fprintf(
-			 stdout,
-			 "SHA1 hash calculated over data:\t%" PRIs_LIBSYSTEM "\n",
-			 calculated_sha1_hash_string );
-
-			if( log_file_stream != NULL )
-			{
-				fprintf(
-				 log_file_stream,
-				 "SHA1 hash calculated over data:\t%" PRIs_LIBSYSTEM "\n",
-				 calculated_sha1_hash_string );
-			}
-			match_sha1_hash = ( libsystem_string_compare(
-					     stored_sha1_hash_string,
-					     calculated_sha1_hash_string,
-					     DIGEST_HASH_STRING_SIZE_SHA1 ) == 0 );
-		}
-		if( verification_handle_additional_hash_values_fprint(
-		     verification_handle,
-		     stdout,
-		     &error ) != 1 )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to print additional hash values.\n" );
-
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-		}
-		if( ( log_file_stream != NULL )
-		 && ( verification_handle_additional_hash_values_fprint(
-		       verification_handle,
-		       log_file_stream,
-		       &error ) != 1 ) )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to write additional hash values in log file.\n" );
-
-			libsystem_notify_print_error_backtrace(
-			 error );
-			liberror_error_free(
-			 &error );
-		}
-		if( calculate_md5 == 1 )
-		{
-			memory_free(
-			 stored_md5_hash_string );
-			memory_free(
-			 calculated_md5_hash_string );
-		}
-		if( calculate_sha1 == 1 )
-		{
-			memory_free(
-			 stored_sha1_hash_string );
-			memory_free(
-			 calculated_sha1_hash_string );
+			goto on_error;
 		}
 	}
-	if( verification_handle_close(
-	     verification_handle,
-	     &error ) != 0 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to close EWF file(s).\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		if( log_file_stream != NULL )
-		{
-			libsystem_file_stream_close(
-			 log_file_stream );
-		}
-		verification_handle_free(
-		 &verification_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
-	}
-	if( verification_handle_free(
-	     &verification_handle,
-	     &error ) != 1 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to free verification handle.\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		if( log_file_stream != NULL )
-		{
-			libsystem_file_stream_close(
-			 log_file_stream );
-		}
-		return( EXIT_FAILURE );
-	}
-	if( status != PROCESS_STATUS_COMPLETED )
-	{
-		if( log_file_stream != NULL )
-		{
-			libsystem_file_stream_close(
-			 log_file_stream );
-		}
-		return( EXIT_FAILURE );
-	}
-	if( libsystem_signal_detach(
+on_abort:
+	if( libcsystem_signal_detach(
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
 		 "Unable to detach signal handler.\n" );
 
-		libsystem_notify_print_error_backtrace(
+		libcnotify_print_error_backtrace(
 		 error );
-		liberror_error_free(
+		libcerror_error_free(
 		 &error );
 	}
-	if( log_file_stream != NULL )
+	if( verification_handle_close(
+	     ewfverify_verification_handle,
+	     &error ) != 0 )
 	{
-		if( libsystem_file_stream_close(
-		     log_file_stream ) != 0 )
-		{
-			fprintf(
-			 stderr,
-			 "Unable to close log file: %s.\n",
-			 log_filename );
-		}
+		fprintf(
+		 stderr,
+		 "Unable to close verification handle.\n" );
+
+		goto on_error;
+
 	}
-	/* The EWF file can be verified without an integrity hash
-	 */
-	if( ( amount_of_crc_errors == 0 )
-	 && ( ( calculate_md5 == 0 )
-	  || ( stored_md5_hash_available == 0 )
-	  || match_md5_hash )
-	 && ( ( calculate_sha1 == 0 )
-	  || ( stored_sha1_hash_available == 0 )
-	  || match_sha1_hash ) )
+	if( verification_handle_free(
+	     &ewfverify_verification_handle,
+	     &error ) != 1 )
+	{
+		fprintf(
+		 stderr,
+		 "Unable to free verification handle.\n" );
+
+		goto on_error;
+	}
+	if( ewfverify_abort != 0 )
 	{
 		fprintf(
 		 stdout,
-		 "\n%" PRIs_LIBSYSTEM ": SUCCESS\n",
+		 "%" PRIs_LIBCSTRING_SYSTEM ": ABORTED\n",
 		 program );
 
-		result = EXIT_SUCCESS;
+		return( EXIT_FAILURE );
 	}
-	else
+	if( result != 1 )
 	{
 		fprintf(
 		 stdout,
-		 "\n%" PRIs_LIBSYSTEM ": FAILURE\n",
+		 "%" PRIs_LIBCSTRING_SYSTEM ": FAILURE\n",
 		 program );
 
-		result = EXIT_FAILURE;
+		return( EXIT_FAILURE );
 	}
-	return( result );
+	fprintf(
+	 stdout,
+	 "%" PRIs_LIBCSTRING_SYSTEM ": SUCCESS\n",
+	 program );
+
+	return( EXIT_SUCCESS );
+
+on_error:
+	if( error != NULL )
+	{
+		libcnotify_print_error_backtrace(
+		 error );
+		libcerror_error_free(
+		 &error );
+	}
+	if( log_handle != NULL )
+	{
+		log_handle_close(
+		 log_handle,
+		 NULL );
+		log_handle_free(
+		 &log_handle,
+		 NULL );
+	}
+	if( ewfverify_verification_handle != NULL )
+	{
+		verification_handle_close(
+		 ewfverify_verification_handle,
+		 NULL );
+		verification_handle_free(
+		 &ewfverify_verification_handle,
+		 NULL );
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( glob != NULL )
+	{
+		libcsystem_glob_free(
+		 &glob,
+		 NULL );
+	}
+#endif
+	return( EXIT_FAILURE );
 }
 

@@ -26,6 +26,81 @@ Install these tools by:
    c. Adding "c:\afflib;" to the beginning of the PATH environment variable.
 
 
+*******************************
+Compiling under Windows
+
+There are three ways to compile for Windows:
+1 - Cross-compiling from a Linux or Mac system with mingw.
+2 - Compiling natively on Windows using mingw.
+3 - Compiling natively on Windows using cygwin (untested)
+
+Cross-compiling from Linux or Mac using MINGW:
+*********************************************
+
+* Cross-compiling works fine, but it does not include the version 4.x
+  GCC compiler and pthreads does not appear to work properly.
+
+* We used to install with mingw cross-compiling, but that created problems with multi-threading
+
+
+Compiling natively under Windows with MINGW:
+*******************************************
+
+  Download the Windows Resource Kit from:
+  http://www.microsoft.com/downloads/details.aspx?familyid=9d467a69-57ff-4ae7-96ee-b18c4790cffd&displaylang=en
+
+  Download and run mingw-get-inst-20101030.exe (or whatever version is current),
+  selecting all options including these:
+    C Compiler, C++ Compiler. MSYS Basic System, MinGW Development Toolkit.
+  When selecting the installation path to MinGW, Do not define a path with spaces in it.
+
+  Start the MinGW32 shell window.
+
+  Download the latest repository catalog and update and install modules required by MinGW
+  by typing the following:
+  mingw-get update
+  mingw-get install g++
+  mingw-get install pthreads
+  mingw-get install mingw32-make
+  mingw-get install zlib
+  mingw-get install libz-dev
+
+  Install the libraries in this order:
+    * expat (http://sourceforge.net/projects/expat/)
+    * openssl (http://openssl.org)
+
+  For each library:
+   - download
+   - ./configure --prefix=/usr/local/ --enable-winapi=yes
+   - make
+   - make install
+
+   For openssl, run "./config --prefix=/usr/local" rather than configure.
+
+   Don't make directories in your home directory if there is a space in it! 
+   Libtool doesn't handle paths with spaces in them.
+
+  If OpenSSL is installed in /usr/local/ssl, you may need to build other libraries with:
+  ./configure CPPFLAGS="-I/usr/local/include" -I/usr/local/ssl/include" \
+              LDFLAGS="-L/usr/local/lib -L/usr/local/ssl/lib"
+
+  Most libraries will install in /usr/local/ ; you may need to add -I/usr/local/include to CFLAGS
+  and -L/usr/local/lib to your make scripts
+
+  Still problematic, though, is actually running what is produced. Unless you link -static you will have
+  a lot of DLL references. Most of the DLLs are installed in /usr/local/bin/*.dll and /bin/*.dll and elsewhere,
+  which maps typically to c:\mingw\msys\1.0\local\bin and c:\mingw\bin\
+
+
+
+
+Compiling your own copy:
+=======================
+We compile with mingw. Download and install MSys. 
+
+Next you will need to download and i
+
+
 Working with the tools
 ======================
 

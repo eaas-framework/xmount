@@ -1,8 +1,7 @@
 /*
  * Error functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -40,26 +39,31 @@ extern "C" {
 
 #if !defined( HAVE_LOCAL_LIBEWF )
 
-LIBEWF_EXTERN void libewf_error_free(
-                    libewf_error_t **error );
+LIBEWF_EXTERN \
+void libewf_error_free(
+      libewf_error_t **error );
 
-LIBEWF_EXTERN int libewf_error_fprint(
-                   libewf_error_t *error,
-                   FILE *stream );
+LIBEWF_EXTERN \
+int libewf_error_fprint(
+     libewf_error_t *error,
+     FILE *stream );
 
-LIBEWF_EXTERN int libewf_error_sprint(
-                   libewf_error_t *error,
-                   char *string,
-                   size_t size );
+LIBEWF_EXTERN \
+int libewf_error_sprint(
+     libewf_error_t *error,
+     char *string,
+     size_t size );
 
-LIBEWF_EXTERN int libewf_error_backtrace_fprint(
-                   libewf_error_t *error,
-                   FILE *stream );
+LIBEWF_EXTERN \
+int libewf_error_backtrace_fprint(
+     libewf_error_t *error,
+     FILE *stream );
 
-LIBEWF_EXTERN int libewf_error_backtrace_sprint(
-                   libewf_error_t *error,
-                   char *string,
-                   size_t size );
+LIBEWF_EXTERN \
+int libewf_error_backtrace_sprint(
+     libewf_error_t *error,
+     char *string,
+     size_t size );
 
 #endif
 

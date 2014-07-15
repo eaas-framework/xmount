@@ -6,7 +6,9 @@
  * That's useful for testing
  *
  * Requires: expat, openssl (for base64 coding)
+ * Distributed under the Berkeley 4-part license
  */
+
 
 #ifndef S3_GLUE_H
 #define S3_GLUE_H

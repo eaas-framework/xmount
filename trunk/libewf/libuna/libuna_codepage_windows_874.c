@@ -1,8 +1,7 @@
 /*
  * Windows 874 codepage (Thai) functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -50,7 +49,7 @@ const uint16_t libuna_codepage_windows_874_byte_stream_to_unicode_base_0x80[ 128
 /* Unicode to ASCII character lookup table for Windows 874 codepage
  * Unknown are filled with the ASCII replacement character 0x1a
  */
-const uint8_t libuna_codepage_windows_874_unicode_to_byte_stream_base_0x00e0[ 96 ] = {
+const uint8_t libuna_codepage_windows_874_unicode_to_byte_stream_base_0x0e00[ 96 ] = {
 	0x1a, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7,
 	0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
 	0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,

@@ -1,8 +1,7 @@
 /*
  * Codepage definitions for libewf
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -10,12 +9,12 @@
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This software is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this software.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -23,11 +22,15 @@
 #if !defined( _LIBEWF_CODEPAGE_H )
 #define _LIBEWF_CODEPAGE_H
 
-#include "types.h"
+#include <libewf/types.h>
+
+#if defined( __cplusplus )
+extern "C" {
+#endif
 
 /* The codepage definitions
  */
-enum LIBEWF_CODEPAGE
+enum LIBEWF_CODEPAGES
 {
 	LIBEWF_CODEPAGE_ASCII				= 20127,
 
@@ -47,7 +50,14 @@ enum LIBEWF_CODEPAGE
 	LIBEWF_CODEPAGE_ISO_8859_15			= 28605,
 	LIBEWF_CODEPAGE_ISO_8859_16			= 28606,
 
+	LIBEWF_CODEPAGE_KOI8_R				= 20866,
+	LIBEWF_CODEPAGE_KOI8_U				= 21866,
+
 	LIBEWF_CODEPAGE_WINDOWS_874			= 874,
+	LIBEWF_CODEPAGE_WINDOWS_932			= 932,
+	LIBEWF_CODEPAGE_WINDOWS_936			= 936,
+	LIBEWF_CODEPAGE_WINDOWS_949			= 949,
+	LIBEWF_CODEPAGE_WINDOWS_950			= 950,
 	LIBEWF_CODEPAGE_WINDOWS_1250			= 1250,
 	LIBEWF_CODEPAGE_WINDOWS_1251			= 1251,
 	LIBEWF_CODEPAGE_WINDOWS_1252			= 1252,
@@ -86,7 +96,14 @@ enum LIBEWF_CODEPAGE
 #define LIBEWF_CODEPAGE_ISO_LATIN_9			LIBEWF_CODEPAGE_ISO_8859_15
 #define LIBEWF_CODEPAGE_ISO_LATIN_10			LIBEWF_CODEPAGE_ISO_8859_16
 
+#define LIBEWF_CODEPAGE_KOI8_RUSSIAN			LIBEWF_CODEPAGE_KOI8_R
+#define LIBEWF_CODEPAGE_KOI8_UKRAINIAN			LIBEWF_CODEPAGE_KOI8_U
+
 #define LIBEWF_CODEPAGE_WINDOWS_THAI			LIBEWF_CODEPAGE_WINDOWS_874
+#define LIBEWF_CODEPAGE_WINDOWS_JAPANESE		LIBEWF_CODEPAGE_WINDOWS_932
+#define LIBEWF_CODEPAGE_WINDOWS_CHINESE_SIMPLIFIED	LIBEWF_CODEPAGE_WINDOWS_936
+#define LIBEWF_CODEPAGE_WINDOWS_KOREAN			LIBEWF_CODEPAGE_WINDOWS_949
+#define LIBEWF_CODEPAGE_WINDOWS_CHINESE_TRADITIONAL	LIBEWF_CODEPAGE_WINDOWS_950
 #define LIBEWF_CODEPAGE_WINDOWS_CENTRAL_EUROPEAN	LIBEWF_CODEPAGE_WINDOWS_1250
 #define LIBEWF_CODEPAGE_WINDOWS_CYRILLIC		LIBEWF_CODEPAGE_WINDOWS_1251
 #define LIBEWF_CODEPAGE_WINDOWS_WESTERN_EUROPEAN	LIBEWF_CODEPAGE_WINDOWS_1252
@@ -96,6 +113,10 @@ enum LIBEWF_CODEPAGE
 #define LIBEWF_CODEPAGE_WINDOWS_ARABIC			LIBEWF_CODEPAGE_WINDOWS_1256
 #define LIBEWF_CODEPAGE_WINDOWS_BALTIC			LIBEWF_CODEPAGE_WINDOWS_1257
 #define LIBEWF_CODEPAGE_WINDOWS_VIETNAMESE		LIBEWF_CODEPAGE_WINDOWS_1258
+
+#if defined( __cplusplus )
+}
+#endif
 
 #endif
 

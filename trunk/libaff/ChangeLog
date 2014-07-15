@@ -1,3 +1,228 @@
+2012-03-31  Simson Garfinkel  <simsong@imac3.home>
+
+	* configure.ac: increased version number to 3.7.0
+
+	* ALL FILES: Audited for copyright.
+
+	* COPYING: Clarified that Basis copyright only applies to 
+
+	* .gitignore: created file in preparation for move to github
+
+2012-03-04  Simson Garfinkel  <simsong@imac3.home>
+
+	* configure.ac: increased version number to 3.6.16
+
+	* Changed license from BSD with advertising to BSD without advertising.
+
+2011-12-02  Simson Garfinkel  <simsong@alphonse-mucha>
+
+	* configure.ac: increased version number to 3.6.15
+
+2011-11-26  Simson Garfinkel  <simsong@it151636.ern.nps.edu>
+
+	* configure.ac: incorporated Greg Freemyer's patch to address some
+	ncurses problems.
+
+2011-11-24  Simson Garfinkel  <slgarfin@submit-0.local>
+
+	* lib/utils.h: created virtual destructore
+
+2011-11-21  Simson Garfinkel  <simsong@Alphonse-Mucha.local>
+
+	* configure.ac: added AC_PROG_CXX
+
+2011-11-18  Simson Garfinkel  <simsong@FC15>
+
+	* tools/affxml.cpp (main): removed unused bflag variable
+
+	* lib/vnode_afd.cpp: max() is now always defined, even on windows.
+
+2011-11-01  Simson Garfinkel  <simsong@it150660.ern.nps.edu>
+
+	* lib/aftimer.h (aftimer::eta_time): added std:: before string
+
+	* configure.ac: updated version counter to 3.6.14
+
+2011-11-01  Simson Garfinkel  <slgarfin@submit-0.local>
+
+	* lib/utils.h: added virtual destructor for seginfo
+
+2011-09-28  Simson Garfinkel  <simsong@arlington-8-30-77-137.ncr.vt.edu>
+
+	* configure.ac: incremented version counter to 3.6.13
+
+	* lib/afflib_pages.cpp (af_get_pagesize): having af_page_size() as
+	a macro was causing problems, so now there is both af_page_size
+	and af_get_pagesize, both of which do the same. Please use af_get_pagesize.
+
+2011-09-27  Simson Garfinkel  <simsong@Alphonse-Mucha.local>
+
+	* aftimer.h (timestamp): updated aftimer for higher resolution on win32
+
+2011-09-18  Simson Garfinkel  <simsong@imac3.home>
+
+	* lib/afflib.cpp (af_get_pagesize): created af_get_pagesize, which
+	for some reason was missing.
+
+	* lib/afflib.h: added int af_get_pagesize(AFFILE *af);
+
+
+2011-05-04  Simson Garfinkel  <simsong@alphonse-mucha.home>
+
+	* configure.ac: increased version number to 3.6.11, overcomes recent problems.
+
+2011-05-02  Simson Garfinkel  <simsong@alphonse-mucha.home>
+
+	* configure.ac: added back libcrypto (needed on MacOS)
+
+	* tools/affinfo.cpp (color): explicity tests for tigetstr(), putp() and tparm()
+
+2011-04-27  Simson Garfinkel  <simsong@t>
+
+	* configure.ac: removed dependency on libcrypto (as we have
+	libssl-dev dependency)
+
+2011-04-25  Simson Garfinkel  <simsong@msimsonnet.local>
+
+	* lib/Makefile.am (EXTRA_PROGRAMS): java re-added to distribution;
+	bulk_extractor.jar is now listed as an EXTRA program so it doesn't
+	always get built.
+
+2011-04-14  Simson Garfinkel  <simsong@Magneto.local>
+
+	* configure.ac: increased version to 3.6.10
+
+	* lib/vnode_split_raw.cpp (split_raw_increment_fname): revised
+	splitraw so that it goes 000 to 999 then A00 through ZZ9 (that is,
+	the first and second character are base 36, the third remains base
+	10)
+
+2011-04-06  Simson Garfinkel  <simsong@t>
+
+	* configure.ac: incremented to version 3.6.9
+
+	* lib/aftest.cpp (bugs_test): added tests
+
+	* lib/vnode_split_raw.cpp (split_raw_identify_file): now 
+	returns 1 for filename.000 or filename.001 or filename.AAA or filename.aaa.
+
+	* (split_raw_close): Now only closes files that are open.
+
+	* (increment_fname) changed to vnode_split_raw_increment_fname so it
+	can be externally tested.
+
+2011-03-20  Simson Garfinkel  <simsong@imac3.home>
+
+	* configure.ac: increased version number to 3.6.8
+
+2011-03-18  Simson Garfinkel  <simsong@Silver.local>
+
+	* configure.ac: version number incremented to 3.6.7
+
+	* lib/afflib_i.h: removed typedefs for uint and int64 and uint32_t
+
+
+2011-03-17  Simson Garfinkel  <simsong@silver.westell.com>
+
+	* ALL OF AFFLIB: All "unsigned long" changed to uint32_t *.
+
+2011-02-16  Simson Garfinkel  <simsong@imac3.home>
+
+	* lib/afflib_i.h: removed all u_int, etc. for Cstandard uint8_t,
+	uint32_t, etc.
+
+2011-01-29  Simson Garfinkel  <simsong@imac3.home>
+
+	* tools/affsegment.cpp ("C"): added extern "C" around regex.h include
+
+	* lib/utils.h: changed all u_int to "unsigned int".
+	(aff): changed u_long to unsigned long
+
+	* lib/afflib.h: changed all u_int to "unsigned int" and all
+	"u_char" to unsigned char to ease compiling in certain environments.
+
+2011-01-14  Simson Garfinkel  <simsong@imac3.home>
+
+	* lib/afflib.cpp (af_make_badflag): changed int to unsigned int to
+	avoid compiler warning.
+
+	* configure.ac: removed AC_MSG_NOTICE([LIBEWF:             ${enable_libewf} (requires uuid-dev on Linux)])
+
+2011-01-12  Simson Garfinkel  <simsong@imac3.home>
+
+	* aftimer.h (aftimer::hms): fixed plural for days.
+
+2011-01-01  Simson Garfinkel  <simsong@imac3.home>
+
+	* Makefile.am (pkginclude_HEADERS): removed threaded_hash.h from package.
+
+	* lib/vnode_aff.cpp: incorporated kernel modifications from kernel mounter.
+
+2010-12-22  Simson Garfinkel  <simsong@Silver-Surfer.local>
+
+	* tools/affverify.cpp (hash_verify): changed aftimer to return string
+
+	* aftimer.h (class aftimer): modified to return string rather than
+	deal with silly buffers.
+
+2010-12-16  Simson Garfinkel  <simsong@247.sub-69-99-140.myvzw.com>
+
+	* configure.ac: removed IN_AFFLIB. I wonder what it was used for.
+
+2010-12-16  Simson Garfinkel  <simsong@Silver-Surfer.local>
+
+	* configure.ac: version number increased to 3.6.6
+
+	* lib/Makefile.am (AFFLIB_SOURCES): threaded_hash.h removed from
+	afflib distribution.
+
+2010-12-04  Simson Garfinkel  <simsong@imac3.home>
+
+	* lib/afflib_i.h: only define ENOTSUP if it is not already defined
+
+	* configure.ac: version number increased to 3.6.5
+
+2010-12-04  Simson Garfinkel  <simsong@imac3.local>
+
+	* configure.ac: disable qemu with Msys
+	
+	* configure.ac: ssl3_new in AC_CHECK_LIB changed to SSL_library_init
+
+2010-11-10  Simson Garfinkel  <simsong@Silver-Surfer.local>
+
+	* tools/affdiskprint.cpp: changed HAVE_EXPAT to HAVE_LIBEXPAT
+
+2010-10-25  Simson Garfinkel  <simsong@imac3.home>
+
+	* tools/affxml.cpp (xml_info): was adding a NULL to data instead
+	of b64size.
+
+2010-10-14  Simson Garfinkel  <simsong@Silver-Surfer.local>
+
+	* lib/afflib.cpp (af_open): added a warning that support for E01
+	was removed.
+
+2010-10-08  Simson Garfinkel  <simsong@Silver-Surfer.local>
+
+	* configure.ac: increased to 3.6.3
+
+	* lib/vnode_split_raw.cpp (split_raw_get_seg): added ability to
+	query AF_PAGESIZE, AF_IMAGESIZE, AF_SECTORSIZE and AF_DEVICE_SECTORS
+
+	* lib/vnode_raw.cpp (raw_get_seg): fixed AF_DEVICE_SECTORS to make
+	sure that there are 8 bytes available for the data (previously was 0)
+
+	* lib/afflib_pages.cpp (af_get_page): wasn't setting *bytes if a
+	page was requested and data was null. Now it does. This caused
+	mis-reporting in the size of split_raw files.
+
+	* lib/vnode_split_raw.cpp (split_raw_open_internal): replaced
+	fprintf with call to stderr.
+
+2010-08-09  Simson Garfinkel  <simsong@m.ern.nps.edu>
+
+	* make_mingw.sh: renamed bootstrap_mingw.sh to make_mingw.sh for consistency.
+
 2010-08-01  Simson Garfinkel  <simsong@Silver-Surfer.local>
 
 	* configure.ac: increased version to 3.6.2

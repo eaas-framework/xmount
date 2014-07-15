@@ -1,9 +1,9 @@
 /************************************************************
  *
  * (c) 2007 Olivier Castan castan.o@free.fr
- * Modifications (C) 2007 Simson Garfinkel, to fit into the AFFLIB build system.
+ * Modified by Simson Garfinkel, to fit into the AFFLIB build system.
  *
- * License: LGPL or AFFLIB. Take your choice. 
+ * License: LGP
  *
  * KISS: based on fuse hello.c example
  *

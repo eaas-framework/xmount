@@ -3,6 +3,9 @@
 #include "afflib_i.h"
 #include "vnode_raw.h"
 
+/*
+ * Distributed under the Berkeley 4-part license
+ */
 
 /* the RAW_PAGESIZE is visible outside the module, but it's kind of irrevellant */
 #define RAW_PAGESIZE 16*1024*1024	
@@ -122,7 +125,7 @@ static int raw_close(AFFILE *af)
 }
 
 static int raw_get_seg(AFFILE *af,const char *name,
-		       unsigned long *arg,unsigned char *data,size_t *datalen)
+		       uint32_t *arg,unsigned char *data,size_t *datalen)
 {
     struct raw_private *rp = RAW_PRIVATE(af);
 
@@ -136,9 +139,9 @@ static int raw_get_seg(AFFILE *af,const char *name,
 	}
 	if(strcmp(name,AF_IMAGESIZE)==0){
 	    struct aff_quad q;
-	    if(data && *datalen>=0){
-		q.low = htonl((unsigned long)(af->image_size & 0xffffffff));
-		q.high = htonl((unsigned long)(af->image_size >> 32));
+	    if(data && *datalen>=8){
+		q.low = htonl((uint32_t)(af->image_size & 0xffffffff));
+		q.high = htonl((uint32_t)(af->image_size >> 32));
 		memcpy(data,&q,8);
 		*datalen = 8;
 	    }
@@ -152,9 +155,9 @@ static int raw_get_seg(AFFILE *af,const char *name,
 	if(strcmp(name,AF_DEVICE_SECTORS)==0){
 	    int64_t devicesectors = af->image_size / af->image_sectorsize;
 	    struct aff_quad q;
-	    if(data && *datalen>=0){
-		q.low = htonl((unsigned long)(devicesectors & 0xffffffff));
-		q.high = htonl((unsigned long)(devicesectors >> 32));
+	    if(data && *datalen>=8){
+		q.low = htonl((uint32_t)(devicesectors & 0xffffffff));
+		q.high = htonl((uint32_t)(devicesectors >> 32));
 		memcpy(data,&q,8);
 		*datalen = 8;
 	    }
@@ -199,7 +202,7 @@ static int raw_get_seg(AFFILE *af,const char *name,
 
 
 int raw_update_seg(AFFILE *af, const char *name,
-		    unsigned long arg,const u_char *value,unsigned int vallen)
+		    uint32_t arg,const u_char *value,uint32_t vallen)
 {
     struct raw_private *rp = RAW_PRIVATE(af);
 
@@ -252,7 +255,7 @@ static int raw_rewind_seg(AFFILE *af)
 }
 
 
-static int raw_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int raw_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen)
 {
     

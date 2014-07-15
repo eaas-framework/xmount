@@ -2,47 +2,9 @@
  * afinfo.cpp:
  *
  * print information about an aff file
+ * Distributed under the Berkeley 4-part license
  */
 
-/*
- * Copyright (c) 2005--2008
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
- */
 
 
 #include "affconfig.h"
@@ -122,10 +84,10 @@ const char *term = 0;
 void bold(int on)
 {
     if(!term) return;
-#if defined(HAVE_LIBNCURSES)
 #ifdef HAVE_ISATTY
     if(!isatty(fileno(stdout))) return;
 #endif
+#if defined(HAVE_TPUTS)
     if(on) tputs(enter_bold_mode,1,putchar);
     else tputs(exit_attribute_mode,0,putchar);
 #endif
@@ -144,7 +106,7 @@ void color(int num)
 #ifdef HAVE_ISATTY
     if(!isatty(fileno(stdout))) return;
 #endif
-#ifdef HAVE_CURSES_H
+#if defined(HAVE_TIGETSTR) && defined(HAVE_PUTP) && defined(HAVE_TPARM)
     char *setf = tigetstr((char *)"setf");
     if(!setf) setf = tigetstr((char *)"setaf");
     if(setf){
@@ -402,7 +364,7 @@ void badscan(AFFILE *af,int page_number,size_t data_len)
  */
 void print_info(AFFILE *af,const char *segname)
 {
-    unsigned long arg;
+    uint32_t arg;
     unsigned char *data = 0;
     int dots = 0;
     u_int display_len = 0;
@@ -445,7 +407,7 @@ void print_info(AFFILE *af,const char *segname)
     memset(output_line,0,sizeof(output_line));
 
     /* Now append the arg and the data len */
-    sprintf(output_line,"%-24s %8ld   %8zd   ",segname,arg,data_len);
+    sprintf(output_line,"%-24s %8"PRIu32"   %8d   ",segname,arg,(int)data_len);
 
     if(opt_no_preview){
 	printf("%s\n",output_line);
@@ -589,11 +551,11 @@ void print_info(AFFILE *af,const char *segname)
 /* Print the information on a specific file. */
 int info_file(const char *infile)
 {
-    unsigned long total_segs = 0;
-    unsigned long total_pages = 0;
-    unsigned long total_hashes = 0;
-    unsigned long total_signatures =0;
-    unsigned long total_nulls = 0;
+    uint32_t total_segs = 0;
+    uint32_t total_pages = 0;
+    uint32_t total_hashes = 0;
+    uint32_t total_signatures =0;
+    uint32_t total_nulls = 0;
     struct af_vnode_info vni;
 
     AFFILE *af = af_open(infile,O_RDONLY,0);
@@ -701,27 +663,27 @@ int info_file(const char *infile)
 
 
     printf("\n");
-    printf("Total segments:        %8lu   (%lu real)\n", total_segs,total_segs-total_nulls);
+    printf("Total segments:        %8"PRIu32"   (%"PRIu32" real)\n", total_segs,(total_segs-total_nulls));
     if(aes_segs){
 	printf("  Encrypted segments:  %8u\n",aes_segs);
     }
-    printf("  Page  segments:      %8lu\n",total_pages);
-    printf("  Hash  segments:      %8lu\n",total_hashes);
-    printf("  Signature segments:  %8lu\n",total_signatures);
-    printf("  Null segments:       %8lu\n",total_nulls);
+    printf("  Page  segments:      %8"PRIu32"\n",total_pages);
+    printf("  Hash  segments:      %8"PRIu32"\n",total_hashes);
+    printf("  Signature segments:  %8"PRIu32"\n",total_signatures);
+    printf("  Null segments:       %8"PRIu32"\n",total_nulls);
     if(opt_all){
-	printf("  Empty segments:      %8lu\n",total_nulls);
+	printf("  Empty segments:      %8"PRIu32"\n",total_nulls);
 	printf("\n");
 	printf("Total data bytes in segments: %"I64d"\n",total_datalen);
 
 	printf("Total space in file dedicated to segment names: %zd\n",
 	       total_segname_len);
-	printf("Total overhead for %lu segments: %zd bytes (%lu*(%zd+%zd))\n",
+	printf("Total overhead for %"PRIu32" segments: %zd bytes (%"PRIu32"*(%zd+%zd))\n",
 	       total_segs,
 	       (size_t) total_segs*(sizeof(struct af_segment_head) +sizeof(struct af_segment_tail)),
 	       total_segs,
 	       sizeof(struct af_segment_head),
-	   sizeof(struct af_segment_tail));
+	       sizeof(struct af_segment_tail));
 	printf("Overhead for AFF file header: %zd bytes\n",sizeof(struct af_head));
     }
 
@@ -729,9 +691,9 @@ int info_file(const char *infile)
     af_get_segq(af,AF_DEVICE_SECTORS,&device_sectors);
     if(device_sectors==0){
 	/* See if we can fake it */
-	unsigned long cylinders=0;
-	unsigned long heads=0;
-	unsigned long sectors_per_track=0;
+	uint32_t cylinders=0;
+	uint32_t heads=0;
+	uint32_t sectors_per_track=0;
 	af_get_seg(af,AF_CYLINDERS,&cylinders,0,0);
 	af_get_seg(af,AF_HEADS,&heads,0,0);
 	af_get_seg(af,AF_SECTORS_PER_TRACK,&sectors_per_track,0,0);
@@ -763,8 +725,8 @@ int info_file(const char *infile)
 
     if(some_missing_pages && opt_debug){
 	printf("Cannot calculate missing pages\n");
-	printf("  device_sectors=%"I64d" image_pagesize=%lu sectorsize=%lu\n",
-	device_sectors,af->image_pagesize,af->image_sectorsize);
+	printf("  device_sectors=%"I64d" image_pagesize=%"PRIu32" sectorsize=%"PRIu32"\n",
+	       device_sectors,af->image_pagesize,af->image_sectorsize);
     }
     af_close(af);
     return 0;

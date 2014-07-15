@@ -1,50 +1,5 @@
 /* vnode_afm: afm raw file implementation with optional metadata support
- */
-
-/*
- * AFFLIB(tm)
- *
- * Copyright (c) 2005, 2006
- *	Simson L. Garfinkel and Basis Technology Corp.
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Support for split raw files and .afm files written by Joel N. Weber II
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson L. Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON L. GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON L. GARFINKEL, BASIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
- *
- * AFF and AFFLIB is a trademark of Simson Garfinkel and Basis Technology Corp.
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -276,7 +231,7 @@ static int afm_split_raw_setup(AFFILE *af)
     }
 
     /* Push down the image_pagesize from the AFM to the split_raw */
-    unsigned long image_pagesize = af->image_pagesize; // default to what's in memory
+    uint32_t image_pagesize = af->image_pagesize; // default to what's in memory
     af_get_seg(af,AF_PAGESIZE,&image_pagesize,0,0); // get from the AFF file if possible
     ap->sr->image_pagesize = af->image_pagesize; // overwrite the default with what the AFM file 
     
@@ -304,7 +259,7 @@ static int afm_raw_vstat(AFFILE *af,struct af_vnode_info *vni)
  * If it is a page segment, satisfy it from the splitraw,
  * otherwise from the aff file.
  */
-static int afm_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned char *data,size_t *datalen)
+static int afm_get_seg(AFFILE *af,const char *name,uint32_t *arg,unsigned char *data,size_t *datalen)
 {
     struct afm_private *ap = AFM_PRIVATE(af);
     int64_t page_num = af_segname_page_number(name);
@@ -337,7 +292,7 @@ static int afm_del_seg(AFFILE *af,const char *segname)
  * Then call get_next_seg of the splitraw until it has noneleft.
  */
 
-static int afm_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int afm_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			    unsigned char *data,size_t *datalen_)
 {
     struct afm_private *ap = AFM_PRIVATE(af);
@@ -361,7 +316,7 @@ static int afm_rewind_seg(AFFILE *af)
  * and metadata updates to the AFF implementation.
  */
 static int afm_update_seg(AFFILE *af, const char *name,
-			  unsigned long arg,const u_char *value,unsigned int vallen)
+			  uint32_t arg,const u_char *value,uint32_t vallen)
     
 {
     struct afm_private *ap = AFM_PRIVATE(af);

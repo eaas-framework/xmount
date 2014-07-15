@@ -1,8 +1,7 @@
 /*
  * Support functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -28,7 +27,6 @@
 
 #include <stdio.h>
 
-#include "libuna_error.h"
 #include "libuna_extern.h"
 
 #if defined( __cplusplus )
@@ -37,21 +35,11 @@ extern "C" {
 
 #if !defined( HAVE_LOCAL_LIBUNA )
 
-LIBUNA_EXTERN const char *libuna_get_version(
-                           void );
+LIBUNA_EXTERN \
+const char *libuna_get_version(
+             void );
 
-LIBUNA_EXTERN void libuna_error_free(
-                    libuna_error_t **error );
-
-LIBUNA_EXTERN void libuna_error_fprint(
-                    libuna_error_t *error,
-                    FILE *stream );
-
-LIBUNA_EXTERN void libuna_error_backtrace_fprint(
-                    libuna_error_t *error,
-                    FILE *stream );
-
-#endif
+#endif /* !defined( HAVE_LOCAL_LIBUNA ) */
 
 #if defined( __cplusplus )
 }

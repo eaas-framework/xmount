@@ -1,3 +1,5 @@
+# Distributed under the Berekeley 4-part license
+
 SUBDIRS = lib tools lzma443 tests doc pyaff man
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -5,7 +7,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = afflib.pc
 
 include_HEADERS = 
-pkginclude_HEADERS = lib/afflib.h lib/afflib_i.h lib/aftimer.h lib/utils.h  lib/threaded_hash.h
+pkginclude_HEADERS = lib/afflib.h lib/afflib_i.h lib/aftimer.h lib/utils.h  
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -71,7 +73,7 @@ DOCS = BUGLIST.txt README_Linux.txt README_Win32.txt \
 
 EXTRA_DIST = $(DOCS) \
 	bootstrap.sh \
-	bootstrap_mingw.sh \
+	make_mingw.sh \
 	m4/acx_pthread.m4 \
 	afflib.spec.in \
 	afflib.spec \

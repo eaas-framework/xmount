@@ -1,8 +1,7 @@
-/* 
+/*
  * Export handle
  *
- * Copyright (C) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,23 +25,13 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
- * before including libewf.h
- */
-#if defined( _WIN32 ) && defined( DLL_EXPORT )
-#define LIBEWF_DLL_IMPORT
-#endif
-
-#include <libewf.h>
-
-#include <libsystem.h>
-
-#include "digest_context.h"
 #include "digest_hash.h"
-#include "md5.h"
-#include "sha1.h"
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libewf.h"
+#include "ewftools_libhmac.h"
+#include "ewftools_libsmraw.h"
+#include "log_handle.h"
 #include "storage_media_buffer.h"
 
 #if defined( __cplusplus )
@@ -52,6 +41,7 @@ extern "C" {
 enum EXPORT_HANDLE_OUTPUT_FORMATS
 {
 	EXPORT_HANDLE_OUTPUT_FORMAT_EWF		= (int) 'e',
+	EXPORT_HANDLE_OUTPUT_FORMAT_FILES	= (int) 'f',
 	EXPORT_HANDLE_OUTPUT_FORMAT_RAW		= (int) 'r'
 };
 
@@ -59,33 +49,117 @@ typedef struct export_handle export_handle_t;
 
 struct export_handle
 {
-	/* Value to indicate if the MD5 digest hash should be calculated
+	/* The user input buffer
 	 */
-	uint8_t calculate_md5;
+	libcstring_system_character_t *input_buffer;
 
-	/* Value to indicate if the SHA1 digest hash should be calculated
+	/* The target path
 	 */
-	uint8_t calculate_sha1;
+	libcstring_system_character_t *target_path;
 
-	/* The MD5 digest context
+	/* The target path size
 	 */
-	md5_context_t md5_context;
+	size_t target_path_size;
 
-	/* The SHA1 digest context
+	/* The compression method
 	 */
-	sha1_context_t sha1_context;
+	uint16_t compression_method;
 
-	/* The libewf input handle
+	/* The compression level
 	 */
-	libewf_handle_t *input_handle;
+	int8_t compression_level;
+
+	/* The compression flags
+	 */
+	uint8_t compression_flags;
 
 	/* The output format
 	 */
 	uint8_t output_format;
 
-	/* The raw output file descriptor
+	/* The EWF format
 	 */
-	int raw_output_file_descriptor;
+	uint8_t ewf_format;
+
+	/* The number of sectors per chunk
+	 */
+	uint32_t sectors_per_chunk;
+
+	/* The maximum segment size
+	 */
+	size64_t maximum_segment_size;
+
+	/* The export offset
+	 */
+	uint64_t export_offset;
+
+	/* The export size
+	 */
+	uint64_t export_size;
+
+	/* The header codepage
+	 */
+	int header_codepage;
+
+	/* Value to indicate if the MD5 digest hash should be calculated
+	 */
+	uint8_t calculate_md5;
+
+	/* The MD5 digest context
+	 */
+	libhmac_md5_context_t *md5_context;
+
+	/* Value to indicate the MD5 digest context was initialized
+	 */
+	uint8_t md5_context_initialized;
+
+	/* The calculated MD5 digest hash string
+	 */
+	libcstring_system_character_t *calculated_md5_hash_string;
+
+	/* Value to indicate if the SHA1 digest hash should be calculated
+	 */
+	uint8_t calculate_sha1;
+
+	/* The SHA1 digest context
+	 */
+	libhmac_sha1_context_t *sha1_context;
+
+	/* Value to indicate the SHA1 digest context was initialized
+	 */
+	uint8_t sha1_context_initialized;
+
+	/* The calculated SHA1 digest hash string
+	 */
+	libcstring_system_character_t *calculated_sha1_hash_string;
+
+	/* Value to indicate if the SHA256 digest hash should be calculated
+	 */
+	uint8_t calculate_sha256;
+
+	/* The SHA256 digest context
+	 */
+	libhmac_sha256_context_t *sha256_context;
+
+	/* Value to indicate the SHA256 digest context was initialized
+	 */
+	uint8_t sha256_context_initialized;
+
+	/* The calculated SHA256 digest hash string
+	 */
+	libcstring_system_character_t *calculated_sha256_hash_string;
+
+	/* The libewf input handle
+	 */
+	libewf_handle_t *input_handle;
+
+	/* The libsmraw output handle
+	 */
+	libsmraw_handle_t *raw_output_handle;
+
+	/* Value to indicate if stdout should be used
+	 */
+	uint8_t use_stdout;
 
 	/* The libewf output handle
 	 */
@@ -95,9 +169,13 @@ struct export_handle
 	 */
 	size32_t input_chunk_size;
 
-	/* The amount of bytes per sector
+	/* The number of bytes per sector
 	 */
 	uint32_t bytes_per_sector;
+
+	/* The input media size
+	 */
+	size64_t input_media_size;
 
 #if defined( HAVE_LOW_LEVEL_FUNCTIONS )
 	/* The last offset of the input data
@@ -109,151 +187,282 @@ struct export_handle
 	 */
 	int write_compressed;
 
-	/* Value to indicate if the chunk should be wiped on error
+	/* Value to indicate if the chunk should be zeroed on error
 	 */
-	int wipe_chunk_on_error;
+	int zero_chunk_on_error;
+
+	/* The process buffer size
+	 */
+	size_t process_buffer_size;
+
+	/* The nofication output stream
+	 */
+	FILE *notify_stream;
+
+	/* Value to indicate if abort was signalled
+	 */
+	int abort;
 };
 
 int export_handle_initialize(
      export_handle_t **export_handle,
      uint8_t calculate_md5,
-     uint8_t calculate_sha1,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int export_handle_free(
      export_handle_t **export_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int export_handle_signal_abort(
      export_handle_t *export_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int export_handle_set_maximum_number_of_open_handles(
+     export_handle_t *export_handle,
+     int maximum_number_of_open_handles,
+     libcerror_error_t **error );
 
 int export_handle_open_input(
      export_handle_t *export_handle,
-     libsystem_character_t * const * filenames,
-     int amount_of_filenames,
-     liberror_error_t **error );
+     libcstring_system_character_t * const * filenames,
+     int number_of_filenames,
+     libcerror_error_t **error );
 
 int export_handle_open_output(
      export_handle_t *export_handle,
-     uint8_t output_format,
-     const libsystem_character_t *filename,
-     liberror_error_t **error );
+     const libcstring_system_character_t *filename,
+     libcerror_error_t **error );
 
 int export_handle_close(
      export_handle_t *export_handle,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 ssize_t export_handle_prepare_read_buffer(
          export_handle_t *export_handle,
          storage_media_buffer_t *storage_media_buffer,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 ssize_t export_handle_read_buffer(
          export_handle_t *export_handle,
          storage_media_buffer_t *storage_media_buffer,
          size_t read_size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 ssize_t export_handle_prepare_write_buffer(
          export_handle_t *export_handle,
          storage_media_buffer_t *storage_media_buffer,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 ssize_t export_handle_write_buffer(
          export_handle_t *export_handle,
          storage_media_buffer_t *storage_media_buffer,
          size_t write_size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 off64_t export_handle_seek_offset(
          export_handle_t *export_handle,
          off64_t offset,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
 int export_handle_swap_byte_pairs(
      export_handle_t *export_handle,
      storage_media_buffer_t *storage_media_buffer,
      size_t read_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int export_handle_initialize_integrity_hash(
+     export_handle_t *export_handle,
+     libcerror_error_t **error );
 
 int export_handle_update_integrity_hash(
      export_handle_t *export_handle,
-     storage_media_buffer_t *storage_media_buffer,
-     size_t read_size,
-     liberror_error_t **error );
+     uint8_t *buffer,
+     size_t buffer_size,
+     libcerror_error_t **error );
 
-int export_handle_get_input_media_size(
+int export_handle_finalize_integrity_hash(
      export_handle_t *export_handle,
-     size64_t *media_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
-int export_handle_get_input_chunk_size(
+int export_handle_input_is_corrupted(
      export_handle_t *export_handle,
-     size32_t *chunk_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int export_handle_get_output_chunk_size(
      export_handle_t *export_handle,
      size32_t *chunk_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_string(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcstring_system_character_t **internal_string,
+     size_t *internal_string_size,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_compression_method(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_compression_level(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_output_format(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_sectors_per_chunk(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_maximum_segment_size(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_export_offset(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_prompt_for_export_size(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *request_string,
+     libcerror_error_t **error );
+
+int export_handle_set_string(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcstring_system_character_t **internal_string,
+     size_t *internal_string_size,
+     libcerror_error_t **error );
+
+int export_handle_set_compression_values(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_output_format(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_sectors_per_chunk(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_maximum_segment_size(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_export_offset(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_export_size(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
 
 int export_handle_set_header_codepage(
      export_handle_t *export_handle,
-     int header_codepage,
-     liberror_error_t **error );
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_process_buffer_size(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
+
+int export_handle_set_additional_digest_types(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *string,
+     libcerror_error_t **error );
 
 int export_handle_set_output_values(
      export_handle_t *export_handle,
-     libsystem_character_t *acquiry_operating_system,
-     libsystem_character_t *acquiry_software,
-     libsystem_character_t *acquiry_software_version,
-     int header_codepage,
-     size64_t media_size,
-     int8_t compression_level,
-     uint8_t compression_flags,
-     uint8_t libewf_format,
-     size64_t segment_file_size,
-     uint32_t sectors_per_chunk,
-     uint8_t wipe_chunk_on_error,
-     liberror_error_t **error );
-
-int export_handle_set_header_value(
-     export_handle_t *export_handle,
-     char *header_value_identifier,
-     size_t header_value_identifier_length,
-     libsystem_character_t *header_value,
-     size_t header_value_length,
-     liberror_error_t **error );
+     libcstring_system_character_t *acquiry_operating_system,
+     libcstring_system_character_t *acquiry_software,
+     libcstring_system_character_t *acquiry_software_version,
+     uint8_t zero_chunk_on_error,
+     uint8_t copy_input_values,
+     libcerror_error_t **error );
 
 int export_handle_set_hash_value(
      export_handle_t *export_handle,
      char *hash_value_identifier,
      size_t hash_value_identifier_length,
-     libsystem_character_t *hash_value,
+     libcstring_system_character_t *hash_value,
      size_t hash_value_length,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( HAVE_LOW_LEVEL_FUNCTIONS )
-int export_handle_add_read_error(
+int export_handle_append_read_error(
       export_handle_t *export_handle,
       off64_t start_offset,
-      size_t amount_of_bytes,
-      liberror_error_t **error );
+      size_t number_of_bytes,
+      libcerror_error_t **error );
 #endif
 
 ssize_t export_handle_finalize(
          export_handle_t *export_handle,
-         libsystem_character_t *calculated_md5_hash_string,
-         size_t calculated_md5_hash_string_size,
-         libsystem_character_t *calculated_sha1_hash_string,
-         size_t calculated_sha1_hash_string_size,
-         liberror_error_t **error );
+         libcerror_error_t **error );
 
-int export_handle_crc_errors_fprint(
+int export_handle_export_input(
+     export_handle_t *export_handle,
+     uint8_t swap_byte_pairs,
+     uint8_t print_status_information,
+     log_handle_t *log_handle,
+     libcerror_error_t **error );
+
+int export_handle_export_single_files(
+     export_handle_t *export_handle,
+     const libcstring_system_character_t *export_path,
+     uint8_t print_status_information,
+     log_handle_t *log_handle,
+     libcerror_error_t **error );
+
+int export_handle_export_file_entry(
+     export_handle_t *export_handle,
+     libewf_file_entry_t *file_entry,
+     const libcstring_system_character_t *export_path,
+     size_t export_path_size,
+     size_t file_entry_path_index,
+     log_handle_t *log_handle,
+     libcerror_error_t **error );
+
+int export_handle_export_file_entry_data(
+     export_handle_t *export_handle,
+     libewf_file_entry_t *file_entry,
+     const libcstring_system_character_t *export_path,
+     libcerror_error_t **error );
+
+int export_handle_export_file_entry_sub_file_entries(
+     export_handle_t *export_handle,
+     libewf_file_entry_t *file_entry,
+     const libcstring_system_character_t *export_path,
+     size_t export_path_size,
+     size_t file_entry_path_index,
+     log_handle_t *log_handle,
+     libcerror_error_t **error );
+
+int export_handle_hash_values_fprint(
      export_handle_t *export_handle,
      FILE *stream,
-     liberror_error_t **error );
+     libcerror_error_t **error );
+
+int export_handle_checksum_errors_fprint(
+     export_handle_t *export_handle,
+     FILE *stream,
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

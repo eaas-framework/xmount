@@ -8,7 +8,7 @@ aftest_LDADD = libafflib.la
 aftest_LDFLAGS = $(PTHREAD_CFLAGS) -static # easier debugging
 
 AFFLIB_SOURCES = aff_db.cpp aff_db.h aff_toc.cpp \
-	afflib.cpp afflib.h afflib_i.h threaded_hash.h afflib_os.cpp \
+	afflib.cpp afflib.h afflib_i.h afflib_os.cpp \
 	afflib_pages.cpp afflib_stream.cpp afflib_util.cpp \
 	crypto.cpp \
 	base64.cpp base64.h lzma_glue.cpp s3_glue.h \

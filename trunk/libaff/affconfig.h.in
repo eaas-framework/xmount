@@ -220,6 +220,9 @@
 /* Define to 1 if you have the `putenv' function. */
 #undef HAVE_PUTENV
 
+/* Define to 1 if you have the `putp' function. */
+#undef HAVE_PUTP
+
 /* Build Python bindings */
 #undef HAVE_PYTHON
 
@@ -265,6 +268,9 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
+/* STL Present */
+#undef HAVE_STL
+
 /* Define to 1 if you have the `strcasecmp' function. */
 #undef HAVE_STRCASECMP
 
@@ -276,6 +282,9 @@
 
 /* Define to 1 if you have the `strerror' function. */
 #undef HAVE_STRERROR
+
+/* Define to 1 if you have the <string> header file. */
+#undef HAVE_STRING
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -395,8 +404,8 @@
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
 
-/* Defined if we are inside AFFLIB */
-#undef IN_AFFLIB
+/* Define to 1 if you have the <_mingw.h> header file. */
+#undef HAVE__MINGW_H
 
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */

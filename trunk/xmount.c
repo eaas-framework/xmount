@@ -1,8 +1,8 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2011 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2013 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
-* vdi or vmdk files and enable virtual write access to them.                   *
+* vdi, vhd or vmdk files and enable virtual write access to them.              *
 *                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *
@@ -18,35 +18,46 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#define HAVE_LIBAFF_STATIC
-#define HAVE_LIBEWF_STATIC
+#undef HAVE_LIBEWF_STATIC
+#undef HAVE_LIBAFF_STATIC
+#define WITH_LIBAEWF
+#define WITH_LIBAAFF
 
 #include "config.h"
 
-#ifdef HAVE_LIBEWF
-  #define WITH_LIBEWF
-#endif
 #ifdef HAVE_LIBEWF_STATIC
   #define WITH_LIBEWF
+#else
+  #ifdef HAVE_LIBEWF
+    #define WITH_LIBEWF
+  #endif
 #endif
 
-#ifdef HAVE_LIBAFFLIB
-  #define WITH_LIBAFF
-#endif
 #ifdef HAVE_LIBAFF_STATIC
   #define WITH_LIBAFF
+#else
+  #ifdef HAVE_LIBAFFLIB
+    #define WITH_LIBAFF
+  #endif
+#endif
+
+#ifndef HAVE_LIBZ
+  #undef WITH_LIBAEWF
 #endif
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <fcntl.h>
+//#include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
+#ifndef __APPLE__
+  #include <linux/fs.h>
+#endif
 #include <pthread.h>
 #include <stdint.h>
+#include <time.h>
 #ifdef HAVE_LIBEWF
   #include <libewf.h>
 #endif
@@ -59,25 +70,41 @@
 #ifdef HAVE_LIBAFF_STATIC
   #include "libaff/lib/afflib.h"
 #endif
+#include "libdd/dd.h"
+#ifdef WITH_LIBAEWF
+  #include "libaewf/aewf.h"
+#endif
+#ifdef WITH_LIBAAFF
+  #include "libaaff/aaff.h"
+#endif
+
 #include "xmount.h"
 #include "md5.h"
 
-// Some constant values
-#define IMAGE_INFO_HEADER "The following values have been extracted from " \
-                          "the mounted image file:\n\n"
-#define VDI_FILE_COMMENT "<<< This is a virtual VDI image >>>"
-#define VDI_HEADER_COMMENT "This VDI was emulated using xmount v" \
-                           PACKAGE_VERSION
+#if ( defined( HAVE_LIBEWF ) || defined( HAVE_LIBEWF_STATIC ) ) && !defined( LIBEWF_HANDLE )
+  // libewf version 2 no longer defines LIBEWF_HANDLE
+  #define HAVE_LIBEWF_V2_API
+#endif
 
 // Struct that contains various runtime configuration options
 static TXMountConfData XMountConfData;
 // Handles for input image types
-static FILE *hDdFile=NULL;
+static t_pdd hDdFile=NULL;
 #ifdef WITH_LIBEWF
-  static LIBEWF_HANDLE *hEwfFile=NULL;
+  #if defined( HAVE_LIBEWF_V2_API )
+    static libewf_handle_t *hEwfFile=NULL;
+  #else
+    static LIBEWF_HANDLE *hEwfFile=NULL;
+  #endif
+#endif
+#ifdef WITH_LIBAEWF
+  static t_pAewf hAewfFile=NULL;
 #endif
 #ifdef WITH_LIBAFF
   static AFFILE *hAffFile=NULL;
+#endif
+#ifdef WITH_LIBAAFF
+  static t_pAaff hAaffFile=NULL;
 #endif
 // Pointer to virtual info file
 static char *pVirtualImageInfoFile=NULL;
@@ -86,6 +113,8 @@ static TVdiFileHeader *pVdiFileHeader=NULL;
 static uint32_t VdiFileHeaderSize=0;
 static char *pVdiBlockMap=NULL;
 static uint32_t VdiBlockMapSize=0;
+// Vars needed for VHD emulation
+static TVhdFileHeader *pVhdFileHeader=NULL;
 // Vars needed for VMDK emulation
 static char *pVirtualVmdkFile=NULL;
 static int VirtualVmdkFileSize=0;
@@ -165,7 +194,7 @@ static void LogWarnMessage(char *pMessage,...) {
  *   n/a
  */
 static void PrintUsage(char *pProgramName) {
-  printf("\nxmount v%s copyright (c) 2008-2011 by Gillen Daniel "
+  printf("\nxmount v%s copyright (c) 2008-2013 by Gillen Daniel "
          "<gillen.dan@pinguin.lu>\n",PACKAGE_VERSION);
   printf("\nUsage:\n");
   printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",pProgramName);
@@ -186,20 +215,32 @@ static void PrintUsage(char *pProgramName) {
 #ifdef WITH_LIBEWF
   printf(", \"ewf\"");
 #endif
+#ifdef WITH_LIBAEWF
+  printf(", \"aewf\"");
+#endif
 #ifdef WITH_LIBAFF
   printf(", \"aff\"");
 #endif
+#ifdef WITH_LIBAAFF
+  printf(", \"aaff\"");
+#endif
   printf(".\n");
   printf("    --info : Print out some infos about used compiler and libraries.\n");
-  printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"vdi\", \"vmdk(s)\".\n");
+  printf("    --offset <off> : Move the output image data start <off> bytes into the input image.\n");
+  printf("    --options <opts> : Specify special xmount options.\n");
+  printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk(s)\".\n");
   printf("    --owcache <file> : Same as --cache <file> but overwrites existing cache.\n");
   printf("    --rw <file> : Same as --cache <file>.\n");
   printf("    --version : Same as --info.\n");
+#ifndef __APPLE__
   printf("    INFO: Input and output image type defaults to \"dd\" if not specified.\n");
+#else
+  printf("    INFO: Input image type defaults to \"dd\" and output image type defaults to \"dmg\" if not specified.\n");
+#endif
   printf("    WARNING: Output image type \"vmdk(s)\" should be considered experimental!\n");
   printf("  ifile:\n");
   printf("    Input image file.");
-#ifdef WITH_LIBEWF
+#if defined(WITH_LIBEWF) || defined(WITH_LIBAEWF)
   printf(" If you use EWF files, you have to specify all image\n");
   printf("    segments! (If your shell supports it, you can use .E?? as file extension\n");
   printf("    to specify them all)\n");
@@ -301,7 +342,7 @@ static int ParseCmdLine(const int argc,
         PrintUsage(argv[0]);
         exit(1);
       } else if(strcmp(argv[i],"-o")==0) {
-        // Next parameter specifies fuse mount options
+        // Next parameter specifies fuse / lib mount options
         if((argc+1)>i) {
           i++;
           // As the user specified the -o option, we assume he knows what he is
@@ -364,10 +405,20 @@ static int ParseCmdLine(const int argc,
             XMountConfData.OrigImageType=TOrigImageType_EWF;
             LOG_DEBUG("Setting input image type to EWF\n")
 #endif
+#ifdef WITH_LIBAEWF
+          } else if(strcmp(argv[i],"aewf")==0) {
+            XMountConfData.OrigImageType=TOrigImageType_AEWF;
+            LOG_DEBUG("Setting input image type to AEWF\n")
+#endif
 #ifdef WITH_LIBAFF
           } else if(strcmp(argv[i],"aff")==0) {
             XMountConfData.OrigImageType=TOrigImageType_AFF;
             LOG_DEBUG("Setting input image type to AFF\n")
+#endif
+#ifdef WITH_LIBAAFF
+          } else if(strcmp(argv[i],"aaff")==0) {
+            XMountConfData.OrigImageType=TOrigImageType_AAFF;
+            LOG_DEBUG("Setting input image type to AAFF\n")
 #endif
           } else {
             LOG_ERROR("Unknown input image type \"%s\"!\n",argv[i])
@@ -379,6 +430,15 @@ static int ParseCmdLine(const int argc,
           PrintUsage(argv[0]);
           exit(1);
         }
+      } else if(strcmp(argv[i],"--options")==0) {
+        if((argc+1)>i) {
+          i++;
+          XMOUNT_STRSET(XMountConfData.p_lib_params,argv[i]);
+        } else {
+          LOG_ERROR("You must specify special options!\n");
+          PrintUsage(argv[0]);
+          exit(1);
+        }
       } else if(strcmp(argv[i],"--out")==0) {
         // Specify output image type
         // Next parameter must be image type
@@ -387,9 +447,15 @@ static int ParseCmdLine(const int argc,
           if(strcmp(argv[i],"dd")==0) {
             XMountConfData.VirtImageType=TVirtImageType_DD;
             LOG_DEBUG("Setting virtual image type to DD\n")
+          } else if(strcmp(argv[i],"dmg")==0) {
+            XMountConfData.VirtImageType=TVirtImageType_DMG;
+            LOG_DEBUG("Setting virtual image type to DMG\n")
           } else if(strcmp(argv[i],"vdi")==0) {
             XMountConfData.VirtImageType=TVirtImageType_VDI;
             LOG_DEBUG("Setting virtual image type to VDI\n")
+          } else if(strcmp(argv[i],"vhd")==0) {
+            XMountConfData.VirtImageType=TVirtImageType_VHD;
+            LOG_DEBUG("Setting virtual image type to VHD\n")
           } else if(strcmp(argv[i],"vmdk")==0) {
             XMountConfData.VirtImageType=TVirtImageType_VMDK;
             LOG_DEBUG("Setting virtual image type to VMDK\n")
@@ -422,24 +488,49 @@ static int ParseCmdLine(const int argc,
         LOG_DEBUG("Enabling virtual write support overwriting cache file \"%s\"\n",
                   XMountConfData.pCacheFile)
       } else if(strcmp(argv[i],"--version")==0 || strcmp(argv[i],"--info")==0) {
-        printf("xmount v%s copyright (c) 2008-2011 by Gillen Daniel "
+        printf("xmount v%s copyright (c) 2008-2013 by Gillen Daniel "
                "<gillen.dan@pinguin.lu>\n\n",PACKAGE_VERSION);
 #ifdef __GNUC__
         printf("  compile timestamp: %s %s\n",__DATE__,__TIME__);
         printf("  gcc version: %s\n",__VERSION__);
 #endif
-#ifdef WITH_LIBEWF
-        printf("  libewf support: YES (version %s)\n",LIBEWF_VERSION_STRING);
+#if defined(WITH_LIBEWF) || defined(WITH_LIBAEWF)
+        printf("  EWF support: YES");
+  #ifdef WITH_LIBEWF
+        printf(" (libewf v%s)",LIBEWF_VERSION_STRING);
+  #endif
+  #ifdef WITH_LIBAEWF
+        printf(" (internal)");
+  #endif
+        printf("\n");
 #else
-        printf("  libewf support: NO\n");
+        printf("  EWF support: NO\n");
 #endif
-#ifdef WITH_LIBAFF
-        printf("  libaff support: YES (version %s)\n",af_version());
+#if defined(WITH_LIBAFF) || defined(WITH_LIBAAFF)
+        printf("  AFF support: YES ");
+  #ifdef WITH_LIBAFF
+        printf("(libaff v%s)",af_version());
+  #endif
+  #ifdef WITH_LIBAAFF
+        printf("(internal) ");
+  #endif
+        printf("\n");
 #else
-        printf("  libaff support: NO\n");
+        printf("  AFF support: NO\n");
 #endif
         printf("\n");
         exit(0);
+      } else if(strcmp(argv[i],"--offset")==0) {
+        if((argc+1)>i) {
+          i++;
+          XMountConfData.orig_img_offset=strtoull(argv[i],NULL,10);
+        } else {
+          LOG_ERROR("You must specify an offset!\n")
+          PrintUsage(argv[0]);
+          exit(1);
+        }
+        LOG_DEBUG("Setting input image offset to \"%" PRIu64 "\"\n",
+                  XMountConfData.orig_img_offset)
       } else {
         LOG_ERROR("Unknown command line option \"%s\"\n",argv[i]);
         PrintUsage(argv[0]);
@@ -554,8 +645,14 @@ static int ExtractVirtFileNames(char *pOrigName) {
     case TVirtImageType_DD:
       XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".dd")
       break;
+    case TVirtImageType_DMG:
+      XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".dmg")
+      break;
     case TVirtImageType_VDI:
       XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".vdi")
+      break;
+    case TVirtImageType_VHD:
+      XMOUNT_STRAPP(XMountConfData.pVirtualImagePath,".vhd")
       break;
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
@@ -585,45 +682,72 @@ static int ExtractVirtFileNames(char *pOrigName) {
  *   Get size of original image
  *
  * Params:
- *   size: Pointer to an uint64_t to which the size will be written to
+ *   p_size: Pointer to an uint64_t to which the size will be written to
  *
  * Returns:
  *   "TRUE" on success, "FALSE" on error
  */
-static int GetOrigImageSize(uint64_t *size) {
+static int GetOrigImageSize(uint64_t *p_size) {
   // Make sure to return correct values when dealing with only 32bit file sizes
-  *size=0;
+  *p_size=0;
+  int rc;
 
   // When size was already queryed, use old value rather than regetting value
   // from disk
   if(XMountConfData.OrigImageSize!=0) {
-    *size=XMountConfData.OrigImageSize;
+    *p_size=XMountConfData.OrigImageSize;
     return TRUE;
   }
 
   // Now get size of original image
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
+      if((rc=ddSize(hDdFile,(long long unsigned int*)p_size))!=DD_OK) {
+        LOG_ERROR("Unable to determine DD size using ddSize. Error code %d!\n",rc);
+        return FALSE;
+      }
+/*
       // Original image is a DD file. Seek to end to get size.
       if(fseeko(hDdFile,0,SEEK_END)!=0) {
         LOG_ERROR("Couldn't seek to end of image file!\n")
         return FALSE;
       }
-      *size=ftello(hDdFile);
+      *p_size=ftello(hDdFile);
+*/
       break;
 #ifdef WITH_LIBEWF
     case TOrigImageType_EWF:
       // Original image is an EWF file. Just query media size.
-      if(libewf_get_media_size(hEwfFile,size)!=1) {
+#if defined( HAVE_LIBEWF_V2_API )
+      if(libewf_handle_get_media_size(hEwfFile,p_size,NULL)!=1)
+#else
+      if(libewf_get_media_size(hEwfFile,p_size)!=1)
+#endif
+      {
         LOG_ERROR("Couldn't get ewf media size!\n")
+        return FALSE;
+      }
+      break;
+#endif
+#ifdef WITH_LIBAEWF
+    case TOrigImageType_AEWF:
+      if((rc=AewfSize(hAewfFile,(long long unsigned int*)p_size))!=AEWF_OK) {
+        LOG_ERROR("Couldn't get ewf media size. Error code %d!\n",rc);
         return FALSE;
       }
       break;
 #endif
 #ifdef WITH_LIBAFF
     case TOrigImageType_AFF:
-      // Original image is an AFF file.
-      *size=af_seek(hAffFile,0,SEEK_END);
+      *p_size=af_seek(hAffFile,0,SEEK_END);
+      break;
+#endif
+#ifdef WITH_LIBAAFF
+    case TOrigImageType_AAFF:
+      if((rc=AaffSize(hAaffFile,(long long unsigned int*)p_size))!=AAFF_OK) {
+        LOG_ERROR("Unable to determine AFF size using AaffSize. Error code %d!\n",rc);
+        return FALSE;
+      }
       break;
 #endif
     default:
@@ -631,7 +755,7 @@ static int GetOrigImageSize(uint64_t *size) {
       return FALSE;
   }
   // Save size so we have not to reget it from disk next time
-  XMountConfData.OrigImageSize=*size;
+  XMountConfData.OrigImageSize=*p_size;
   return TRUE;
 }
 
@@ -652,10 +776,11 @@ static int GetVirtImageSize(uint64_t *size) {
   }
 
   switch(XMountConfData.VirtImageType) {
+    case TVirtImageType_DD:
+    case TVirtImageType_DMG:
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
-    case TVirtImageType_DD:
-      // Virtual image is a DD or VMDK file. Just return the size of the
+      // Virtual image is a DD, DMG or VMDK file. Just return the size of the
       // original image
       if(!GetOrigImageSize(size)) {
         LOG_ERROR("Couldn't get size of input image!\n")
@@ -670,6 +795,15 @@ static int GetVirtImageSize(uint64_t *size) {
         return FALSE;
       }
       (*size)+=(sizeof(TVdiFileHeader)+VdiBlockMapSize);
+      break;
+    case TVirtImageType_VHD:
+      // Virtual image is a VHD file. Get size of original image and add size
+      // of VHD footer.
+      if(!GetOrigImageSize(size)) {
+        LOG_ERROR("Couldn't get size of input image!\n")
+        return FALSE;
+      }
+      (*size)+=sizeof(TVhdFileHeader);
       break;
     default:
       LOG_ERROR("Unsupported image type!\n")
@@ -694,6 +828,7 @@ static int GetVirtImageSize(uint64_t *size) {
 static int GetOrigImageData(char *buf, off_t offset, size_t size) {
   size_t ToRead=0;
   uint64_t ImageSize=0;
+  int rc;
 
   // Make sure we aren't reading past EOF of image file
   if(!GetOrigImageSize(&ImageSize)) {
@@ -715,6 +850,13 @@ static int GetOrigImageData(char *buf, off_t offset, size_t size) {
   // Now read data from image file
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
+      // Original image is a DD file. Read ToRead bytes.  
+      if((rc=ddRead(hDdFile,offset,buf,ToRead))!=DD_OK) {
+        LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64
+                  " using ddRead. Error code %d!\n",ToRead,offset,rc);
+        return -1;
+      }
+/*
       // Original image is a DD file. Seek to offset and read ToRead bytes.
       // TODO: Perhaps check whether it is cheaper to seek from current position
       // to offset than seeking from beginning of the file
@@ -727,41 +869,68 @@ static int GetOrigImageData(char *buf, off_t offset, size_t size) {
                   "!\n",ToRead,offset)
         return -1;
       }
+*/
       LOG_DEBUG("Read %zd bytes at offset %" PRIu64 " from DD file\n",
-                ToRead,offset)
+                ToRead,offset);
       break;
 #ifdef WITH_LIBEWF
     case TOrigImageType_EWF:
       // Original image is an EWF file. Seek to offset and read ToRead bytes.
+#if defined( HAVE_LIBEWF_V2_API )
+      if(libewf_handle_seek_offset(hEwfFile,offset,SEEK_SET,NULL)!=-1) {
+        if(libewf_handle_read_buffer(hEwfFile,buf,ToRead,NULL)!=ToRead) {
+#else
       if(libewf_seek_offset(hEwfFile,offset)!=-1) {
         if(libewf_read_buffer(hEwfFile,buf,ToRead)!=ToRead) {
+#endif
           LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64
-                    "!\n",ToRead,offset)
+                    "!\n",ToRead,offset);
           return -1;
         }
       } else {
-        LOG_ERROR("Couldn't seek to offset %" PRIu64 "!\n",offset)
+        LOG_ERROR("Couldn't seek to offset %" PRIu64 "!\n",offset);
         return -1;
       }
       LOG_DEBUG("Read %zd bytes at offset %" PRIu64 " from EWF file\n",
-                ToRead,offset)
+                ToRead,offset);
+      break;
+#endif
+#ifdef WITH_LIBAEWF
+    case TOrigImageType_AEWF:
+      if((rc=AewfRead(hAewfFile,offset,buf,ToRead))!=AEWF_OK) {
+        LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64
+                  " using AewfRead. Error code %d!\n",ToRead,offset,rc);
+        return -1;
+      }
+      LOG_DEBUG("Read %zd bytes at offset %" PRIu64 " from EWF file\n",
+                ToRead,offset);
       break;
 #endif
 #ifdef WITH_LIBAFF
     case TOrigImageType_AFF:
-      // Original image is an AFF file.
       af_seek(hAffFile,offset,SEEK_SET);
       if(af_read(hAffFile,buf,ToRead)!=ToRead) {
         LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64
-                  "!\n",ToRead,offset)
+                  "!\n",ToRead,offset);
         return -1;
       }
       LOG_DEBUG("Read %zd bytes at offset %" PRIu64 " from AFF file\n",
-                ToRead,offset)
+                ToRead,offset);
+      break;
+#endif
+#ifdef WITH_LIBAAFF
+    case TOrigImageType_AAFF:
+      if((rc=AaffRead(hAaffFile,offset,buf,ToRead))!=AAFF_OK) {
+        LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64
+                  " using AaffRead. Error code %d!\n",ToRead,offset,rc);
+        return -1;
+      }
+      LOG_DEBUG("Read %zd bytes at offset %" PRIu64 " from AFF file\n",
+                ToRead,offset);
       break;
 #endif
     default:
-      LOG_ERROR("Unsupported image type!\n")
+      LOG_ERROR("Unsupported image type!\n");
       return -1;
   }
   return ToRead;
@@ -823,10 +992,12 @@ static int GetVirtualVmdkData(char *buf, off_t offset, size_t size) {
 static int GetVirtImageData(char *buf, off_t offset, size_t size) {
   uint32_t CurBlock=0;
   uint64_t VirtImageSize;
+  uint64_t orig_image_size;
   size_t ToRead=0;
   size_t CurToRead=0;
   off_t FileOff=offset;
   off_t BlockOff=0;
+  size_t to_read_later=0;
 
   // Get virtual image size
   if(!GetVirtImageSize(&VirtImageSize)) {
@@ -846,9 +1017,15 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
 
   ToRead=size;
 
-  // Read virtual image type specific data
+  if(!GetOrigImageSize(&orig_image_size)) {
+    LOG_ERROR("Couldn't get original image size!")
+    return 0;
+  }
+
+  // Read virtual image type specific data preceeding original image data
   switch(XMountConfData.VirtImageType) {
     case TVirtImageType_DD:
+    case TVirtImageType_DMG:
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
       break;
@@ -893,6 +1070,18 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
           FileOff=0;
         }
       } else FileOff-=VdiFileHeaderSize;
+      break;
+    case TVirtImageType_VHD:
+      // When emulating VHD, make sure the while loop below only reads data
+      // available in the original image. Any VHD footer data must be read
+      // afterwards.
+      if(FileOff>=orig_image_size) {
+        to_read_later=ToRead;
+        ToRead=0;
+      } else if((FileOff+ToRead)>orig_image_size) {
+        to_read_later=(FileOff+ToRead)-orig_image_size;
+        ToRead-=to_read_later;
+      }
       break;
   }
 
@@ -943,6 +1132,57 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
     ToRead-=CurToRead;
     FileOff+=CurToRead;
   }
+
+  if(to_read_later!=0) {
+    // Read virtual image type specific data following original image data
+    switch(XMountConfData.VirtImageType) {
+      case TVirtImageType_DD:
+      case TVirtImageType_DMG:
+      case TVirtImageType_VMDK:
+      case TVirtImageType_VMDKS:
+      case TVirtImageType_VDI:
+        break;
+      case TVirtImageType_VHD:
+        // Micro$oft has choosen to use a footer rather then a header.
+        if(XMountConfData.Writable==TRUE &&
+           pCacheFileHeader->VhdFileHeaderCached==TRUE)
+        {
+          // VHD footer was already cached
+          if(fseeko(hCacheFile,
+                    pCacheFileHeader->pVhdFileHeader+(FileOff-orig_image_size),
+                    SEEK_SET)!=0)
+          {
+            LOG_ERROR("Couldn't seek to cached VHD footer at offset %"
+                      PRIu64 "\n",
+                      pCacheFileHeader->pVhdFileHeader+
+                        (FileOff-orig_image_size))
+            return 0;
+          }
+          if(fread(buf,to_read_later,1,hCacheFile)!=1) {
+            LOG_ERROR("Couldn't read %zu bytes from cache file at offset %"
+                      PRIu64 "\n",to_read_later,
+                      pCacheFileHeader->pVhdFileHeader+
+                        (FileOff-orig_image_size))
+            return 0;
+          }
+          LOG_DEBUG("Read %zd bytes from cached VHD footer at offset %"
+                    PRIu64 " at cache file offset %" PRIu64 "\n",
+                    to_read_later,(FileOff-orig_image_size),
+                    pCacheFileHeader->pVhdFileHeader+(FileOff-orig_image_size))
+        } else {
+          // VHD header isn't cached
+          memcpy(buf,
+                 ((char*)pVhdFileHeader)+(FileOff-orig_image_size),
+                 to_read_later);
+          LOG_DEBUG("Read %zd bytes at offset %" PRIu64
+                    " from virtual VHD header\n",
+                    to_read_later,
+                    (FileOff-orig_image_size))
+        }
+        break;
+    }
+  }
+
   return size;
 }
 
@@ -1053,6 +1293,111 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
 }
 
 /*
+ * SetVhdFileHeaderData:
+ *   Write data to virtual VHD file footer
+ *
+ * Params:
+ *   buf: Buffer containing data to write
+ *   offset: Offset of changes
+ *   size: Amount of bytes to write
+ *
+ * Returns:
+ *   Number of written bytes on success or "-1" on error
+ */
+static int SetVhdFileHeaderData(char *buf,off_t offset,size_t size) {
+  LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
+            " from VHD footer\n",size,offset)
+  if(pCacheFileHeader->VhdFileHeaderCached==1) {
+    // Header has already been cached
+    if(fseeko(hCacheFile,
+              pCacheFileHeader->pVhdFileHeader+offset,
+              SEEK_SET)!=0)
+    {
+      LOG_ERROR("Couldn't seek to cached VHD header at address %"
+                PRIu64 "\n",pCacheFileHeader->pVhdFileHeader+offset)
+      return -1;
+    }
+    if(fwrite(buf,size,1,hCacheFile)!=1) {
+      LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
+                PRIu64 "\n",size,
+                pCacheFileHeader->pVhdFileHeader+offset)
+      return -1;
+    }
+    LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64 " to cache file\n",
+              size,pCacheFileHeader->pVhdFileHeader+offset)
+  } else {
+    // Header hasn't been cached yet.
+    if(fseeko(hCacheFile,
+              0,
+              SEEK_END)!=0)
+    {
+      LOG_ERROR("Couldn't seek to end of cache file!")
+      return -1;
+    }
+    pCacheFileHeader->pVhdFileHeader=ftello(hCacheFile);
+    LOG_DEBUG("Caching whole VHD header\n")
+    if(offset>0) {
+      // Changes do not begin at offset 0, need to prepend with data from
+      // VHD header
+      if(fwrite((char*)pVhdFileHeader,offset,1,hCacheFile)!=1) {
+        LOG_ERROR("Error while writing %" PRIu64 " bytes "
+                  "to cache file at offset %" PRIu64 "!\n",
+                  offset,
+                  pCacheFileHeader->pVhdFileHeader);
+        return -1;
+      }
+      LOG_DEBUG("Prepended changed data with %" PRIu64
+                " bytes at cache file offset %" PRIu64 "\n",
+                offset,pCacheFileHeader->pVhdFileHeader)
+    }
+    // Cache changed data
+    if(fwrite(buf,size,1,hCacheFile)!=1) {
+      LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
+                PRIu64 "\n",size,
+                pCacheFileHeader->pVhdFileHeader+offset)
+      return -1;
+    }
+    LOG_DEBUG("Wrote %zu bytes of changed data to cache file offset %"
+              PRIu64 "\n",size,
+              pCacheFileHeader->pVhdFileHeader+offset)
+    if(offset+size!=sizeof(TVhdFileHeader)) {
+      // Need to append data from VHD header to cache whole data struct
+      if(fwrite(((char*)pVhdFileHeader)+offset+size,
+                sizeof(TVhdFileHeader)-(offset+size),
+                1,
+                hCacheFile)!=1)
+      {
+        LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
+                  PRIu64 "\n",sizeof(TVhdFileHeader)-(offset+size),
+                  (uint64_t)(pCacheFileHeader->pVhdFileHeader+offset+size))
+        return -1;
+      }
+      LOG_DEBUG("Appended %" PRIu32
+                " bytes to changed data at cache file offset %"
+                PRIu64 "\n",sizeof(TVhdFileHeader)-(offset+size),
+                pCacheFileHeader->pVhdFileHeader+offset+size)
+    }
+    // Mark header as cached and update header in cache file
+    pCacheFileHeader->VhdFileHeaderCached=1;
+    if(fseeko(hCacheFile,0,SEEK_SET)!=0) {
+      LOG_ERROR("Couldn't seek to offset 0 of cache file!\n")
+      return -1;
+    }
+    if(fwrite((char*)pCacheFileHeader,sizeof(TCacheFileHeader),1,hCacheFile)!=1) {
+      LOG_ERROR("Couldn't write changed cache file header!\n")
+      return -1;
+    }
+  }
+  // All important data has been written, now flush all buffers to make
+  // sure data is written to cache file
+  fflush(hCacheFile);
+#ifndef __APPLE__
+  ioctl(fileno(hCacheFile),BLKFLSBUF,0);
+#endif
+  return size;
+}
+
+/*
  * SetVirtImageData:
  *   Write data to virtual image
  *
@@ -1069,6 +1414,7 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
   uint64_t VirtImageSize;
   uint64_t OrigImageSize;
   size_t ToWrite=0;
+  size_t to_write_later=0;
   size_t CurToWrite=0;
   off_t FileOff=offset;
   off_t BlockOff=0;
@@ -1094,27 +1440,46 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
 
   ToWrite=size;
 
-  // Cache virtual image type specific data
-  if(XMountConfData.VirtImageType==TVirtImageType_VDI) {
-    if(FileOff<VdiFileHeaderSize) {
-      ret=SetVdiFileHeaderData(WriteBuf,FileOff,ToWrite);
-      if(ret==-1) {
-        LOG_ERROR("Couldn't write data to virtual VDI file header!\n")
-        return -1;
-      }
-      if(ret==ToWrite) return ToWrite;
-      else {
-        ToWrite-=ret;
-        WriteBuf+=ret;
-        FileOff=0;
-      }
-    } else FileOff-=VdiFileHeaderSize;
-  }
-
   // Get original image size
   if(!GetOrigImageSize(&OrigImageSize)) {
     LOG_ERROR("Couldn't get original image size!\n")
     return -1;
+  }
+
+  // Cache virtual image type specific data preceeding original image data
+  switch(XMountConfData.VirtImageType) {
+    case TVirtImageType_DD:
+    case TVirtImageType_DMG:
+    case TVirtImageType_VMDK:
+    case TVirtImageType_VMDKS:
+      break;
+    case TVirtImageType_VDI:
+      if(FileOff<VdiFileHeaderSize) {
+        ret=SetVdiFileHeaderData(WriteBuf,FileOff,ToWrite);
+        if(ret==-1) {
+          LOG_ERROR("Couldn't write data to virtual VDI file header!\n")
+          return -1;
+        }
+        if(ret==ToWrite) return ToWrite;
+        else {
+          ToWrite-=ret;
+          WriteBuf+=ret;
+          FileOff=0;
+        }
+      } else FileOff-=VdiFileHeaderSize;
+      break;
+    case TVirtImageType_VHD:
+      // When emulating VHD, make sure the while loop below only writes data
+      // available in the original image. Any VHD footer data must be written
+      // afterwards.
+      if(FileOff>=OrigImageSize) {
+        to_write_later=ToWrite;
+        ToWrite=0;
+      } else if((FileOff+ToWrite)>OrigImageSize) {
+        to_write_later=(FileOff+ToWrite)-OrigImageSize;
+        ToWrite-=to_write_later;
+      }
+      break;
   }
 
   // Calculate block to write data to
@@ -1213,7 +1578,8 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
           LOG_ERROR("Error while writing %zd bytes "
                     "to cache file at offset %" PRIu64 "!\n",
                     CACHE_BLOCK_SIZE-(BlockOff+CurToWrite),
-                    pCacheFileBlockIndex[CurBlock].off_data+BlockOff+CurToWrite);
+                    pCacheFileBlockIndex[CurBlock].off_data+
+                      BlockOff+CurToWrite);
           return -1;
         }
         free(buf2);
@@ -1251,6 +1617,26 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
     WriteBuf+=CurToWrite;
     ToWrite-=CurToWrite;
     FileOff+=CurToWrite;
+  }
+
+  if(to_write_later!=0) {
+    // Cache virtual image type specific data preceeding original image data
+    switch(XMountConfData.VirtImageType) {
+      case TVirtImageType_DD:
+      case TVirtImageType_DMG:
+      case TVirtImageType_VMDK:
+      case TVirtImageType_VMDKS:
+      case TVirtImageType_VDI:
+        break;
+      case TVirtImageType_VHD:
+        // Micro$oft has choosen to use a footer rather then a header.
+        ret=SetVhdFileHeaderData(WriteBuf,FileOff-OrigImageSize,to_write_later);
+        if(ret==-1) {
+          LOG_ERROR("Couldn't write data to virtual VHD file footer!\n")
+          return -1;
+        }
+        break;
+    }
   }
 
   return size;
@@ -1307,6 +1693,12 @@ static int GetVirtFileAttr(const char *path, struct stat *stbuf) {
     if(!GetVirtImageSize(&(stbuf->st_size))) {
       LOG_ERROR("Couldn't get image size!\n");
       return -ENOENT;
+    }
+    if(XMountConfData.VirtImageType==TVirtImageType_VHD) {
+      // Make sure virtual image seems to be fully allocated (not sparse file).
+      // Without this, Windows won't attach the vhd file!
+      stbuf->st_blocks=stbuf->st_size/512;
+      if(stbuf->st_size%512!=0) stbuf->st_blocks++;
     }
   } else if(strcmp(path,XMountConfData.pVirtualImageInfoPath)==0) {
     // Attributes of virtual image info file
@@ -2006,6 +2398,104 @@ static int InitVirtVdiHeader() {
 }
 
 /*
+ * InitVirtVhdHeader:
+ *   Build and init virtual VHD file header
+ *
+ * Params:
+ *   n/a
+ *
+ * Returns:
+ *   "TRUE" on success, "FALSE" on error
+ */
+static int InitVirtVhdHeader() {
+  uint64_t orig_image_size=0;
+  uint16_t i=0;
+  uint64_t geom_tot_s=0;
+  uint64_t geom_c_x_h=0;
+  uint16_t geom_c=0;
+  uint8_t geom_h=0;
+  uint8_t geom_s=0;
+  uint32_t checksum=0;
+
+  // Get input image size
+  if(!GetOrigImageSize(&orig_image_size)) {
+    LOG_ERROR("Couldn't get input image size!\n")
+    return FALSE;
+  }
+
+  // Allocate memory for vhd header
+  XMOUNT_MALLOC(pVhdFileHeader,pTVhdFileHeader,sizeof(TVhdFileHeader))
+  memset(pVhdFileHeader,0,sizeof(TVhdFileHeader));
+
+  // Init header values
+  pVhdFileHeader->cookie=VHD_IMAGE_HVAL_COOKIE;
+  pVhdFileHeader->features=VHD_IMAGE_HVAL_FEATURES;
+  pVhdFileHeader->file_format_version=VHD_IMAGE_HVAL_FILE_FORMAT_VERSION;
+  pVhdFileHeader->data_offset=VHD_IMAGE_HVAL_DATA_OFFSET;
+  pVhdFileHeader->creation_time=htobe32(time(NULL)-
+                                          VHD_IMAGE_TIME_CONVERSION_OFFSET);
+  pVhdFileHeader->creator_app=VHD_IMAGE_HVAL_CREATOR_APPLICATION;
+  pVhdFileHeader->creator_ver=VHD_IMAGE_HVAL_CREATOR_VERSION;
+  pVhdFileHeader->creator_os=VHD_IMAGE_HVAL_CREATOR_HOST_OS;
+  pVhdFileHeader->size_original=htobe64(orig_image_size);
+  pVhdFileHeader->size_current=pVhdFileHeader->size_original;
+
+  // Convert size to sectors
+  if(orig_image_size>136899993600) {
+    // image is larger then CHS values can address.
+    // Set sectors to max (C65535*H16*S255).
+    geom_tot_s=267382800;
+  } else {
+    // Calculate actual sectors
+    geom_tot_s=orig_image_size/512;
+    if((orig_image_size%512)!=0) geom_tot_s++;
+  }
+
+  // Calculate CHS values. This is done according to the VHD specs
+  if(geom_tot_s>=66059280) { // C65535 * H16 * S63
+    geom_s=255;
+    geom_h=16;
+    geom_c_x_h=geom_tot_s/geom_s;
+  } else {
+    geom_s=17;
+    geom_c_x_h=geom_tot_s/geom_s;
+    geom_h=(geom_c_x_h+1023)/1024;
+    if(geom_h<4) geom_h=4;
+    if(geom_c_x_h>=(geom_h*1024) || geom_h>16) {
+      geom_s=31;
+      geom_h=16;
+      geom_c_x_h=geom_tot_s/geom_s;
+    }
+    if(geom_c_x_h>=(geom_h*1024)) {
+      geom_s=63;
+      geom_h=16;
+      geom_c_x_h=geom_tot_s/geom_s;
+    }
+  }
+  geom_c=geom_c_x_h/geom_h;
+
+  pVhdFileHeader->disk_geometry_c=htobe16(geom_c);
+  pVhdFileHeader->disk_geometry_h=geom_h;
+  pVhdFileHeader->disk_geometry_s=geom_s;
+
+  pVhdFileHeader->disk_type=VHD_IMAGE_HVAL_DISK_TYPE;
+
+  pVhdFileHeader->uuid_l=XMountConfData.InputHashLo;
+  pVhdFileHeader->uuid_h=XMountConfData.InputHashHi;
+  pVhdFileHeader->saved_state=0x00;
+
+  // Calculate footer checksum
+  for(i=0;i<sizeof(TVhdFileHeader);i++) {
+    checksum+=*((uint8_t*)(pVhdFileHeader)+i);
+  }
+  pVhdFileHeader->checksum=htobe32(~checksum);
+
+  LOG_DEBUG("VHD header size = %u\n",sizeof(TVhdFileHeader));
+
+  return TRUE;
+}
+
+/*
  * InitVirtualVmdkFile:
  *   Init the virtual VMDK file
  *
@@ -2099,7 +2589,7 @@ static int InitVirtImageInfoFile() {
       break;
 
 #ifdef WITH_LIBEWF
-#define M_SAVE_VALUE(DESC) { \
+#define M_SAVE_VALUE(DESC,SHORT_DESC) { \
   if(ret==1) {             \
     XMOUNT_REALLOC(pVirtualImageInfoFile,char*, \
       (strlen(pVirtualImageInfoFile)+strlen(buf)+strlen(DESC)+2)) \
@@ -2107,43 +2597,81 @@ static int InitVirtImageInfoFile() {
     strncpy((pVirtualImageInfoFile+strlen(pVirtualImageInfoFile)),buf,strlen(buf)+1); \
     strncpy((pVirtualImageInfoFile+strlen(pVirtualImageInfoFile)),"\n",2); \
   } else if(ret==-1) { \
-    LOG_ERROR("Couldn't query EWF image info!\n") \
-    return FALSE; \
+    LOG_WARNING("Couldn't query EWF image header value '%s'\n",SHORT_DESC) \
   } \
 }
     case TOrigImageType_EWF:
       // Original image is an EWF file. Extract various infos from ewf file and
       // add them to the virtual image info file content.
+#if defined( HAVE_LIBEWF_V2_API )
+      ret=libewf_handle_get_utf8_header_value_case_number(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Case number: ","Case number")
+      ret=libewf_handle_get_utf8_header_value_description(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Description: ","Description")
+      ret=libewf_handle_get_utf8_header_value_examiner_name(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Examiner: ","Examiner")
+      ret=libewf_handle_get_utf8_header_value_evidence_number(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Evidence number: ","Evidence number")
+      ret=libewf_handle_get_utf8_header_value_notes(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Notes: ","Notes")
+      ret=libewf_handle_get_utf8_header_value_acquiry_date(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Acquiry date: ","Acquiry date")
+      ret=libewf_handle_get_utf8_header_value_system_date(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("System date: ","System date")
+      ret=libewf_handle_get_utf8_header_value_acquiry_operating_system(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Acquiry os: ","Acquiry os")
+      ret=libewf_handle_get_utf8_header_value_acquiry_software_version(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("Acquiry sw version: ","Acquiry sw version")
+      ret=libewf_handle_get_utf8_hash_value_md5(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("MD5 hash: ","MD5 hash")
+      ret=libewf_handle_get_utf8_hash_value_sha1(hEwfFile,buf,sizeof(buf),NULL);
+      M_SAVE_VALUE("SHA1 hash: ","SHA1 hash")
+#else
       ret=libewf_get_header_value_case_number(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Case number: ")
+      M_SAVE_VALUE("Case number: ","Case number")
       ret=libewf_get_header_value_description(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Description: ")
+      M_SAVE_VALUE("Description: ","Description")
       ret=libewf_get_header_value_examiner_name(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Examiner: ")
+      M_SAVE_VALUE("Examiner: ","Examiner")
       ret=libewf_get_header_value_evidence_number(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Evidence number: ")
+      M_SAVE_VALUE("Evidence number: ","Evidence number")
       ret=libewf_get_header_value_notes(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Notes: ")
+      M_SAVE_VALUE("Notes: ","Notes")
       ret=libewf_get_header_value_acquiry_date(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry date: ")
+      M_SAVE_VALUE("Acquiry date: ","Acquiry date")
       ret=libewf_get_header_value_system_date(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("System date: ")
+      M_SAVE_VALUE("System date: ","System date")
       ret=libewf_get_header_value_acquiry_operating_system(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry os: ")
+      M_SAVE_VALUE("Acquiry os: ","Acquiry os")
       ret=libewf_get_header_value_acquiry_software_version(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry sw version: ")
+      M_SAVE_VALUE("Acquiry sw version: ","Acquiry sw version")
       ret=libewf_get_hash_value_md5(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("MD5 hash: ")
+      M_SAVE_VALUE("MD5 hash: ","MD5 hash")
       ret=libewf_get_hash_value_sha1(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("SHA1 hash: ")
+      M_SAVE_VALUE("SHA1 hash: ","SHA1 hash")
+#endif
       break;
 #undef M_SAVE_VALUE
 #endif
-
+#ifdef WITH_LIBAEWF
+    case TOrigImageType_AEWF:
+      if((ret=AewfInfo(hAewfFile,(const char**)&pVirtualImageInfoFile))!=AEWF_OK) {
+        LOG_ERROR("Unable to get EWF image infos using AewfInfo. Return code %d!\n",ret)
+        return FALSE;
+      }
+      break;
+#endif
 #ifdef WITH_LIBAFF
     case TOrigImageType_AFF:
-      // Original image is an AFF file.
       // TODO: Extract some infos from AFF file to add to our info file
+      break;
+#endif
+#ifdef WITH_LIBAAFF
+    case TOrigImageType_AAFF:
+      if((ret=AaffInfo(hAaffFile,&pVirtualImageInfoFile))!=AAFF_OK) {
+        LOG_ERROR("Unable to get AAF image infos using AaffInfo. Return code %d!\n",ret)
+        return FALSE;
+      }
       break;
 #endif
     default:
@@ -2299,6 +2827,8 @@ static int InitCacheFile() {
     pCacheFileHeader->VmdkFileCached=FALSE;
     pCacheFileHeader->VmdkFileSize=0;
     pCacheFileHeader->pVmdkFile=0;
+    pCacheFileHeader->VhdFileHeaderCached=FALSE;
+    pCacheFileHeader->pVhdFileHeader=0;
     // Write header to file
     if(fwrite(pCacheFileHeader,CacheFileHeaderSize,1,hCacheFile)!=1) {
       free(pCacheFileHeader);
@@ -2340,13 +2870,19 @@ int main(int argc, char *argv[])
   char *pMountpoint=NULL;
   int ret=1;
   int i=0;
+  int rc;
+  char *p_lib_err=NULL;
 
   setbuf(stdout,NULL);
   setbuf(stderr,NULL);
 
   // Init XMountConfData
   XMountConfData.OrigImageType=TOrigImageType_DD;
+#ifndef __APPLE__
   XMountConfData.VirtImageType=TVirtImageType_DD;
+#else
+  XMountConfData.VirtImageType=TVirtImageType_DMG;
+#endif
   XMountConfData.Debug=FALSE;
   XMountConfData.pVirtualImagePath=NULL;
   XMountConfData.pVirtualVmdkPath=NULL;
@@ -2358,6 +2894,8 @@ int main(int argc, char *argv[])
   XMountConfData.VirtImageSize=0;
   XMountConfData.InputHashLo=0;
   XMountConfData.InputHashHi=0;
+  XMountConfData.orig_img_offset=0;
+  XMountConfData.p_lib_params=NULL;
 
   // Parse command line options
   if(!ParseCmdLine(argc,
@@ -2390,7 +2928,11 @@ int main(int argc, char *argv[])
   // Check for valid ewf files
   if(XMountConfData.OrigImageType==TOrigImageType_EWF) {
     for(i=0;i<InputFilenameCount;i++) {
+#if defined( HAVE_LIBEWF_V2_API )
+      if(libewf_check_file_signature(ppInputFilenames[i],NULL)!=1) {
+#else
       if(libewf_check_file_signature(ppInputFilenames[i])!=1) {
+#endif
         LOG_ERROR("File \"%s\" isn't a valid ewf file!\n",ppInputFilenames[i])
         return 1;
       }
@@ -2420,15 +2962,40 @@ int main(int argc, char *argv[])
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
       // Input image is a DD file
+      if((rc=ddOpen(&hDdFile,InputFilenameCount,(const char**)ppInputFilenames))!=DD_OK) {
+        LOG_ERROR("Unable to open DD file using ddOpen. Error code %d!\n",rc);
+        return 1;
+      }
+/*
       hDdFile=(FILE*)FOPEN(ppInputFilenames[0],"rb");
       if(hDdFile==NULL) {
         LOG_ERROR("Couldn't open DD file \"%s\"\n",ppInputFilenames[0])
         return 1;
       }
+*/
       break;
 #ifdef WITH_LIBEWF
     case TOrigImageType_EWF:
       // Input image is an EWF file or glob
+#if defined( HAVE_LIBEWF_V2_API )
+      if( libewf_handle_initialize(
+           &hEwfFile,
+           NULL ) != 1 )
+      {
+        LOG_ERROR("Couldn't create EWF handle!\n")
+        return 1;
+      }
+      if( libewf_handle_open(
+           hEwfFile,
+           ppInputFilenames,
+           InputFilenameCount,
+           libewf_get_access_flags_read(),
+           NULL ) != 1 )
+      {
+        LOG_ERROR("Couldn't open EWF file(s)!\n")
+        return 1;
+      }
+#else
       hEwfFile=libewf_open(ppInputFilenames,
                            InputFilenameCount,
                            libewf_get_flags_read());
@@ -2441,11 +3008,24 @@ int main(int argc, char *argv[])
         LOG_ERROR("Couldn't parse ewf header values!\n")
         return 1;
       }
+#endif
       break;
+#endif
+#ifdef WITH_LIBAEWF
+    case TOrigImageType_AEWF: {
+      if((rc=AewfOpen(&hAewfFile,InputFilenameCount,(const char**)ppInputFilenames))!=AEWF_OK) {
+        LOG_ERROR("Unable to open EWF file using AewfOpen. Error code %d!\n",rc)
+        return 1;
+      }
+      if((rc=AewfOptions(hAewfFile,XMountConfData.p_lib_params,&p_lib_err))!=AEWF_OK) {
+        LOG_ERROR("Unable to open EWF file using AewfOpen. Error code %d : %s!\n",rc,p_lib_err)
+        return 1;
+      }
+      break;
+    }
 #endif
 #ifdef WITH_LIBAFF
     case TOrigImageType_AFF:
-      // Input image is an AFF file
       hAffFile=af_open(ppInputFilenames[0],O_RDONLY,0);
       if(!hAffFile) {
         LOG_ERROR("Couldn't open AFF file!\n")
@@ -2453,6 +3033,14 @@ int main(int argc, char *argv[])
       }
       if(af_cannot_decrypt(hAffFile)) {
         LOG_ERROR("Encrypted AFF input images aren't supported yet!\n")
+        return 1;
+      }
+      break;
+#endif
+#ifdef WITH_LIBAAFF
+    case TOrigImageType_AAFF:
+      if((rc=AaffOpen(&hAaffFile,ppInputFilenames[0],0))!=AAFF_OK) {
+        LOG_ERROR("Unable to open AFF file using AaffOpen. Error code %d!\n",rc)
         return 1;
       }
       break;
@@ -2496,6 +3084,7 @@ int main(int argc, char *argv[])
   // Do some virtual image type specific initialisations
   switch(XMountConfData.VirtImageType) {
     case TVirtImageType_DD:
+    case TVirtImageType_DMG:
       break;
     case TVirtImageType_VDI:
       // When mounting as VDI, we need to construct a vdi header
@@ -2504,6 +3093,14 @@ int main(int argc, char *argv[])
         return 1;
       }
       LOG_DEBUG("Virtual VDI file header build successfully\n")
+      break;
+    case TVirtImageType_VHD:
+      // When mounting as VHD, we need to construct a vhd footer
+      if(!InitVirtVhdHeader()) {
+        LOG_ERROR("Couldn't initialize virtual VHD file footer!\n")
+        return 1;
+      }
+      LOG_DEBUG("Virtual VHD file footer build successfully\n")
       break;
     case TVirtImageType_VMDK:
     case TVirtImageType_VMDKS:
@@ -2534,16 +3131,40 @@ int main(int argc, char *argv[])
   // Close input image
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
+      if((rc=ddClose(&hDdFile))!=DD_OK) {
+        LOG_ERROR("Couldn't close DD file using ddClose. Error code %d!");
+      }
+/*
       fclose(hDdFile);
+*/
       break;
 #ifdef WITH_LIBEWF
     case TOrigImageType_EWF:
+#if defined( HAVE_LIBEWF_V2_API )
+      libewf_handle_close(hEwfFile,NULL);
+      libewf_handle_free(&hEwfFile,NULL);
+#else
       libewf_close(hEwfFile);
+#endif
+      break;
+#endif
+#ifdef WITH_LIBAEWF
+    case TOrigImageType_AEWF:
+      if((rc=AewfClose(&hAewfFile))!=AEWF_OK) {
+        LOG_ERROR("Couldn't close EWF file using AewfClose. Error code %d!");
+      }
       break;
 #endif
 #ifdef WITH_LIBAFF
     case TOrigImageType_AFF:
       af_close(hAffFile);
+      break;
+#endif
+#ifdef WITH_LIBAAFF
+    case TOrigImageType_AAFF:
+      if((rc=AaffClose(&hAaffFile))!=AAFF_OK) {
+        LOG_ERROR("Couldn't close AFF file using AaffClose. Error code %d!");
+      }
       break;
 #endif
     default:
@@ -2560,6 +3181,10 @@ int main(int argc, char *argv[])
   if(XMountConfData.VirtImageType==TVirtImageType_VDI) {
     // Free constructed VDI header
     free(pVdiFileHeader);
+  }
+  if(XMountConfData.VirtImageType==TVirtImageType_VHD) {
+    // Free constructed VHD header
+    free(pVhdFileHeader);
   }
   if(XMountConfData.VirtImageType==TVirtImageType_VMDK ||
      XMountConfData.VirtImageType==TVirtImageType_VMDKS)
@@ -2744,4 +3369,25 @@ int main(int argc, char *argv[])
   20110210: * Adding subtype and fsname FUSE options in order to display mounted
               source in mount command output.
   20110211: v0.4.5 released
+  20111011: * Changes to deal with libewf v2 API (Thx to Joachim Metz)
+  20111109: v0.4.6 released
+            * Added support for DMG output type (actually a DD with .dmg file
+              extension). This type is used as default output type when
+              using xmount under Mac OS X.
+  20120130: v0.4.7 released
+            * Made InitVirtImageInfoFile less picky about missing EWF infos.
+  20120507: * Added support for VHD output image as requested by various people.
+            * Statically linked libs updated to 20120504 (libewf) and 3.7.0
+              (afflib).
+  20120510: v0.5.0 released
+            * Added stbuf->st_blocks calculation for VHD images in function
+              GetVirtFileAttr. This makes Windows not think the emulated
+              file would be a sparse file. Sparse vhd files are not attachable
+              in Windows.
+  20130726: v0.6.0 released
+            * Added libaaff to replace libaff (thx to Guy Voncken).
+            * Added libdd to replace raw dd input file handling and finally
+              support split dd files (thx to Guy Voncken).
+  20140311: v0.7.0 released
+            * Added libaewf (thx to Guy Voncken).
 */

@@ -212,15 +212,15 @@ int  aff_bom::write(AFFILE *af,aff::seglist &segments)
 }
 
 
-void aff_bom::make_hash(u_char seghash[32], unsigned long arg,const char *segname,
-			const u_char *segbuf, unsigned long segsize)
+void aff_bom::make_hash(u_char seghash[32], uint32_t arg,const char *segname,
+			const u_char *segbuf, uint32_t segsize)
 {
     OpenSSL_add_all_digests();		// probably a good idea
     const EVP_MD *sha256 = EVP_get_digestbyname("SHA256");
 
     if(sha256){
 	unsigned int seghash_len = sizeof(seghash);
-	unsigned long arg_net = htonl(arg);
+	uint32_t arg_net = htonl(arg);
 	EVP_MD_CTX md;		/* EVP message digest */
 	EVP_DigestInit(&md,sha256);
 	EVP_DigestUpdate(&md,(const unsigned char *)segname,strlen(segname)+1);
@@ -235,7 +235,7 @@ int aff_bom::add(AFFILE *af,const char *segname)
     /* Get the segment length first */
     size_t datalen = 0;
     if(af_get_seg(af,segname,0,0,&datalen)<0) return -1;
-    unsigned long arg;
+    uint32_t arg;
     u_char *segdata = (u_char *)malloc(datalen);/* Allocate memory */
     if(segdata<0) return -1;
     if(af_get_seg(af,segname,&arg,segdata,&datalen)<0){

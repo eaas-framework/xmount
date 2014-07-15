@@ -1,8 +1,7 @@
 /*
  * EWF table section
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,15 +29,14 @@
 extern "C" {
 #endif
 
-typedef struct ewf_table ewf_table_t;
-typedef struct ewf_table_offset ewf_table_offset_t;
+typedef struct ewf_table_header ewf_table_header_t;
 
-struct ewf_table
+struct ewf_table_header
 {
-	/* The amount of chunks in the table
+	/* The number of offsets
 	 * consists of 4 bytes (32 bits)
 	 */
-	uint8_t amount_of_chunks[ 4 ];
+	uint8_t number_of_offsets[ 4 ];
 
 	/* Padding
 	 * consists of 4 bytes
@@ -57,19 +55,21 @@ struct ewf_table
 	 */
 	uint8_t padding2[ 4 ];
 
-	/* The section crc of all (previous) table data
+	/* The section checksum of all (previous) table data
 	 * consists of 4 bytes
 	 * starts with offset 76
 	 */
-	uint8_t crc[ 4 ];
+	uint8_t checksum[ 4 ];
 
 	/* The offset array
 	 * consists of mulitple 4 byte offsets
 	 */
 
-	/* The last offset is followed by a 4 byte CRC
+	/* The last offset is followed by a 4 byte checksum
 	 */
 };
+
+typedef struct ewf_table_offset ewf_table_offset_t;
 
 struct ewf_table_offset
 {

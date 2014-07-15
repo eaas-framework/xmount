@@ -4,5 +4,5 @@
 )
 (
   cd libewf
-  ./configure --enable-v1-api --disable-v2-api --disable-shared --enable-static && make -j$1
+  ./configure --disable-v1-api --disable-shared --enable-static && make -j$1
 )

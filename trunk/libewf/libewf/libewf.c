@@ -1,8 +1,7 @@
 /*
- * Library for the Expert Witness Compression Format Support (EWF)
+ * Library to access the Expert Witness Compression Format (EWF)
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,6 +25,8 @@
 #include <windows.h>
 #endif
 
+#include "libewf_unused.h"
+
 /* Define HAVE_LOCAL_LIBEWF for local use of libewf
  */
 #if !defined( HAVE_LOCAL_LIBEWF )
@@ -43,6 +44,8 @@ BOOL WINAPI DllMain(
              DWORD fdwReason,
              LPVOID lpvReserved )
 {
+	LIBEWF_UNREFERENCED_PARAMETER( lpvReserved )
+
 	switch( fdwReason )
 	{
 		case DLL_PROCESS_ATTACH:
@@ -62,19 +65,16 @@ BOOL WINAPI DllMain(
 	return( TRUE );
 }
 
-#endif
-
-#if defined( LIBEWF_DLL_EXPORT )
-
 /* Function that indicates the library is a DLL
  * Returns 1
  */
-char libewf_is_dll(
-      void )
+int libewf_is_dll(
+     void )
 {
 	return( 1 );
 }
-#endif
 
-#endif
+#endif /* defined( WINAPI ) */
+
+#endif /* !defined( HAVE_LOCAL_LIBEWF ) */
 

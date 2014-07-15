@@ -1,8 +1,7 @@
 /*
  * Support functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -27,6 +26,7 @@
 #include <types.h>
 
 #include "libbfio_extern.h"
+#include "libbfio_libcerror.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -34,10 +34,21 @@ extern "C" {
 
 #if !defined( HAVE_LOCAL_LIBBFIO )
 
-LIBBFIO_EXTERN const char *libbfio_get_version(
-                           void );
+LIBBFIO_EXTERN \
+const char *libbfio_get_version(
+             void );
 
-#endif
+LIBBFIO_EXTERN \
+int libbfio_get_codepage(
+     int *codepage,
+     libcerror_error_t **error );
+
+LIBBFIO_EXTERN \
+int libbfio_set_codepage(
+     int codepage,
+     libcerror_error_t **error );
+
+#endif /* !defined( HAVE_LOCAL_LIBBFIO ) */
 
 #if defined( __cplusplus )
 }

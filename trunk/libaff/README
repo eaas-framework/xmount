@@ -1,12 +1,13 @@
 		     The Advanced Forensic Format
 			  Library and Tools
+			      Version 3
 
 			 Simson L. Garfinkel
 		      Naval Postgraduate School
-				 2009
+				 2012
 
 
-The Advanced Forensic Format (AFF) is an emerging standard for storing
+The Advanced Forensic Format (AFF) is on-disk format for storing
 computer forensic information. Critical features of AFF include:
 
   - AFF allows you to store both computer forensic data and associated
@@ -55,6 +56,17 @@ forensic information. Using these tools you can:
  * Produce an XML "diskprint" which allows a disk image to be rapidly
    fingerprinted without having the computer the SHA1 of the entire
    disk.
+
+AFFLIBv3 implements version 3 of the AFF format. This version is
+currently in maintenance mode while work on AFFv4 continues. Key
+differences between AFFv3 and AFFv4 include:
+
+ * Whereas AFFv3 uses a purpose-built container file format, AFFv4 is
+   based on ZIP64.
+
+ * Whereas AFFv3 is licensed with a four-part Berkeley license, AFFv4
+   is licensed an approved Open Source license.
+
 
 
 AFFLIB and Toolkit is provided in source code form for Linux, MacOS

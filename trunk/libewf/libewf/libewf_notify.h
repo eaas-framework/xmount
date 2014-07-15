@@ -1,8 +1,7 @@
 /*
  * Notification function
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,8 +25,7 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-#include <libnotify.h>
+#include "libewf_libcerror.h"
 
 #include <stdio.h>
 
@@ -39,19 +37,23 @@ extern "C" {
 
 #if !defined( HAVE_LOCAL_LIBEWF )
 
-LIBEWF_EXTERN void libewf_notify_set_verbose(
-                    int verbose );
+LIBEWF_EXTERN \
+void libewf_notify_set_verbose(
+      int verbose );
 
-LIBEWF_EXTERN int libewf_notify_set_stream(
-                   FILE *stream,
-                   liberror_error_t **error );
+LIBEWF_EXTERN \
+int libewf_notify_set_stream(
+     FILE *stream,
+     libcerror_error_t **error );
 
-LIBEWF_EXTERN int libewf_notify_stream_open(
-                   const char *filename,
-                   liberror_error_t **error );
+LIBEWF_EXTERN \
+int libewf_notify_stream_open(
+     const char *filename,
+     libcerror_error_t **error );
 
-LIBEWF_EXTERN int libewf_notify_stream_close(
-                   liberror_error_t **error );
+LIBEWF_EXTERN \
+int libewf_notify_stream_close(
+     libcerror_error_t **error );
 
 #endif
 

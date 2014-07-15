@@ -2,6 +2,7 @@
  * vnode_aff.cpp:
  * 
  * Functions for the manipulation of AFF files...
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -19,7 +20,7 @@
 #endif
 
 
-#if defined(WIN32) and !defined(__MINGW_H)
+#if defined(WIN32) and !defined(HAVE__MINGW_H)
 /**********************************************************************
  * Implement dirent-style opendir/readdir/rewinddir/closedir on Win32
  *
@@ -44,10 +45,9 @@ extern "C" DIR *opendir(const char *dir)
 	filespec = (char *)malloc(strlen(dir) + 2 + 1);
 	strcpy(filespec, dir);
 	index = strlen(filespec) - 1;
-	if (index >= 0 && (filespec[index] == '/' || 
-	   (filespec[index] == '\\' && !IsDBCSLeadByte(filespec[index-1]))))
+	if (index >= 0 && (filespec[index] == '/' || (filespec[index] == '\\' )))
 		filespec[index] = '\0';
-	strcat(filespec, "/*");
+	strcat(filespec, "\\*");
 
 	dp = (DIR *) malloc(sizeof(DIR));
 	dp->offset = 0;
@@ -222,7 +222,7 @@ static int afd_identify_file(const char *filename,int exists)
     if(exists && access(filename,R_OK)!=0) return 0;	// needs to exist and it doesn't
 
     /* If it ends with a '/', remove it */
-    char *fn = (char *)alloca(strlen(filename)+1);
+    char *fn = (char *)malloc(strlen(filename)+1);
     strcpy(fn,filename);
     char *lastc = fn + strlen(fn) - 1;
     if(*lastc=='/') *lastc = '\000';
@@ -231,12 +231,20 @@ static int afd_identify_file(const char *filename,int exists)
     struct stat sb;
     if(stat(fn,&sb)==0){
 	if((sb.st_mode & S_IFMT)==S_IFDIR){
-	    if(af_ext_is(fn,"afd")) return 1;
+	    if(af_ext_is(fn,"afd")){
+		free(fn);
+		return 1;
+	    }
 	}
+	free(fn);
 	return 0;			//
     }
     /* Doesn't exist. Does it end .afd ? */
-    if(af_ext_is(fn,"afd")) return 1;
+    if(af_ext_is(fn,"afd")){
+	free(fn);
+	return 1;
+    }
+    free(fn);
     return 0;
 }
 
@@ -311,7 +319,7 @@ static int afd_add_file(AFFILE *af,const char *fname_)
 	    for(const char **segname=segs_to_copy;*segname;segname++){
 		unsigned char data[65536];	// big enough for most metadata
 		size_t datalen = sizeof(data);
-		unsigned long arg=0;
+		uint32_t arg=0;
 		
 		if(af_get_seg(af0,*segname,&arg,data,&datalen)==0){
 		    int r = af_update_seg(af2,*segname,arg,data,datalen);
@@ -411,7 +419,7 @@ static int afd_close(AFFILE *af)
 }
 
 
-#ifndef WIN32
+#if !defined(WIN32) || defined(HAVE__MINGW_H)
 static uint64_t max(uint64_t a,uint64_t b)
 {
     return a > b ? a : b;
@@ -440,7 +448,7 @@ static int afd_vstat(AFFILE *af,struct af_vnode_info *vni)
     return 0;
 }
 
-static int afd_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned char *data,
+static int afd_get_seg(AFFILE *af,const char *name,uint32_t *arg,unsigned char *data,
 		       size_t *datalen)
 {
     AFFILE *af2 = afd_file_with_seg(af,name);
@@ -451,7 +459,7 @@ static int afd_get_seg(AFFILE *af,const char *name,unsigned long *arg,unsigned c
 }
 
 
-static int afd_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int afd_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen_)
 {
     /* See if there are any more in the current segment */
@@ -489,7 +497,7 @@ static int afd_rewind_seg(AFFILE *af)
  * Otherwise, ada a new file.
  */
 static int afd_update_seg(AFFILE *af, const char *name,
-		    unsigned long arg,const u_char *value,unsigned int vallen)
+		    uint32_t arg,const u_char *value,uint32_t vallen)
     
 {
     struct afd_private *ap = AFD_PRIVATE(af);

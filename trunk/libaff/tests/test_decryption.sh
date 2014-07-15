@@ -1,4 +1,8 @@
 #!/bin/sh
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
+
+
 echo === VERIFY THAT WE CAN STILL DECRYPT encrypted.aff ===
 unset AFFLIB_PASSPHRASE
 

@@ -1,8 +1,7 @@
 /*
  * Header sections functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,9 +25,9 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include "libewf_values_table.h"
+#include "libewf_io_handle.h"
+#include "libewf_libcerror.h"
+#include "libewf_libfvalue.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -36,14 +35,8 @@ extern "C" {
 
 typedef struct libewf_header_sections libewf_header_sections_t;
 
-/* Additional subhandle for media specific parameters
- */
 struct libewf_header_sections
 {
-	/* The header codepage
-	 */
-	int header_codepage;
-
 	/* The stored header
 	 */
 	uint8_t *header;
@@ -68,31 +61,39 @@ struct libewf_header_sections
 	 */
 	size_t xheader_size;
 
-	/* Value to indicate how much header sections were found
+	/* Value to indicate the number of header sections found
 	 */
-	uint8_t amount_of_header_sections;
+	uint8_t number_of_header_sections;
 };
 
 int libewf_header_sections_initialize(
      libewf_header_sections_t **header_sections,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_header_sections_free(
      libewf_header_sections_t **header_sections,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
-int libewf_header_sections_create(
+int libewf_header_sections_clone(
+     libewf_header_sections_t **destination_header_sections,
+     libewf_header_sections_t *source_header_sections,
+     libcerror_error_t **error );
+
+int libewf_header_sections_generate(
      libewf_header_sections_t *header_sections,
-     libewf_values_table_t *header_values,
+     libfvalue_table_t *header_values,
+     time_t timestamp,
      int8_t compression_level,
      uint8_t format,
-     liberror_error_t **error );
+     int header_codepage,
+     libcerror_error_t **error );
 
-int libewf_header_sections_determine_format(
+int libewf_header_sections_parse(
      libewf_header_sections_t *header_sections,
-     uint8_t ewf_format,
+     libewf_io_handle_t *io_handle,
+     libfvalue_table_t *header_values,
      uint8_t *format,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

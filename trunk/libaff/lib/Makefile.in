@@ -59,11 +59,11 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libafflib_la_LIBADD =
 am__libafflib_la_SOURCES_DIST = aff_db.cpp aff_db.h aff_toc.cpp \
-	afflib.cpp afflib.h afflib_i.h threaded_hash.h afflib_os.cpp \
-	afflib_pages.cpp afflib_stream.cpp afflib_util.cpp crypto.cpp \
-	base64.cpp base64.h lzma_glue.cpp s3_glue.h vnode_aff.cpp \
-	vnode_aff.h vnode_afd.cpp vnode_afd.h vnode_afm.cpp \
-	vnode_afm.h vnode_raw.cpp vnode_raw.h vnode_split_raw.cpp \
+	afflib.cpp afflib.h afflib_i.h afflib_os.cpp afflib_pages.cpp \
+	afflib_stream.cpp afflib_util.cpp crypto.cpp base64.cpp \
+	base64.h lzma_glue.cpp s3_glue.h vnode_aff.cpp vnode_aff.h \
+	vnode_afd.cpp vnode_afd.h vnode_afm.cpp vnode_afm.h \
+	vnode_raw.cpp vnode_raw.h vnode_split_raw.cpp \
 	vnode_split_raw.h aftimer.h utils.cpp utils.h display.cpp \
 	vnode_qemu.cpp vnode_qemu.h qemu/aes.h qemu/aff-block-vmdk.h \
 	qemu/block-bochs.c qemu/block-cloop.c qemu/block-cow.c \
@@ -208,6 +208,7 @@ MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 NMEDIT = @NMEDIT@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
@@ -277,7 +278,6 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
-lt_ECHO = @lt_ECHO@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -301,7 +301,7 @@ aftest_SOURCES = aftest.cpp
 aftest_LDADD = libafflib.la  
 aftest_LDFLAGS = $(PTHREAD_CFLAGS) -static # easier debugging
 AFFLIB_SOURCES = aff_db.cpp aff_db.h aff_toc.cpp \
-	afflib.cpp afflib.h afflib_i.h threaded_hash.h afflib_os.cpp \
+	afflib.cpp afflib.h afflib_i.h afflib_os.cpp \
 	afflib_pages.cpp afflib_stream.cpp afflib_util.cpp \
 	crypto.cpp \
 	base64.cpp base64.h lzma_glue.cpp s3_glue.h \

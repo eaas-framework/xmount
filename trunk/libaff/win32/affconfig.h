@@ -117,5 +117,5 @@
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_ZLIB_H 1
-#define PACKAGE_VERSION "3.6.2"
+#define PACKAGE_VERSION "3.6.16"
 typedef SSIZE_T ssize_t;

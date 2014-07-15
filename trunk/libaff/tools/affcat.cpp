@@ -2,46 +2,7 @@
  * afcat.cpp:
  *
  * cat the contents of an AFF file...
- */
-
-/*
- * Copyright (c) 2005, 2006
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -195,7 +156,7 @@ int afcat(AFFILE *af)
 	}
 	int count = fwrite(data,1,datalen,stdout);
 	if(count!=(ssize_t)datalen){
-	    fprintf(stderr,"fwrite(buf,1,%zd,outfile) only wrote %d bytes\n",datalen,count);
+	    fprintf(stderr,"fwrite(buf,1,%d,outfile) only wrote %d bytes\n",(int)datalen,count);
 	}
 	free(data);
 	return 0;
@@ -255,7 +216,7 @@ int afcat(AFFILE *af)
 
     af_rewind_seg(af);			// start at the beginning
     char segname[AF_MAX_NAME_LEN];
-    unsigned long arg;
+    uint32_t arg;
     size_t datalen = 0;
     memset(segname,0,sizeof(segname));
 
@@ -266,7 +227,7 @@ int afcat(AFFILE *af)
 	if(opt_list){
 	    printf("%s",segname);
 	    if(opt_list_long){
-		printf("\targ:%lu\tlen:%d",arg,(int)datalen);
+		printf("\targ:%"PRIu32"\tlen:%d",arg,(int)datalen);
 	    }
 	    putchar('\n');
 	}
@@ -331,13 +292,12 @@ int64_t atoi64(const char *buf)
 
 int main(int argc,char **argv)
 {
-    int bflag, ch;
+    int ch;
 
 #ifdef SIGINFO
     signal(SIGINFO,sig_info);
 #endif
 
-    bflag = 0;
     while ((ch = getopt(argc, argv, "s:S:p:lLh?dqnvr:")) != -1) {
 	switch (ch) {
 	case 's':

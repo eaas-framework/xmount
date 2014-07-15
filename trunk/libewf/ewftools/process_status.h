@@ -1,8 +1,7 @@
 /*
  * Process status functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2012, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,9 +25,9 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include <libsystem.h>
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libcsystem.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -47,15 +46,15 @@ struct process_status
 {
 	/* The status process string
 	 */
-	const libsystem_character_t *status_process_string;
+	const libcstring_system_character_t *status_process_string;
 
 	/* The status update string
 	 */
-	const libsystem_character_t *status_update_string;
+	const libcstring_system_character_t *status_update_string;
 
 	/* The status summary string
 	 */
-	const libsystem_character_t *status_summary_string;
+	const libcstring_system_character_t *status_summary_string;
 
 	/* The ouput stream
 	 */
@@ -82,39 +81,54 @@ struct process_status
 	int8_t last_percentage;
 };
 
+#if defined( HAVE_CTIME ) || defined( HAVE_CTIME_R ) || defined( WINAPI )
+int process_status_get_ctime_string(
+     const time_t *timestamp,
+     libcstring_system_character_t *string,
+     size_t string_size,
+     libcerror_error_t **error );
+#endif
+
+#if defined( HAVE_GMTIME ) || defined( HAVE_GMTIME_R ) || defined( WINAPI )
+int process_status_get_time_elements_in_utc(
+     const time_t *timestamp,
+     struct tm *time_elements,
+     libcerror_error_t **error );
+#endif
+
 int process_status_initialize(
      process_status_t **process_status,
-     const libsystem_character_t *status_process_string,
-     const libsystem_character_t *status_update_string,
-     const libsystem_character_t *status_summary_string,
+     const libcstring_system_character_t *status_process_string,
+     const libcstring_system_character_t *status_update_string,
+     const libcstring_system_character_t *status_summary_string,
      FILE *output_stream,
      uint8_t print_status_information,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int process_status_free(
      process_status_t **process_status,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int process_status_start(
      process_status_t *process_status,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int process_status_update(
      process_status_t *process_status,
      size64_t bytes_read,
      size64_t bytes_total,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int process_status_update_unknown_total(
      process_status_t *process_status,
      size64_t bytes_read,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int process_status_stop(
      process_status_t *process_status,
      size64_t bytes_total,
      int status,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 void process_status_timestamp_fprint(
       FILE *stream,

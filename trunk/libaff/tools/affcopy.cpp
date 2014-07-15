@@ -3,42 +3,7 @@
  *
  * Copy one AFF file to another. 
  * Resulting file is re-ordered and possibly re-compressed.
- */
-
-/*
- * Copyright (c) 2006
- *	Simson L. Garfinkel 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. [Omitted]
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL AND CONTRIBUTORS ``AS
- * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL SIMSON
- * GARFINKEL, BAIS TECHNOLOGy, OR CONTRIBUTORS BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Distributed under the Berkeley 4-part license
  */
 
 
@@ -272,7 +237,7 @@ void open_outfiles(AFFILE *ain,outlist &afouts,const vector<string> &outfiles)
  * Return 0 if success, -1 if can't do it.
  * Properly handles signing and preening if requested.
  */
-int copy_page(AFFILE *ain,AFFILE *aout,int64_t pagenum,unsigned long arg,u_char *seghash,u_int *seghash_len)
+int copy_page(AFFILE *ain,AFFILE *aout,int64_t pagenum,uint32_t arg,u_char *seghash,u_int *seghash_len)
 {
     /* If we are preening but not signing, see if we can get out fast */
     if(opt_sign==0 && opt_preen==0) return -1; // not preening and not signing
@@ -407,7 +372,7 @@ int afcopy(char *infile,vector<string> &outfiles)
 	}
 
 	/* Now get the raw source segment */
-	unsigned long arg=0;
+	uint32_t arg=0;
 	if(af_get_seg(ain,segname,&arg,segbuf,&seglen)){
 	    unlink_outfiles(outfiles);	// failure; unlink the output files
 	    err(1,"Cannot read segment '%s' in %s. Deleteing output file", segname,af_filename(ain));
@@ -555,7 +520,7 @@ int afcopy(char *infile,vector<string> &outfiles)
 		    err(1,"Cannot allocated %d bytes for segment '%s' in %s",
 			(int)seglen,segname,af_filename(ain));
 		}
-		unsigned long arg;
+		uint32_t arg;
 		if(af_get_seg(aout->af,segname,&arg,segbuf,&seglen)){
 		    err(1,"Cannot read segment '%s' in %s",
 			segname,af_filename(aout->af));

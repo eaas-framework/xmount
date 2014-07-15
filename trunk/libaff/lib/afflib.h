@@ -6,6 +6,44 @@
  * 
  * This file describes the public AFFLIB interface.
  * The interface to reading AFF files and  Raw files.
+ *
+ * Copyright (c) 2005-2006
+ *	Simson L. Garfinkel and Basis Technology, Inc. 
+ *      All rights reserved.
+ *
+ * This code is derrived from software contributed by
+ * Simson L. Garfinkel
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *    This product includes software developed by Simson L. Garfinkel
+ *    and Basis Technology Corp.
+ * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
+ *    contributors to this program may be used to endorse or promote
+ *    products derived from this software without specific prior written
+ *    permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
+ * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.  
  */
 
 /* Figure out what kind of OS we are running on */
@@ -38,22 +76,18 @@
 #ifdef WIN32                            
 #include <basetsd.h>
 #include <io.h>				// gets isatty
-typedef unsigned int uint;
-typedef unsigned int u_int;
-typedef unsigned long ulong;
-typedef unsigned long u_long;
-typedef unsigned __int64 uint64;		/* 64-bit types Types */
-typedef          __int64 int64;
-typedef unsigned char u_char;
 
+/* These aren't needed for mingw */
+#if !defined(__MINGW_H)
 #ifndef _UINT64_T_DECLARED
 typedef unsigned __int64 uint64_t;	/* 64-bit types Types */
 #define _UINT64_T_DECLARED
 #endif
 
 #ifndef _INT64_T_DECLARED
-typedef         __int64 int64_t;
+typedef __int64 int64_t;
 #define _INT64_T_DECLARED
+#endif
 #endif
 
 #ifndef PRId64
@@ -68,18 +102,8 @@ typedef         __int64 int64_t;
 #define PRIu64 "I64u"
 #endif
 
-
-#if defined(__MINGW_H)
-#define ftello ftello64
-#define fseeko fseeko64
-#else
-#define ftello _ftelli64			/* replaces ftello64 in VC2008 */
-#define fseeko _fseeki64
-#endif
-
 #endif	
 /** END OF WIN32 DEFINES **/
-
 
 #define I64d PRIi64
 #define I64u PRIu64
@@ -92,29 +116,29 @@ struct aff_pagebuf {
     int64_t       pagenum;		// -1 means no page loaded 
     unsigned char *pagebuf;		// where the data is; size is image_pagesize
     size_t        pagebuf_bytes;        // number of bytes in the pagebuf that are valid.
-    unsigned int  pagenum_valid:1;	// buffer contains data
-    unsigned int  pagebuf_valid:1;	// buffer contains data
-    unsigned int  pagebuf_dirty:1;	// data was modified
+    uint32_t  pagenum_valid:1;	// buffer contains data
+    uint32_t  pagebuf_valid:1;	// buffer contains data
+    uint32_t  pagebuf_dirty:1;	// data was modified
     int		  last;			// when the page was last visited
 };
 
 struct af_vnode_info {
     uint64_t imagesize;			// size of this image
     int   pagesize;			// what is the natural page size?
-    u_int supports_compression:1; // supports writing compressed segments
-    u_int has_pages:1;		 // does system support page segments?
-    u_int supports_metadata:1;		// does it support metadata?
-    u_int is_raw:1;			// file is raw
-    u_int use_eof:1;			// should we use the EOF flag?
-    u_int at_eof:1;			// are we at the EOF?
-    u_int changable_pagesize:1;	// pagesize can be changed at any time
-    u_int changable_sectorsize:1; // sectorsize can be changed at any time
-    u_int cannot_decrypt:1; // encrypted pages cannot be decrypted becuase passphrase is invalid
-    u_int segment_count_total;
-    u_int page_count_total;
-    u_int segment_count_signed;
-    u_int segment_count_encrypted;
-    u_int page_count_encrypted;
+    uint32_t supports_compression:1; // supports writing compressed segments
+    uint32_t has_pages:1;		 // does system support page segments?
+    uint32_t supports_metadata:1;		// does it support metadata?
+    uint32_t is_raw:1;			// file is raw
+    uint32_t use_eof:1;			// should we use the EOF flag?
+    uint32_t at_eof:1;			// are we at the EOF?
+    uint32_t changable_pagesize:1;	// pagesize can be changed at any time
+    uint32_t changable_sectorsize:1; // sectorsize can be changed at any time
+    uint32_t cannot_decrypt:1; // encrypted pages cannot be decrypted becuase passphrase is invalid
+    uint32_t segment_count_total;
+    uint32_t page_count_total;
+    uint32_t segment_count_signed;
+    uint32_t segment_count_encrypted;
+    uint32_t page_count_encrypted;
 };					// 
 
 
@@ -150,7 +174,7 @@ extern "C" {
  ***
  ****************************************************************/
 
-const char *af_version(void);		// returns AFF Version Number
+const char * af_version(void);		// returns AFF Version Number
 
 /* af_file stream functions */
 AFFILE *af_open(const char *filename,int flags,int mode);
@@ -188,9 +212,9 @@ int	af_set_option(AFFILE *af,int option,int value);
 
 /* navigating within the data segments as if they were a single file */
 #ifdef _WIN32
-SSIZE_T af_read(AFFILE *af,unsigned char *buf,SSIZE_T count);
+SSIZE_T   af_read(AFFILE *af,unsigned char *buf,SSIZE_T count);
 #else
-ssize_t af_read(AFFILE *af,unsigned char *buf,ssize_t count);
+ssize_t   af_read(AFFILE *af,unsigned char *buf,ssize_t count);
 #endif
 uint64_t  af_seek(AFFILE *af,int64_t pos,int whence); // returns new position
 uint64_t  af_tell(AFFILE *af);
@@ -212,9 +236,10 @@ const char *af_filename(AFFILE *af);	// returns the filename of an open stream.
 int	    af_identify(AFFILE *af);	// returns type of AFFILE pointer
 
 /* Accessor Functions */
-int64_t	    af_get_imagesize(AFFILE *af);	// byte # of last mapped byte in image, or size of device;
+int64_t af_get_imagesize(AFFILE *af);	// byte # of last mapped byte in image, or size of device;
 					// returns -1 if error
-int	    af_set_acquisition_date(AFFILE *af,time_t t); // sets AF_ACQUISITION_DATE
+int	af_get_pagesize(AFFILE *af);	// returns page size, or -1
+int	af_set_acquisition_date(AFFILE *af,time_t t); // sets AF_ACQUISITION_DATE
 
 #define af_imagesize(af) af_get_imagesize(af) // backwards compatiability 
 int	    af_get_segq(AFFILE *af,const char *name,int64_t *quad);/* Get/set 8-byte values */
@@ -236,10 +261,10 @@ int	    af_update_segq(AFFILE *af,const char *name,int64_t quad);
  *** -3 file is corrupt or other internal error. (AF_ERROR_CORRUPT)
  */
 
-int	af_get_seg(AFFILE *af,const char *name,unsigned long *arg,
+int	af_get_seg(AFFILE *af,const char *name,uint32_t *arg,
 		   unsigned char *data,size_t *datalen);
 int	af_get_next_seg(AFFILE *af,char *segname,size_t segname_len,
-			unsigned long *arg, unsigned char *data, size_t *datalen);
+			uint32_t *arg, unsigned char *data, size_t *datalen);
 
 int	af_rewind_seg(AFFILE *af); // rewind seg pointer to beginning
 
@@ -248,12 +273,12 @@ int	af_rewind_seg(AFFILE *af); // rewind seg pointer to beginning
  */
 
 /* Writing arbitrary name/value pairs */
-int	af_update_seg(AFFILE *af,const char *segname,unsigned long arg,
-		      const unsigned char *value,unsigned int vallen);
+int	af_update_seg(AFFILE *af,const char *segname,uint32_t arg,
+		      const unsigned char *value,uint32_t vallen);
 #ifdef HAVE_OPENSSL_BIO_H
 /* Write a memory bio to a segment */
 #include <openssl/bio.h>
-int	af_update_seg_frombio(AFFILE *af,const char *segname,unsigned long arg,BIO *bio);
+int	af_update_seg_frombio(AFFILE *af,const char *segname,uint32_t arg,BIO *bio);
 #endif
 
 
@@ -289,14 +314,14 @@ int  af_is_encrypted_segment(const char *segname);
 int  af_establish_aes_passphrase(AFFILE *af,const char *passphrase);
 int  af_change_aes_passphrase(AFFILE *af,const char *oldphrase,const char *newphrase);
 int  af_use_aes_passphrase(AFFILE *af,const char *passphrase);
-int  af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const u_char affkey[32]);
+int  af_save_aes_key_with_passphrase(AFFILE *af,const char *passphrase, const unsigned char affkey[32]);
 int  af_get_aes_key_from_passphrase(AFFILE *af,const char *passphrase, unsigned char affkey[32]);
 
 
 /* PKI Signing */
 int  af_set_sign_files(AFFILE *af,const char *keyfile,const char *certfile);
-int  af_sign_seg3(AFFILE *af,const char *segname, unsigned long arg,
-		  const unsigned char *data,unsigned int datalen,unsigned long signmode);
+int  af_sign_seg3(AFFILE *af,const char *segname, uint32_t arg,
+		  const unsigned char *data,uint32_t datalen,uint32_t signmode);
 int  af_sign_seg(AFFILE *af,const char *segname);
 int  af_sign_all_unsigned_segments(AFFILE *af);	// 
 int  af_sig_verify_seg(AFFILE *af,const char *segname);	// see below for return codes
@@ -308,15 +333,15 @@ int  af_set_seal_certificates(AFFILE *af,const char *certfiles[],int numcertfile
 int  af_seal_affkey_using_certificates(AFFILE *af,const char *certfiles[],int numcertfiles, unsigned char affkey[32]);//
 int  af_set_unseal_keybuffer(AFFILE *af,const char *key); // take key from a buffer
 int  af_set_unseal_keyfile(AFFILE *af,const char *keyfile); // take key from a file
-int  af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,u_char affkey[32]);
+int  af_get_affkey_using_keyfile(AFFILE *af, const char *private_keyfile,unsigned char affkey[32]);
 
 
 
 #ifdef HAVE_OPENSSL_EVP_H
 #include <openssl/evp.h>
-int  af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,u_char *sigbuf,
+int  af_sig_verify_seg2(AFFILE *af,const char *segname,EVP_PKEY *pubkey,unsigned char *sigbuf,
 			size_t sigbuf_len,int sigmode);
-int af_hash_verify_seg2(AFFILE *af,const char *segname,u_char *sigbuf_,size_t sigbuf_len_,int sigmode);
+int af_hash_verify_seg2(AFFILE *af,const char *segname,unsigned char *sigbuf_,size_t sigbuf_len_,int sigmode);
 #define AF_HASH_VERIFIES 0
 
 #endif

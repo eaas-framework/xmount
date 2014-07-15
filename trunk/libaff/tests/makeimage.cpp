@@ -2,6 +2,8 @@
  * makeimage.cpp:
  * 
  * Make an image with a given number of sectors.
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
 
 #include <stdio.h>

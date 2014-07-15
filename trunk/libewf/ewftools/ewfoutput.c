@@ -1,8 +1,7 @@
 /*
  * Output functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,12 +20,9 @@
  */
 
 #include <common.h>
+#include <file_stream.h>
 #include <memory.h>
 #include <types.h>
-
-#include <liberror.h>
-
-#include <errno.h>
 
 #if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
@@ -36,37 +32,23 @@
 #include <string.h>
 #endif
 
-#if defined( HAVE_SYS_UTSNAME_H )
-#include <sys/utsname.h>
-#endif
-
-#if defined( HAVE_STDARG_H ) || defined( WINAPI )
-#include <stdarg.h>
-#elif defined( HAVE_VARARGS_H )
-#include <varargs.h>
-#else
-#error No variable argument support available
-#endif
-
-#include <libewf/features.h>
-
-#if defined( HAVE_LOCAL_LIBUNA )
-#include <libuna_definitions.h>
-#elif defined( HAVE_LIBUNA_H )
-#include <libuna.h>
-#endif
-
 #if defined( HAVE_LOCAL_LIBBFIO )
 #include <libbfio_definitions.h>
 #elif defined( HAVE_LIBBFIO )
 #include <libbfio.h>
 #endif
 
-#if defined( HAVE_ZLIB_H ) || defined( ZLIB_DLL )
+#if defined( HAVE_LOCAL_LIBFVALUE )
+#include <libfvalue_definitions.h>
+#elif defined( HAVE_LIBFVALUE )
+#include <libfvalue.h>
+#endif
+
+#if defined( HAVE_ZLIB ) || defined( ZLIB_DLL )
 #include <zlib.h>
 #endif
 
-#if defined( HAVE_OPENSSL_OPENSSLV_H )
+#if defined( HAVE_OPENSSL_OPENSSLV_H ) || defined( HAVE_LIBCRYPTO )
 #include <openssl/opensslv.h>
 #endif
 
@@ -74,23 +56,53 @@
 #include <uuid/uuid.h>
 #endif
 
-#include <libewf.h>
-
-#include <libsystem.h>
-
 #include "ewfoutput.h"
+#include "ewftools_libcerror.h"
+#include "ewftools_libclocale.h"
+#include "ewftools_libcnotify.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libcsystem.h"
+#include "ewftools_libewf.h"
+#include "ewftools_libhmac.h"
+#include "ewftools_libodraw.h"
+#include "ewftools_libsmdev.h"
+#include "ewftools_libsmraw.h"
+#include "ewftools_libuna.h"
 
-/* Print the version information to a stream
+/* Prints the executable version information
+ */
+void ewfoutput_copyright_fprint(
+      FILE *stream )
+{
+	static char *function = "ewfoutput_copyright_fprint";
+
+	if( stream == NULL )
+	{
+		libcnotify_printf(
+		 "%s: invalid stream.\n",
+		 function );
+
+		return;
+	}
+	fprintf(
+	 stream,
+	 "Copyright (c) 2006-2013, Joachim Metz <%s>.\n"
+	 "This is free software; see the source for copying conditions. There is NO\n"
+	 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+	 PACKAGE_BUGREPORT );
+}
+
+/* Prints the version information to a stream
  */
 void ewfoutput_version_fprint(
       FILE *stream,
-      const libsystem_character_t *program )
+      const libcstring_system_character_t *program )
 {
 	static char *function = "ewfoutput_version_fprint";
 
 	if( stream == NULL )
 	{
-		libsystem_notify_printf(
+		libcnotify_printf(
 		 "%s: invalid stream.\n",
 		 function );
 
@@ -98,7 +110,7 @@ void ewfoutput_version_fprint(
 	}
 	if( program == NULL )
 	{
-		libsystem_notify_printf(
+		libcnotify_printf(
 		 "%s: invalid program name.\n",
 		 function );
 
@@ -106,20 +118,62 @@ void ewfoutput_version_fprint(
 	}
 	fprintf(
 	 stream,
-	 "%" PRIs_LIBSYSTEM " %s (libewf %s",
+	 "%" PRIs_LIBCSTRING_SYSTEM " %s\n\n",
+	 program,
+	 LIBEWF_VERSION_STRING );
+}
+
+/* Prints the detailed version information to a stream
+ */
+void ewfoutput_version_detailed_fprint(
+      FILE *stream,
+      const libcstring_system_character_t *program )
+{
+	static char *function = "ewfoutput_version_detailed_fprint";
+
+	if( stream == NULL )
+	{
+		libcnotify_printf(
+		 "%s: invalid stream.\n",
+		 function );
+
+		return;
+	}
+	if( program == NULL )
+	{
+		libcnotify_printf(
+		 "%s: invalid program name.\n",
+		 function );
+
+		return;
+	}
+	fprintf(
+	 stream,
+	 "%" PRIs_LIBCSTRING_SYSTEM " %s (libewf %s",
 	 program,
 	 LIBEWF_VERSION_STRING,
 	 LIBEWF_VERSION_STRING );
 
+#if defined( HAVE_LIBUNA ) || defined( HAVE_LOCAL_LIBUNA )
 	fprintf(
 	 stream,
 	 ", libuna %s",
 	 LIBUNA_VERSION_STRING );
+#endif
 
+#if defined( HAVE_LIBBFIO ) || defined( HAVE_LOCAL_LIBBFIO )
 	fprintf(
 	 stream,
 	 ", libbfio %s",
 	 LIBBFIO_VERSION_STRING );
+#endif
+
+#if defined( HAVE_LIBFVALUE ) || defined( HAVE_LOCAL_LIBFVALUE )
+	fprintf(
+	 stream,
+	 ", libfvalue %s",
+	 LIBFVALUE_VERSION_STRING );
+#endif
 
 #if defined( HAVE_LIBZ )
 	fprintf(
@@ -128,11 +182,44 @@ void ewfoutput_version_fprint(
 	 ZLIB_VERSION );
 #endif
 
+	fprintf(
+	 stream,
+	 ", libsystem %s",
+	 LIBCSYSTEM_VERSION_STRING );
+
+#if defined( HAVE_LIBHMAC ) || defined( HAVE_LOCAL_LIBHMAC )
+	fprintf(
+	 stream,
+	 ", libhmac %s",
+	 LIBHMAC_VERSION_STRING );
+
 #if defined( HAVE_LIBCRYPTO )
 	fprintf(
 	 stream,
-	 ", libcrypto %s",
+	 " (libcrypto %s)",
 	 SHLIB_VERSION_NUMBER );
+#endif
+#endif
+
+#if defined( HAVE_LIBODRAW ) || defined( HAVE_LOCAL_LIBODRAW )
+	fprintf(
+	 stream,
+	 ", libodraw %s",
+	 LIBODRAW_VERSION_STRING );
+#endif
+
+#if defined( HAVE_LIBSMDEV ) || defined( HAVE_LOCAL_LIBSMDEV )
+	fprintf(
+	 stream,
+	 ", libsmdev %s",
+	 LIBSMDEV_VERSION_STRING );
+#endif
+
+#if defined( HAVE_LIBSMRAW ) || defined( HAVE_LOCAL_LIBSMRAW )
+	fprintf(
+	 stream,
+	 ", libsmraw %s",
+	 LIBSMRAW_VERSION_STRING );
 #endif
 
 #if defined( HAVE_LIBUUID )
@@ -144,28 +231,5 @@ void ewfoutput_version_fprint(
 	fprintf(
 	 stream,
 	 ")\n\n" );
-}
-
-/* Prints the executable version information
- */
-void ewfoutput_copyright_fprint(
-      FILE *stream )
-{
-	static char *function = "ewfoutput_copyright_fprint";
-
-	if( stream == NULL )
-	{
-		libsystem_notify_printf(
-		 "%s: invalid stream.\n",
-		 function );
-
-		return;
-	}
-	fprintf(
-	 stream,
-	 "Copyright (c) 2006-2009, Joachim Metz, Hoffmann Investigations <%s> and contributors.\n"
-	 "This is free software; see the source for copying conditions. There is NO\n"
-	 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
-	 PACKAGE_BUGREPORT );
 }
 

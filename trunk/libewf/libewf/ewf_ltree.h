@@ -1,8 +1,7 @@
 /*
  * EWF ltree section
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,9 +29,9 @@
 extern "C" {
 #endif
 
-typedef struct ewf_ltree ewf_ltree_t;
+typedef struct ewf_ltree_header ewf_ltree_header_t;
 
-struct ewf_ltree
+struct ewf_ltree_header
 {
 	/* Unknown
 	 * consists of 16 bytes
@@ -52,7 +51,7 @@ struct ewf_ltree
 
 	/* Unknown
 	 * consists of 4 bytes
-	 * possible CRC?
+	 * possible checksum?
 	 */
 	uint8_t unknown3[ 4 ];
 

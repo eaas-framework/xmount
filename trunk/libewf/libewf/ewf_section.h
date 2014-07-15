@@ -1,8 +1,7 @@
 /*
  * EWF section start
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,34 +29,37 @@
 extern "C" {
 #endif
 
-typedef struct ewf_section ewf_section_t;
+typedef struct ewf_section_start ewf_section_start_t;
 
-struct ewf_section
+struct ewf_section_start
 {
 	/* The section type string
 	 * consists of 16 bytes
 	 */
 	uint8_t type[ 16 ];
 
-	/* The section offset to the next section
+	/* The offset to the next section
 	 * consists of 8 bytes (64 bits)
 	 */
-	uint8_t next[ 8 ];
+	uint8_t next_offset[ 8 ];
 
-	/* The section size
+	/* The size of the section
 	 * consists of 8 bytes (64 bits)
 	 */
 	uint8_t size[ 8 ];
 
-	/* The section padding
+	/* The padding
 	 * consists of 40 bytes
 	 */
 	uint8_t padding[ 40 ];
 
-	/* The section crc of all (previous) section data
+	/* The checksum of the section start data
 	 * consists of 4 bytes
 	 */
-	uint8_t crc[ 4 ];
+	uint8_t checksum[ 4 ];
+
+	/* The section data
+	 */
 };
 
 #if defined( __cplusplus )

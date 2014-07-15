@@ -2,6 +2,7 @@
  * vnode_aff.cpp:
  * 
  * Functions for the manipulation of AFF files...
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -20,12 +21,15 @@
 
 
 static int      aff_write_ignore(AFFILE *af,size_t bytes);
-static int	aff_write_seg(AFFILE *af,const char *name,unsigned long arg,
+static int	aff_write_seg(AFFILE *af,const char *name,uint32_t arg,
 			      const u_char *value,size_t vallen); 
-static int	aff_get_seg(AFFILE *af,const char *name,unsigned long *arg,
+static int	aff_get_seg(AFFILE *af,const char *name,uint32_t *arg,
 			    unsigned char *data,size_t *datalen);
+#ifdef KERNEL_LIBRARY
+static int	aff_write_seg_no_data(AFFILE *af,const char *name,uint32_t arg, size_t vallen); 
+#endif
 static int	aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,
-				 unsigned long *arg, unsigned char *data, size_t *datalen);
+				 uint32_t *arg, unsigned char *data, size_t *datalen);
 
 /** aff_segment_overhead:
  * @param segname - the name of a segment
@@ -39,10 +43,14 @@ int aff_segment_overhead(const char *segname)
 
 static int aff_write_ignore2(AFFILE *af,size_t bytes)
 {
-    if(af_trace) fprintf(af_trace,"aff_write_ignore2(%p,%zd)\n",af,bytes);
+#ifdef KERNEL_LIBRARY
+    aff_write_seg_no_data(af,AF_IGNORE,0,bytes);
+#else
+    if(af_trace) fprintf(af_trace,"aff_write_ignore2(%p,%d)\n",af,(int)bytes);
     unsigned char *invalidate_data = (unsigned char *)calloc(bytes,1);
     aff_write_seg(af,AF_IGNORE,0,invalidate_data,bytes); // overwrite with NULLs
     free(invalidate_data);
+#endif
     return 0;
 }
 
@@ -51,7 +59,7 @@ static int aff_write_ignore(AFFILE *af,size_t bytes)
     int64_t startpos = ftello(af->aseg);	// remember start position
     int r = 0;
 
-    if(af_trace) fprintf(af_trace,"aff_write_ignore(%p,%zd)\n",af,bytes);
+    if(af_trace) fprintf(af_trace,"aff_write_ignore(%p,%d)\n",af,(int)bytes);
 
     /* First write the ignore */
     r = aff_write_ignore2(af,bytes);
@@ -101,9 +109,10 @@ static int aff_write_ignore(AFFILE *af,size_t bytes)
  * This is the only place where a segment actually gets written
  */
 
-int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char *data,size_t datalen)
+int aff_write_seg(AFFILE *af, const char *segname,uint32_t arg,const u_char *data,size_t datalen)
 {
-    if(af_trace) fprintf(af_trace,"aff_write_seg(%p,%s,%lu,%p,len=%zu)\n",af,segname,arg,data,datalen);
+    if(af_trace) fprintf(af_trace,"aff_write_seg(%p,%s,%"PRIu32",%p,len=%u)\n",
+			 af,segname,arg,data,(int)datalen);
 
     struct af_segment_head segh;
     struct af_segment_tail segt;
@@ -120,7 +129,50 @@ int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char
      * we are not at the end of the file, something is very wrong.
      */
 
-    unsigned int segname_len = strlen(segname);
+    uint32_t segname_len = strlen(segname);
+
+    strcpy(segh.magic,AF_SEGHEAD);
+    segh.name_len = htonl(segname_len);
+    segh.data_len = htonl(datalen);
+    segh.flag      = htonl(arg);
+
+    strcpy(segt.magic,AF_SEGTAIL);
+    segt.segment_len = htonl(sizeof(segh)+segname_len + datalen + sizeof(segt));
+    aff_toc_update(af,segname,ftello(af->aseg),datalen);
+
+    
+    if(af_trace) fprintf(af_trace,"aff_write_seg: putting segment %s (datalen=%d) offset=%"PRId64"\n",
+			 segname,(int)datalen,ftello(af->aseg));
+
+    if(fwrite(&segh,sizeof(segh),1,af->aseg)!=1) return -10;
+    if(fwrite(segname,1,segname_len,af->aseg)!=segname_len) return -11;
+    if(fwrite(data,1,datalen,af->aseg)!=datalen) return -12;
+    if(fwrite(&segt,sizeof(segt),1,af->aseg)!=1) return -13;
+    fflush(af->aseg);			// make sure it is on the disk
+    return 0;
+}
+
+
+#ifdef KERNEL_LIBRARY
+/* aff_write_seg_no_data:
+ * put the given named segment at the current position in the file but don't write any data.
+ * <km> this is an attempt at optimizing the write performance
+ * Return 0 for success, -1 for failure (probably disk full?)
+ */
+
+int aff_write_seg_no_data(AFFILE *af, const char *segname,uint32_t arg,size_t datalen)
+{
+    struct af_segment_head segh;
+    struct af_segment_tail segt;
+
+    assert(sizeof(segh)==16);
+    assert(sizeof(segt)==8);
+
+    /* If the last command was not a probe (so we know where we are), and
+     * we are not at the end of the file, something is very wrong.
+     */
+
+    uint32_t segname_len = strlen(segname);
 
     strcpy(segh.magic,AF_SEGHEAD);
     segh.name_len = htonl(segname_len);
@@ -137,11 +189,13 @@ int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char
 
     if(fwrite(&segh,sizeof(segh),1,af->aseg)!=1) return -10;
     if(fwrite(segname,1,segname_len,af->aseg)!=segname_len) return -11;
-    if(fwrite(data,1,datalen,af->aseg)!=datalen) return -12;
+    //if(fwrite(data,1,datalen,af->aseg)!=datalen) return -12;
+    if(fseeko(af->aseg,datalen,SEEK_CUR)!=0) return -12;
     if(fwrite(&segt,sizeof(segt),1,af->aseg)!=1) return -13;
     fflush(af->aseg);			// make sure it is on the disk
     return 0;
 }
+#endif
 
 
 /****************************************************************
@@ -153,7 +207,7 @@ int aff_write_seg(AFFILE *af, const char *segname,unsigned long arg,const u_char
  */
 
 static int aff_get_seg(AFFILE *af,const char *name,
-		       unsigned long *arg,unsigned char *data,size_t *datalen)
+		       uint32_t *arg,unsigned char *data,size_t *datalen)
 {
     if(af_trace) fprintf(af_trace,"aff_get_seg(%p,%s,arg=%p,data=%p,datalen=%p)\n",af,name,arg,data,datalen);
 
@@ -189,7 +243,7 @@ static int aff_get_seg(AFFILE *af,const char *name,
  *  -2  = *data is not large enough to hold the segment (AF_ERROR_DATASMALL)
  *  -3  = af file is corrupt; no tail (AF_ERROR_TAIL)
  */
-static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned long *arg,
+static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,uint32_t *arg,
 			unsigned char *data,size_t *datalen_)
 {
     if(af_trace) fprintf(af_trace,"aff_get_next_seg()\n");
@@ -237,8 +291,8 @@ static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned
 	return AF_ERROR_TAIL;
     }
     /* Validate tail */
-    unsigned long stl = ntohl(segt.segment_len);
-    unsigned long calculated_segment_len =
+    uint32_t stl = ntohl(segt.segment_len);
+    uint32_t calculated_segment_len =
 	sizeof(struct af_segment_head)
 	+ strlen(segname)
 	+ data_len + sizeof(struct af_segment_tail);
@@ -249,7 +303,7 @@ static int aff_get_next_seg(AFFILE *af,char *segname,size_t segname_len,unsigned
 	return AF_ERROR_TAIL;
     }
     if(stl != calculated_segment_len){
-	snprintf(af->error_str,sizeof(af->error_str),"af_get_next_segv: AF file corrupt (%lu!=%lu)/!",
+	snprintf(af->error_str,sizeof(af->error_str),"af_get_next_segv: AF file corrupt (%"PRIu32"!=%"PRIu32")/!",
 		 stl,calculated_segment_len);
 	fseeko(af->aseg,start,SEEK_SET); // go back to last good position
 	return AF_ERROR_TAIL;
@@ -300,7 +354,7 @@ int af_truncate_blank(AFFILE *af)
  */
 
 static int aff_update_seg(AFFILE *af, const char *name,
-		    unsigned long arg,const u_char *value,unsigned int vallen)
+		    uint32_t arg,const u_char *value,uint32_t vallen)
 {
     char   next_segment_name[AF_MAX_NAME_LEN];
     size_t next_segsize = 0;
@@ -315,7 +369,7 @@ static int aff_update_seg(AFFILE *af, const char *name,
     uint64_t         loc_closest = 0;
     struct aff_toc_mem *adm = aff_toc(af,name);
        
-    if(af_trace) fprintf(af_trace,"aff_update_seg(name=%s,arg=%lu,vallen=%u)\n",name,arg,vallen);
+    if(af_trace) fprintf(af_trace,"aff_update_seg(name=%s,arg=%"PRIu32",vallen=%u)\n",name,arg,vallen);
 
 
     if(adm){

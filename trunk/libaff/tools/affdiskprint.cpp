@@ -30,7 +30,7 @@
 #include "base64.h"
 #include "hashextent.h"
 
-#ifdef HAVE_EXPAT
+#ifdef HAVE_LIBEXPAT
 
 #include <openssl/evp.h>
 
@@ -206,13 +206,13 @@ int diskprint(const char *infile)
 	cout << "\n";
     }
     /* Get sector size and number of sectors */
-    unsigned long sectorsize=512;		// default sectorsize
+    uint32_t sectorsize=512;		// default sectorsize
     af_get_seg(af,AF_SECTORSIZE,&sectorsize,0,0);
     if(sectorsize==0) sectorsize=512;	// default sectorsize
     int64_t sectors = imagesize/sectorsize;
     if(sectors>0){
 	char buf[32];
-	snprintf(buf,sizeof(buf),"%lu",sectorsize);
+	snprintf(buf,sizeof(buf),"%"PRIu32"",sectorsize);
 	out_xmlstr(cout,2,AF_SECTORSIZE,buf);
 	cout << "\n";
     }
@@ -446,7 +446,7 @@ int main(int argc,char **argv)
 #else
 int main(int argc,char **argv)
 {
-    fprintf(stderr,"afdiskprint requires EXPAT. Cannot continue.\n");
+    fprintf(stderr,"affdiskprint requires EXPAT. Cannot continue.\n");
     exit(-1);
 }
 #endif

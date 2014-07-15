@@ -3,6 +3,8 @@
 # test to make sure that the encrypted aff that is distributed with
 # the AFFLIB can be decrypted using a known passphrase.
 #
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
 
 unset AFFLIB_PASSPHRASE
 export PATH=$srcdir:../tools:../../tools:.:$PATH

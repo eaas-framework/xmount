@@ -2,6 +2,8 @@
  * utils.cpp:
  *
  * Some handy utilities for working with AFF
+ *
+ * Distributed under the Berkeley 4-part license
  */
 
 
@@ -24,16 +26,6 @@
 
 namespace aff {
 
-    /** Given argc and argv, return a string with the command line */
-    std::string command_line(int argc,char **argv) {
-	std::string command = "";
-	for(int i=0;i<argc;i++){
-	    if(i>0) command += " ";
-	    command += argv[i];
-	}
-	return command;
-    }
-
     bool ends_with(const char *buf,const char *with)
     {
 	if(buf && with){
@@ -44,10 +36,21 @@ namespace aff {
 	return 0;
     }
 
+#ifdef HAVE_STL
+    /** Given argc and argv, return a string with the command line */
+    std::string command_line(int argc,char **argv) {
+	std::string command = "";
+	for(int i=0;i<argc;i++){
+	    if(i>0) command += " ";
+	    command += argv[i];
+	}
+	return command;
+    }
     bool ends_with(const std::string &buf,const std::string &with)
     {
 	return ends_with(buf.c_str(),with.c_str());
     }
+
 
     /* Given an AFFILE, return a seglist.
      * Returns -1 if failure, 0 if success.
@@ -57,7 +60,7 @@ namespace aff {
 	if(af_rewind_seg(af)) return -1;
 	char name_[AF_MAX_NAME_LEN];
 	size_t len_=0;
-	u_long arg_=0;
+	uint32_t arg_=0;
 	while(af_get_next_seg(af,name_,sizeof(name_),&arg_,0,&len_)==0){
 	    // We shouldn't have 0-len segment names, but we do in some files.
 	    // Don't copy these segments.
@@ -88,5 +91,6 @@ namespace aff {
 	return false;
     }
 
+#endif
 }
        

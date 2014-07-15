@@ -1,8 +1,7 @@
 /*
  * Output functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -24,20 +23,25 @@
 #define _EWFOUTPUT_H
 
 #include <common.h>
+#include <file_stream.h>
 #include <types.h>
 
-#include <libsystem.h>
+#include "ewftools_libcstring.h"
 
 #if defined( __cplusplus )
 extern "C" {
 #endif
 
-void ewfoutput_version_fprint(
-      FILE *stream,
-      const libsystem_character_t *program );
-
 void ewfoutput_copyright_fprint(
       FILE *stream );
+
+void ewfoutput_version_fprint(
+      FILE *stream,
+      const libcstring_system_character_t *program );
+
+void ewfoutput_version_detailed_fprint(
+      FILE *stream,
+      const libcstring_system_character_t *program );
 
 #if defined( __cplusplus )
 }

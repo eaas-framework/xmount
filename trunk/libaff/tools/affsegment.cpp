@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2006
+ * Copyright (c) 2005-2006
  *	Simson L. Garfinkel and Basis Technology, Inc. 
  *      All rights reserved.
  *
@@ -20,10 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
+ * 3. [omitted]
  * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
  *    contributors to this program may be used to endorse or promote
  *    products derived from this software without specific prior written
@@ -52,7 +49,9 @@
 #include <limits.h>
 
 #ifdef HAVE_REGEX_H
+extern "C" {
 #include <regex.h>
+}
 #endif
 
 #include <algorithm>
@@ -117,7 +116,7 @@ void usage()
 }
 
 #ifdef REG_EXTENDED
-int get_segment_from_file(AFFILE *af,const char *segname,unsigned long arg,FILE *in)
+int get_segment_from_file(AFFILE *af,const char *segname,uint32_t arg,FILE *in)
 {
     u_char *value = (u_char *)malloc(0);
     int  value_len = 0;
@@ -141,7 +140,7 @@ int get_segment_from_file(AFFILE *af,const char *segname,unsigned long arg,FILE 
 void update_segment(AFFILE *af,const char *segname,
 		    const char *argstr,const char *segval)
 {
-    unsigned long arg = 0;
+    uint32_t arg = 0;
 
     if(strlen(argstr)>1) arg = atoi(argstr+1);
 
@@ -224,14 +223,14 @@ void process(const char *fn)
 		
 	    buf = (u_char *)malloc(len+1);
 	    if(!buf) err(1,"malloc");
-	    unsigned long arg = 0;
+	    uint32_t arg = 0;
 	    buf[len] = 0;
 	    if(af_get_seg(af,segname,&arg,buf,&len)){
 		af_err(1,"af_get_seg"); // this shoudln't fail here
 		free(buf);
 		continue;
 	    }
-	    if(opt_debug) fprintf(stderr," arg=%lu len=%zd\n",arg,len);
+	    if(opt_debug) fprintf(stderr," arg=%"PRIu32" len=%zd\n",arg,len);
 	    int p = 1;
 	    
 	    if(filecount>1) printf("%s:",fn);
@@ -243,7 +242,7 @@ void process(const char *fn)
 	    }
 	    
 	    if(opt_arg){
-		printf("%lu\n",arg);
+		printf("%"PRIu32"\n",arg);
 		p = 0;
 	    }
 	    

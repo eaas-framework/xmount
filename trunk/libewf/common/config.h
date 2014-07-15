@@ -1,8 +1,29 @@
 /* common/config.h.  Generated from config.h.in by configure.  */
 /* common/config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define to 1 if you have the `atoll' function. */
-/* #undef HAVE_ATOLL */
+/* Define to 1 if translation of program messages to the user's native
+   language is requested. */
+#define ENABLE_NLS 1
+
+/* Define to 1 if adler32 funtion is available in zlib. */
+#define HAVE_ADLER32 1
+
+/* Define to 1 if you have the `bindtextdomain' function. */
+#define HAVE_BINDTEXTDOMAIN 1
+
+/* Define to 1 if you have the 'bzip2' library (-lbz2). */
+#define HAVE_BZIP2 1
+
+/* Define to 1 if you have the <bzlib.h> header file. */
+#define HAVE_BZLIB_H 1
+
+/* Define to 1 if you have the MacOS X function CFLocaleCopyCurrent in the
+   CoreFoundation framework. */
+/* #undef HAVE_CFLOCALECOPYCURRENT */
+
+/* Define to 1 if you have the MacOS X function CFPreferencesCopyAppValue in
+   the CoreFoundation framework. */
+/* #undef HAVE_CFPREFERENCESCOPYAPPVALUE */
 
 /* Define to 1 if you have the `chdir' function. */
 #define HAVE_CHDIR 1
@@ -28,12 +49,16 @@
 /* Define to 1 if you have the <cygwin/hdreg.h> header file. */
 /* #undef HAVE_CYGWIN_HDREG_H */
 
+/* Define if the GNU dcgettext() function is already present or preinstalled.
+   */
+#define HAVE_DCGETTEXT 1
+
 /* Define to 1 if debug output should be used. */
 /* #undef HAVE_DEBUG_OUTPUT */
 
 /* Define to 1 if you have the declaration of `memrchr', and to 0 if you
    don't. */
-/* #undef HAVE_DECL_MEMRCHR */
+#define HAVE_DECL_MEMRCHR 0
 
 /* Define to 1 if you have the declaration of `strerror_r', and to 0 if you
    don't. */
@@ -44,6 +69,15 @@
 
 /* Define to 1 if you have the <errno.h> header file. */
 #define HAVE_ERRNO_H 1
+
+/* Define to 1 if you have the `EVP_md5' function". */
+#define HAVE_EVP_MD5 1
+
+/* Define to 1 if you have the `EVP_sha1' function". */
+#define HAVE_EVP_SHA1 1
+
+/* Define to 1 if you have the `EVP_sha256' function". */
+#define HAVE_EVP_SHA256 1
 
 /* Define to 1 if you have the `fclose' function. */
 #define HAVE_FCLOSE 1
@@ -60,6 +94,9 @@
 /* Define to 1 if you have the `fgetws' function. */
 /* #undef HAVE_FGETWS */
 
+/* Define to 1 if you have the `fileno' function. */
+#define HAVE_FILENO 1
+
 /* Define to 1 if you have the `fopen' function. */
 #define HAVE_FOPEN 1
 
@@ -72,29 +109,74 @@
 /* Define to 1 if you have the `fseeko' function. */
 #define HAVE_FSEEKO 1
 
+/* Define to 1 if you have the `fseeko64' function. */
+#define HAVE_FSEEKO64 1
+
 /* Define to 1 if you have the `fstat' function. */
 #define HAVE_FSTAT 1
+
+/* Define to 1 if you have the `ftello' function. */
+#define HAVE_FTELLO 1
+
+/* Define to 1 if you have the `ftello64' function. */
+#define HAVE_FTELLO64 1
+
+/* Define to 1 if you have the `ftruncate' function. */
+#define HAVE_FTRUNCATE 1
+
+/* Define to 1 if you have the <fuse.h> header file. */
+/* #undef HAVE_FUSE_H */
 
 /* Define to 1 if you have the `fwrite' function. */
 #define HAVE_FWRITE 1
 
+/* Define to 1 if you have the `getcwd' function. */
+#define HAVE_GETCWD 1
+
+/* Define to 1 if you have the `getegid' function. */
+#define HAVE_GETEGID 1
+
+/* Define to 1 if you have the `getenv' function. */
+#define HAVE_GETENV 1
+
+/* Define to 1 if you have the `geteuid' function. */
+#define HAVE_GETEUID 1
+
 /* Define to 1 if you have the `getopt' function. */
 #define HAVE_GETOPT 1
+
+/* Define to 1 if you have the `getrlimit' function. */
+#define HAVE_GETRLIMIT 1
+
+/* Define if the GNU gettext() function is already present or preinstalled. */
+#define HAVE_GETTEXT 1
+
+/* Define to 1 if you have the `getuid' function. */
+#define HAVE_GETUID 1
 
 /* Define to 1 if you have the <glob.h> header file. */
 #define HAVE_GLOB_H 1
 
 /* Define to 1 if you have the `gmtime' function. */
-/* #undef HAVE_GMTIME */
+#define HAVE_GMTIME 1
 
 /* Define to 1 if you have the `gmtime_r' function. */
 #define HAVE_GMTIME_R 1
 
-/* Define to 1 if GUID support is available. */
-#define HAVE_GUID_SUPPORT 1
+/* Define to 1 if GUID/UUID support is available. */
+/* #undef HAVE_GUID_SUPPORT */
+
+/* Define if you have the iconv() function and it works. */
+/* #undef HAVE_ICONV */
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
+
+/* Define to 1 if you have the `ioctl' function. */
+#define HAVE_IOCTL 1
+
+/* Define to 1 if you have the <io.h> header file. */
+/* #undef HAVE_IO_H */
 
 /* Define if nl_langinfo has CODESET support. */
 #define HAVE_LANGINFO_CODESET 1
@@ -108,8 +190,122 @@
 /* Define to 1 if you have the <libbfio.h> header file. */
 /* #undef HAVE_LIBBFIO_H */
 
+/* Define to 1 if you have the `bz2' library (-lbz2). */
+#define HAVE_LIBBZ2 1
+
+/* Define to 1 if you have the `caes' library (-lcaes). */
+/* #undef HAVE_LIBCAES */
+
+/* Define to 1 if you have the <libcaes.h> header file. */
+/* #undef HAVE_LIBCAES_H */
+
+/* Define to 1 if you have the `cdata' library (-lcdata). */
+/* #undef HAVE_LIBCDATA */
+
+/* Define to 1 if you have the <libcdata.h> header file. */
+/* #undef HAVE_LIBCDATA_H */
+
+/* Define to 1 if you have the `cerror' library (-lcerror). */
+/* #undef HAVE_LIBCERROR */
+
+/* Define to 1 if you have the <libcerror.h> header file. */
+/* #undef HAVE_LIBCERROR_H */
+
+/* Define to 1 if you have the `cfile' library (-lcfile). */
+/* #undef HAVE_LIBCFILE */
+
+/* Define to 1 if you have the <libcfile.h> header file. */
+/* #undef HAVE_LIBCFILE_H */
+
+/* Define to 1 if you have the `clocale' library (-lclocale). */
+/* #undef HAVE_LIBCLOCALE */
+
+/* Define to 1 if you have the <libclocale.h> header file. */
+/* #undef HAVE_LIBCLOCALE_H */
+
+/* Define to 1 if you have the `cnotify' library (-lcnotify). */
+/* #undef HAVE_LIBCNOTIFY */
+
+/* Define to 1 if you have the <libcnotify.h> header file. */
+/* #undef HAVE_LIBCNOTIFY_H */
+
+/* Define to 1 if you have the `cpath' library (-lcpath). */
+/* #undef HAVE_LIBCPATH */
+
+/* Define to 1 if you have the <libcpath.h> header file. */
+/* #undef HAVE_LIBCPATH_H */
+
 /* Define to 1 if you have the 'crypto' library (-lcrypto). */
 #define HAVE_LIBCRYPTO 1
+
+/* Define to 1 if you have the `csplit' library (-lcsplit). */
+/* #undef HAVE_LIBCSPLIT */
+
+/* Define to 1 if you have the <libcsplit.h> header file. */
+/* #undef HAVE_LIBCSPLIT_H */
+
+/* Define to 1 if you have the `cstring' library (-lcstring). */
+/* #undef HAVE_LIBCSTRING */
+
+/* Define to 1 if you have the <libcstring.h> header file. */
+/* #undef HAVE_LIBCSTRING_H */
+
+/* Define to 1 if you have the `csystem' library (-lcsystem). */
+/* #undef HAVE_LIBCSYSTEM */
+
+/* Define to 1 if you have the <libcsystem.h> header file. */
+/* #undef HAVE_LIBCSYSTEM_H */
+
+/* Define to 1 if you have the `fcache' library (-lfcache). */
+/* #undef HAVE_LIBFCACHE */
+
+/* Define to 1 if you have the <libfcache.h> header file. */
+/* #undef HAVE_LIBFCACHE_H */
+
+/* Define to 1 if you have the 'fuse' library (-lfuse). */
+#define HAVE_LIBFUSE 1
+
+/* Define to 1 if you have the `fvalue' library (-lfvalue). */
+/* #undef HAVE_LIBFVALUE */
+
+/* Define to 1 if you have the <libfvalue.h> header file. */
+/* #undef HAVE_LIBFVALUE_H */
+
+/* Define to 1 if you have the `hmac' library (-lhmac). */
+/* #undef HAVE_LIBHMAC */
+
+/* Define to 1 if you have the <libhmac.h> header file. */
+/* #undef HAVE_LIBHMAC_H */
+
+/* Define to 1 if you have the <libintl.h> header file. */
+#define HAVE_LIBINTL_H 1
+
+/* Define to 1 if you have the `mfdata' library (-lmfdata). */
+/* #undef HAVE_LIBMFDATA */
+
+/* Define to 1 if you have the <libmfdata.h> header file. */
+/* #undef HAVE_LIBMFDATA_H */
+
+/* Define to 1 if you have the `odraw' library (-lodraw). */
+/* #undef HAVE_LIBODRAW */
+
+/* Define to 1 if you have the <libodraw.h> header file. */
+/* #undef HAVE_LIBODRAW_H */
+
+/* Define to 1 if you have the 'osxfuse' library (-losxfuse). */
+/* #undef HAVE_LIBOSXFUSE */
+
+/* Define to 1 if you have the `smdev' library (-lsmdev). */
+/* #undef HAVE_LIBSMDEV */
+
+/* Define to 1 if you have the <libsmdev.h> header file. */
+/* #undef HAVE_LIBSMDEV_H */
+
+/* Define to 1 if you have the `smraw' library (-lsmraw). */
+/* #undef HAVE_LIBSMRAW */
+
+/* Define to 1 if you have the <libsmraw.h> header file. */
+/* #undef HAVE_LIBSMRAW_H */
 
 /* Define to 1 if you have the `una' library (-luna). */
 /* #undef HAVE_LIBUNA */
@@ -117,11 +313,11 @@
 /* Define to 1 if you have the <libuna.h> header file. */
 /* #undef HAVE_LIBUNA_H */
 
-/* Define to 1 if you have the 'uuid' library (-luuid). */
-#define HAVE_LIBUUID 1
+/* Define to 1 if you have the 'libuuid' library (-luuid). */
+/* #undef HAVE_LIBUUID */
 
 /* Define to 1 if you have the `z' library (-lz). */
-#define HAVE_LIBZ 1
+/* #undef HAVE_LIBZ */
 
 /* Define to 1 if you have the <limits.h> header file. */
 #define HAVE_LIMITS_H 1
@@ -141,17 +337,71 @@
 /* Define to 1 if you have the <linux/usb/ch9.h> header file. */
 #define HAVE_LINUX_USB_CH9_H 1
 
+/* Define to 1 if you have the `localeconv' function. */
+#define HAVE_LOCALECONV 1
+
 /* Define to 1 if you have the <locale.h> header file. */
 #define HAVE_LOCALE_H 1
 
 /* Define to 1 if you have the `localtime' function. */
-/* #undef HAVE_LOCALTIME */
+#define HAVE_LOCALTIME 1
 
 /* Define to 1 if you have the `localtime_r' function. */
 #define HAVE_LOCALTIME_R 1
 
 /* Define to 1 if the local version of libbfio is used. */
 #define HAVE_LOCAL_LIBBFIO 1
+
+/* Define to 1 if the local version of libcaes is used. */
+#define HAVE_LOCAL_LIBCAES 1
+
+/* Define to 1 if the local version of libcdata is used. */
+#define HAVE_LOCAL_LIBCDATA 1
+
+/* Define to 1 if the local version of libcerror is used. */
+#define HAVE_LOCAL_LIBCERROR 1
+
+/* Define to 1 if the local version of libcfile is used. */
+#define HAVE_LOCAL_LIBCFILE 1
+
+/* Define to 1 if the local version of libclocale is used. */
+#define HAVE_LOCAL_LIBCLOCALE 1
+
+/* Define to 1 if the local version of libcnotify is used. */
+#define HAVE_LOCAL_LIBCNOTIFY 1
+
+/* Define to 1 if the local version of libcpath is used. */
+#define HAVE_LOCAL_LIBCPATH 1
+
+/* Define to 1 if the local version of libcsplit is used. */
+#define HAVE_LOCAL_LIBCSPLIT 1
+
+/* Define to 1 if the local version of libcstring is used. */
+#define HAVE_LOCAL_LIBCSTRING 1
+
+/* Define to 1 if the local version of libcsystem is used. */
+#define HAVE_LOCAL_LIBCSYSTEM 1
+
+/* Define to 1 if the local version of libfcache is used. */
+#define HAVE_LOCAL_LIBFCACHE 1
+
+/* Define to 1 if the local version of libfvalue is used. */
+#define HAVE_LOCAL_LIBFVALUE 1
+
+/* Define to 1 if the local version of libhmac is used. */
+#define HAVE_LOCAL_LIBHMAC 1
+
+/* Define to 1 if the local version of libmfdata is used. */
+#define HAVE_LOCAL_LIBMFDATA 1
+
+/* Define to 1 if the local version of libodraw is used. */
+#define HAVE_LOCAL_LIBODRAW 1
+
+/* Define to 1 if the local version of libsmdev is used. */
+#define HAVE_LOCAL_LIBSMDEV 1
+
+/* Define to 1 if the local version of libsmraw is used. */
+#define HAVE_LOCAL_LIBSMRAW 1
 
 /* Define to 1 if the local version of libuna is used. */
 #define HAVE_LOCAL_LIBUNA 1
@@ -167,7 +417,7 @@
 #define HAVE_MALLOC 1
 
 /* Define to 1 if you have the `memchr' function. */
-/* #undef HAVE_MEMCHR */
+#define HAVE_MEMCHR 1
 
 /* Define to 1 if you have the `memcmp' function. */
 #define HAVE_MEMCMP 1
@@ -179,13 +429,16 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the `memrchr' function. */
-/* #undef HAVE_MEMRCHR */
+#define HAVE_MEMRCHR 1
 
 /* Define to 1 if you have the `memset' function. */
 #define HAVE_MEMSET 1
 
-/* Define to 1 if you have the `mkdir' function. */
+/* Define to 1 if you have the mkdir function. */
 #define HAVE_MKDIR 1
+
+/* Define to 1 if you have the mkdir function with a second mode argument. */
+#define HAVE_MKDIR_MODE 1
 
 /* Define to 1 if you have the `mktime' function. */
 #define HAVE_MKTIME 1
@@ -196,6 +449,9 @@
 /* Define to 1 if you have the `open' function. */
 #define HAVE_OPEN 1
 
+/* Define to 1 if you have the <openssl/aes.h> header file. */
+/* #undef HAVE_OPENSSL_AES_H */
+
 /* Define to 1 if you have the <openssl/evp.h> header file. */
 #define HAVE_OPENSSL_EVP_H 1
 
@@ -203,12 +459,15 @@
 /* #undef HAVE_OPENSSL_MD5_H */
 
 /* Define to 1 if you have the <openssl/opensslv.h> header file. */
-#define HAVE_OPENSSL_OPENSSLV_H 1
+/* #undef HAVE_OPENSSL_OPENSSLV_H */
 
 /* Define to 1 if you have the <openssl/sha.h> header file. */
 /* #undef HAVE_OPENSSL_SHA_H */
 
-/* Define to 1 if you have the posix_fadvise unction. */
+/* Define to 1 if you have the <osxfuse/fuse.h> header file. */
+/* #undef HAVE_OSXFUSE_FUSE_H */
+
+/* Define to 1 if you have the posix_fadvise function. */
 #define HAVE_POSIX_FADVISE 1
 
 /* Define to 1 whether printf supports the conversion specifier "%jd". */
@@ -217,8 +476,11 @@
 /* Define to 1 whether printf supports the conversion specifier "%zd". */
 #define HAVE_PRINTF_ZD 1
 
-/* Have Python bindings */
+/* Define to 1 if you have Python */
 /* #undef HAVE_PYTHON */
+
+/* Define to 1 if you have the <Python.h> header file. */
+/* #undef HAVE_PYTHON_H */
 
 /* Define to 1 if you have the `read' function. */
 #define HAVE_READ 1
@@ -238,17 +500,20 @@
 /* Define to 1 if you have the `setlocale' function. */
 #define HAVE_SETLOCALE 1
 
+/* Define to 1 if you have the `setvbuf' function. */
+#define HAVE_SETVBUF 1
+
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
 /* Define to 1 if you have the `snprintf' function. */
 #define HAVE_SNPRINTF 1
 
-/* Define to 1 if you have the `sprintf' function. */
-/* #undef HAVE_SPRINTF */
-
 /* Define to 1 if you have the `sscanf' function. */
 #define HAVE_SSCANF 1
+
+/* Define to 1 if you have the `stat' function. */
+#define HAVE_STAT 1
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #define HAVE_STDARG_H 1
@@ -256,17 +521,20 @@
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
 
+/* Define to 1 if you have the <stdio.h> header file. */
+#define HAVE_STDIO_H 1
+
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
+
+/* Define to 1 if you have the `strcasecmp' function. */
+#define HAVE_STRCASECMP 1
 
 /* Define to 1 if you have the `strchr' function. */
 #define HAVE_STRCHR 1
 
-/* Define to 1 if you have the `strcmp' function. */
-/* #undef HAVE_STRCMP */
-
-/* Define to 1 if you have the `strcpy' function. */
-/* #undef HAVE_STRCPY */
+/* Define to 1 if you have the `strerror' function. */
+/* #undef HAVE_STRERROR */
 
 /* Define to 1 if you have the `strerror_r' function. */
 #define HAVE_STRERROR_R 1
@@ -280,6 +548,9 @@
 /* Define to 1 if you have the `strlen' function. */
 #define HAVE_STRLEN 1
 
+/* Define to 1 if you have the `strncasecmp' function. */
+#define HAVE_STRNCASECMP 1
+
 /* Define to 1 if you have the `strncmp' function. */
 #define HAVE_STRNCMP 1
 
@@ -289,11 +560,8 @@
 /* Define to 1 if you have the `strrchr' function. */
 #define HAVE_STRRCHR 1
 
-/* Define to 1 if you have the `strtoll' function. */
-#define HAVE_STRTOLL 1
-
-/* Define to 1 if you have the `strtoull' function. */
-#define HAVE_STRTOULL 1
+/* Define to 1 if you have the `strstr' function. */
+#define HAVE_STRSTR 1
 
 /* Define to 1 if you have the `swprintf' function. */
 /* #undef HAVE_SWPRINTF */
@@ -307,11 +575,17 @@
 /* Define to 1 if you have the <sys/ioctl.h> header file. */
 #define HAVE_SYS_IOCTL_H 1
 
+/* Define to 1 if you have the <sys/resource.h> header file. */
+#define HAVE_SYS_RESOURCE_H 1
+
 /* Define to 1 if you have the <sys/signal.h> header file. */
 #define HAVE_SYS_SIGNAL_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
+
+/* Define to 1 if you have the <sys/syslimits.h> header file. */
+/* #undef HAVE_SYS_SYSLIMITS_H */
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
@@ -319,8 +593,14 @@
 /* Define to 1 if you have the <sys/utsname.h> header file. */
 #define HAVE_SYS_UTSNAME_H 1
 
+/* Define to 1 if you have the `textdomain' function. */
+#define HAVE_TEXTDOMAIN 1
+
 /* Define to 1 if you have the `time' function. */
 #define HAVE_TIME 1
+
+/* Define to 1 if you have the `towlower' function. */
+/* #undef HAVE_TOWLOWER */
 
 /* Define to 1 if you have the `uname' function. */
 #define HAVE_UNAME 1
@@ -328,20 +608,17 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
 
-/* Define to 1 if uuid_generate_random funtion is available. */
-#define HAVE_UUID_GENERATE_RANDOM 1
+/* Define to 1 if uuid_generate_random funtion is available in libuuid. */
+/* #undef HAVE_UUID_GENERATE_RANDOM */
 
-/* Define to 1 if uuid_generate_time funtion is available. */
-#define HAVE_UUID_GENERATE_TIME 1
+/* Define to 1 if uuid_generate_time funtion is available in libuuid. */
+/* #undef HAVE_UUID_GENERATE_TIME */
 
 /* Define to 1 if you have the <uuid/uuid.h> header file. */
-#define HAVE_UUID_UUID_H 1
+/* #undef HAVE_UUID_UUID_H */
 
-/* Define to 1 if experimental version 1 API should be used. */
-#define HAVE_V1_API 1
-
-/* Define to 1 if experimental version 2 API should be used. */
-/* #undef HAVE_V2_API */
+/* Define to 1 if the version 1 API should be available. */
+/* #undef HAVE_V1_API */
 
 /* Define to 1 if you have the <varargs.h> header file. */
 /* #undef HAVE_VARARGS_H */
@@ -356,19 +633,19 @@
 #define HAVE_VSNPRINTF 1
 
 /* Define to 1 if you have the <wchar.h> header file. */
-/* #undef HAVE_WCHAR_H */
+#define HAVE_WCHAR_H 1
+
+/* Define to 1 if you have the `wcscasecmp' function. */
+/* #undef HAVE_WCSCASECMP */
 
 /* Define to 1 if you have the `wcschr' function. */
 /* #undef HAVE_WCSCHR */
 
-/* Define to 1 if you have the `wcscmp' function. */
-/* #undef HAVE_WCSCMP */
-
-/* Define to 1 if you have the `wcscpy' function. */
-/* #undef HAVE_WCSCPY */
-
 /* Define to 1 if you have the `wcslen' function. */
 /* #undef HAVE_WCSLEN */
+
+/* Define to 1 if you have the `wcsncasecmp' function. */
+/* #undef HAVE_WCSNCASECMP */
 
 /* Define to 1 if you have the `wcsncmp' function. */
 /* #undef HAVE_WCSNCMP */
@@ -379,14 +656,26 @@
 /* Define to 1 if you have the `wcsrchr' function. */
 /* #undef HAVE_WCSRCHR */
 
-/* Define to 1 if you have the `wcstoll' function. */
-/* #undef HAVE_WCSTOLL */
+/* Define to 1 if you have the `wcsstr' function. */
+/* #undef HAVE_WCSSTR */
 
-/* Define to 1 if you have the `wcstoull' function. */
-/* #undef HAVE_WCSTOULL */
+/* Define to 1 if you have the `wcstombs' function. */
+/* #undef HAVE_WCSTOMBS */
+
+/* Define to 1 if you have the <wctype.h> header file. */
+#define HAVE_WCTYPE_H 1
 
 /* Define to 1 if wide character type should be used. */
 /* #undef HAVE_WIDE_CHARACTER_TYPE */
+
+/* Define to 1 if you have the <wincrypt.h> header file. */
+/* #undef HAVE_WINCRYPT_H */
+
+/* Define to 1 if you have the <windows.h> header file. */
+/* #undef HAVE_WINDOWS_H */
+
+/* Define to 1 if STORAGE_BUS_TYPE is defined. */
+/* #undef HAVE_WINIOCTL_H_STORAGE_BUS_TYPE */
 
 /* Define to 1 if you have the `wmemchr' function. */
 /* #undef HAVE_WMEMCHR */
@@ -403,8 +692,11 @@
 /* Define to 1 if you have the `write' function. */
 #define HAVE_WRITE 1
 
+/* Define to 1 if you have the 'zlib' library (-lz). */
+#define HAVE_ZLIB 1
+
 /* Define to 1 if you have the <zlib.h> header file. */
-#define HAVE_ZLIB_H 1
+/* #undef HAVE_ZLIB_H */
 
 /* Defines the fallback operating system string. */
 #define LIBEWF_OPERATING_SYSTEM "Linux"
@@ -417,19 +709,22 @@
 #define PACKAGE "libewf"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "forensics@hoffmannbv.nl"
+#define PACKAGE_BUGREPORT "joachim.metz@gmail.com"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "libewf"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libewf 20100226"
+#define PACKAGE_STRING "libewf 20130416"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libewf"
 
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "20100226"
+#define PACKAGE_VERSION "20130416"
 
 /* The size of `off_t', as computed by sizeof. */
 #define SIZEOF_OFF_T 8
@@ -453,7 +748,16 @@
 /* #undef TM_IN_SYS_TIME */
 
 /* Version number of package */
-#define VERSION "20100226"
+#define VERSION "20130416"
+
+/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+   `char[]'. */
+/* #undef YYTEXT_POINTER */
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */

@@ -1,8 +1,7 @@
 /*
  * Low level reading functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,136 +20,138 @@
  */
 
 #include <common.h>
-#include <byte_stream.h>
 #include <types.h>
 
-#include <liberror.h>
-#include <libnotify.h>
-
+#include "libewf_chunk_data.h"
 #include "libewf_definitions.h"
-#include "libewf_compression.h"
-#include "libewf_chunk_cache.h"
 #include "libewf_libbfio.h"
+#include "libewf_libcdata.h"
+#include "libewf_libcerror.h"
+#include "libewf_libcnotify.h"
+#include "libewf_libfcache.h"
+#include "libewf_libmfdata.h"
 #include "libewf_media_values.h"
-#include "libewf_offset_table.h"
 #include "libewf_read_io_handle.h"
-#include "libewf_sector_table.h"
-#include "libewf_segment_file_handle.h"
 
-#include "ewf_crc.h"
-#include "ewf_file_header.h"
-
-/* Initialize the read io handle
+/* Initialize the read IO handle
  * Returns 1 if successful or -1 on error
  */
 int libewf_read_io_handle_initialize(
      libewf_read_io_handle_t **read_io_handle,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
 	static char *function = "libewf_read_io_handle_initialize";
 
 	if( read_io_handle == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid read io handle.",
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid read IO handle.",
 		 function );
 
 		return( -1 );
 	}
+	if( *read_io_handle != NULL )
+	{
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_VALUE_ALREADY_SET,
+		 "%s: invalid read IO handle value already set.",
+		 function );
+
+		return( -1 );
+	}
+	*read_io_handle = memory_allocate_structure(
+	                   libewf_read_io_handle_t );
+
 	if( *read_io_handle == NULL )
 	{
-		*read_io_handle = (libewf_read_io_handle_t *) memory_allocate(
-		                                               sizeof( libewf_read_io_handle_t ) );
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_INSUFFICIENT,
+		 "%s: unable to create read IO handle.",
+		 function );
 
-		if( *read_io_handle == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_INSUFFICIENT,
-			 "%s: unable to create read io handle.",
-			 function );
-
-			return( -1 );
-		}
-		if( memory_set(
-		     *read_io_handle,
-		     0,
-		     sizeof( libewf_read_io_handle_t ) ) == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to clear read io handle.",
-			 function );
-
-			memory_free(
-			 *read_io_handle );
-
-			*read_io_handle = NULL;
-
-			return( -1 );
-		}
-		if( libewf_sector_table_initialize(
-		     &( ( *read_io_handle )->crc_errors ),
-		     0,
-		     error ) != 1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_RUNTIME,
-			 LIBERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
-			 "%s: unable to create crc errors.",
-			 function );
-
-			memory_free(
-			 *read_io_handle );
-
-			*read_io_handle = NULL;
-
-			return( -1 );
-		}
-		( *read_io_handle )->wipe_on_error = 1;
+		goto on_error;
 	}
+	if( memory_set(
+	     *read_io_handle,
+	     0,
+	     sizeof( libewf_read_io_handle_t ) ) == NULL )
+	{
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_SET_FAILED,
+		 "%s: unable to clear read IO handle.",
+		 function );
+
+		goto on_error;
+	}
+	if( libcdata_range_list_initialize(
+	     &( ( *read_io_handle )->checksum_errors ),
+	     error ) != 1 )
+	{
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
+		 "%s: unable to create checksum errors range list.",
+		 function );
+
+		goto on_error;
+	}
+	( *read_io_handle )->zero_on_error = 1;
+
 	return( 1 );
+
+on_error:
+	if( *read_io_handle != NULL )
+	{
+		memory_free(
+		 *read_io_handle );
+
+		*read_io_handle = NULL;
+	}
+	return( -1 );
 }
 
-/* Frees the read io handle including elements
+/* Frees the read IO handle including elements
  * Returns 1 if successful or -1 on error
  */
 int libewf_read_io_handle_free(
      libewf_read_io_handle_t **read_io_handle,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
 	static char *function = "libewf_read_io_handle_free";
 	int result            = 1;
 
 	if( read_io_handle == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid read io handle.",
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid read IO handle.",
 		 function );
 
-		return( 1 );
+		return( -1 );
 	}
 	if( *read_io_handle != NULL )
 	{
-		if( libewf_sector_table_free(
-		     &( ( *read_io_handle )->crc_errors ),
+		if( libcdata_range_list_free(
+		     &( ( *read_io_handle )->checksum_errors ),
 		     error ) != 1 )
 		{
-			liberror_error_set(
+			libcerror_error_set(
 			 error,
-			 LIBERROR_ERROR_DOMAIN_RUNTIME,
-			 LIBERROR_RUNTIME_ERROR_FINALIZE_FAILED,
-			 "%s: unable to free crc errors.",
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_FINALIZE_FAILED,
+			 "%s: unable to free checksum errors range list.",
 			 function );
 
 			result = -1;
@@ -163,810 +164,367 @@ int libewf_read_io_handle_free(
 	return( result );
 }
 
-/* Processes the chunk data, applies decompression if necessary and validates the CRC
- * Sets the crc_mismatch value to 1 if the chunk CRC did not match the calculated CRC
- * Returns the amount of bytes of the processed chunk data or -1 on error
+/* Clones the read IO handle
+ * Returns 1 if successful or -1 on error
  */
-ssize_t libewf_read_io_handle_process_chunk(
-         uint8_t *chunk_buffer,
-         size_t chunk_buffer_size,
-         uint8_t *uncompressed_buffer,
-         size_t *uncompressed_buffer_size,
-         int8_t is_compressed,
-         ewf_crc_t chunk_crc,
-         int8_t read_crc,
-         uint8_t *crc_mismatch,
-         liberror_error_t **error )
+int libewf_read_io_handle_clone(
+     libewf_read_io_handle_t **destination_read_io_handle,
+     libewf_read_io_handle_t *source_read_io_handle,
+     libcerror_error_t **error )
 {
-	uint8_t *crc_buffer      = NULL;
-	static char *function    = "libewf_read_io_handle_process_chunk";
-	ewf_crc_t calculated_crc = 0;
+	static char *function = "libewf_read_io_handle_clone";
 
-	if( chunk_buffer == NULL )
+	if( destination_read_io_handle == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid chunk buffer.",
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid destination read IO handle.",
 		 function );
 
 		return( -1 );
 	}
-	if( chunk_buffer_size > (size_t) SSIZE_MAX )
+	if( *destination_read_io_handle != NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid chunk buffer size value exceeds maximum.",
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_VALUE_ALREADY_SET,
+		 "%s: invalid destination read IO handle value already set.",
 		 function );
 
 		return( -1 );
 	}
-	if( crc_mismatch == NULL )
+	if( source_read_io_handle == NULL )
 	{
-		liberror_error_set(
+		*destination_read_io_handle = NULL;
+
+		return( 1 );
+	}
+	*destination_read_io_handle = memory_allocate_structure(
+	                               libewf_read_io_handle_t );
+
+	if( *destination_read_io_handle == NULL )
+	{
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid CRC mismatch.",
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_INSUFFICIENT,
+		 "%s: unable to create destination read IO handle.",
 		 function );
 
-		return( -1 );
+		goto on_error;
 	}
-	*crc_mismatch = 0;
-
-	/* Do not bother with an empry chunk
-	 */
-	if( chunk_buffer_size == 0 )
+	if( memory_set(
+	     *destination_read_io_handle,
+	     0,
+	     sizeof( libewf_read_io_handle_t ) ) == NULL )
 	{
-		return( 0 );
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_MEMORY,
+		 LIBCERROR_MEMORY_ERROR_SET_FAILED,
+		 "%s: unable to clear source to destination read IO handle.",
+		 function );
+
+		goto on_error;
 	}
-	if( is_compressed == 0 )
+	if( libcdata_range_list_clone(
+	     &( ( *destination_read_io_handle )->checksum_errors ),
+	     source_read_io_handle->checksum_errors,
+	     error ) != 1 )
 	{
-		if( read_crc == 0 )
-		{
-			chunk_buffer_size -= sizeof( ewf_crc_t );
-			crc_buffer         = &( chunk_buffer[ chunk_buffer_size ] );
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
+		 "%s: unable to create destination checksum errors range list.",
+		 function );
 
-			byte_stream_copy_to_uint32_little_endian(
-			 crc_buffer,
-			 chunk_crc );
-		}
-		calculated_crc = ewf_crc_calculate(
-		                  chunk_buffer,
-		                  chunk_buffer_size,
-		                  1 );
-
-		if( chunk_crc != calculated_crc )
-		{
-#if defined( HAVE_VERBOSE_OUTPUT )
-			libnotify_verbose_printf(
-			 "%s: CRC does not match (in file: %" PRIu32 " calculated: %" PRIu32 ").\n",
-			 function,
-			 chunk_crc,
-			 calculated_crc );
-#endif
-
-			*crc_mismatch = 1;
-		}
-		*uncompressed_buffer_size = chunk_buffer_size;
+		goto on_error;
 	}
-	else
+	( *destination_read_io_handle )->zero_on_error = source_read_io_handle->zero_on_error;
+
+	return( 1 );
+
+on_error:
+	if( *destination_read_io_handle != NULL )
 	{
-		if( uncompressed_buffer == NULL )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-			 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-			 "%s: invalid uncompressed buffer.",
-			 function );
+		memory_free(
+		 *destination_read_io_handle );
 
-			return( -1 );
-		}
-		if( chunk_buffer== uncompressed_buffer )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-			 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-			 "%s: invalid uncompressed buffer is the same as chunk buffer.",
-			 function );
-
-			return( -1 );
-		}
-		if( *uncompressed_buffer_size > (size_t) SSIZE_MAX )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-			 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
-			 "%s: invalid uncompressed buffer size value exceeds maximum.",
-			 function );
-
-			return( -1 );
-		}
-		if( libewf_uncompress(
-		     uncompressed_buffer,
-		     uncompressed_buffer_size,
-		     chunk_buffer,
-		     chunk_buffer_size,
-		     error ) != 1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_COMPRESSION,
-			 LIBERROR_COMPRESSION_ERROR_UNCOMPRESS_FAILED,
-			 "%s: unable to uncompressed buffer.",
-			 function );
-
-			return( -1 );
-		}
+		*destination_read_io_handle = NULL;
 	}
-	return( (ssize_t) *uncompressed_buffer_size );
+	return( -1 );
 }
 
-/* Reads a certain chunk of data into the chunk buffer
- * Will read until the requested size is filled or the entire chunk is read
- * read_crc is set if the crc has been read into crc_buffer
- * read_crc is used for uncompressed chunks only
- * chunk_crc is set to a runtime version of the value in the crc_buffer
- * Returns the amount of bytes read, 0 if no bytes can be read or -1 on error
+/* Reads a certain chunk of data
+ * Adds a checksum error if the data is corrupted
+ * Returns 1 if successful or -1 on error
  */
-ssize_t libewf_read_io_handle_read_chunk(
-         libewf_io_handle_t *io_handle,
-         libewf_offset_table_t *offset_table,
-         uint32_t chunk,
-         uint8_t *chunk_buffer,
-         size_t chunk_buffer_size,
-         int8_t *is_compressed,
-         uint8_t *crc_buffer,
-         ewf_crc_t *chunk_crc,
-         int8_t *read_crc,
-         liberror_error_t **error )
+int libewf_read_io_handle_read_chunk_data(
+     libewf_read_io_handle_t *read_io_handle,
+     libbfio_pool_t *file_io_pool,
+     libewf_media_values_t *media_values,
+     libmfdata_list_t *chunk_table_list,
+     libfcache_cache_t *chunk_table_cache,
+     int chunk_index,
+     off64_t chunk_offset,
+     libewf_chunk_data_t **chunk_data,
+     libcerror_error_t **error )
 {
-	libewf_segment_file_handle_t *segment_file_handle = NULL;
-#if defined( HAVE_VERBOSE_OUTPUT )
-        char *chunk_type                                  = NULL;
-#endif
-	static char *function                             = "libewf_read_io_handle_read_chunk";
-	ssize_t read_count                                = 0;
-	ssize_t total_read_count                          = 0;
-	size_t chunk_size                                 = 0;
-
-	if( io_handle == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid io handle.",
-		 function );
-
-		return( -1 );
-	}
-	if( offset_table == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid offset table.",
-		 function );
-
-		return( -1 );
-	}
-	if( offset_table->chunk_offset == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
-		 "%s: invalid offset table - missing chunk offsets.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_buffer == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid chunk buffer.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_buffer_size == 0 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_ZERO_OR_LESS,
-		 "%s: invalid chunk buffer size value is zero.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_buffer_size > (size_t) SSIZE_MAX )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid chunk buffer size value exceeds maximum.",
-		 function );
-
-		return( -1 );
-	}
-	if( is_compressed == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid is compressed.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_crc == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid chunk crc.",
-		 function );
-
-		return( -1 );
-	}
-	if( read_crc == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid read crc.",
-		 function );
-
-		return( -1 );
-	}
-	/* Check if the chunk is available
-	 */
-	if( chunk >= offset_table->amount_of_chunk_offsets )
-	{
-		return( 0 );
-	}
-	*chunk_crc     = 0;
-	*read_crc      = 0;
-	*is_compressed = 0;
-
-	/* Determine the size of the chunk including the CRC
-	 */
-	chunk_size = offset_table->chunk_offset[ chunk ].size;
-
-	/* Determine if the chunk is compressed or not
-	 */
-	if( ( offset_table->chunk_offset[ chunk ].flags & LIBEWF_CHUNK_OFFSET_FLAGS_COMPRESSED ) == LIBEWF_CHUNK_OFFSET_FLAGS_COMPRESSED )
-	{
-		*is_compressed = 1;
-	}
-	else if( chunk_buffer_size < chunk_size )
-	{
-		chunk_size -= sizeof( ewf_crc_t );
-		*read_crc   = 1;
-	}
-	segment_file_handle = offset_table->chunk_offset[ chunk ].segment_file_handle;
-
-	if( segment_file_handle == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid segment file.",
-		 function );
-
-		return( -1 );
-	}
-	/* Make sure the segment file offset is in the right place
-	 */
-	if( libbfio_pool_seek_offset(
-	     io_handle->file_io_pool,
-	     segment_file_handle->file_io_pool_entry,
-	     offset_table->chunk_offset[ chunk ].file_offset,
-	     SEEK_SET,
-	     error ) <= -1 )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_IO,
-		 LIBERROR_IO_ERROR_SEEK_FAILED,
-		 "%s: unable to seek chunk in segment file.",
-		 function );
-
-		return( -1 );
-	}
-#if defined( HAVE_VERBOSE_OUTPUT )
-	if( ( offset_table->chunk_offset[ chunk ].flags & LIBEWF_CHUNK_OFFSET_FLAGS_DELTA_CHUNK ) == LIBEWF_CHUNK_OFFSET_FLAGS_DELTA_CHUNK )
-	{
-		chunk_type = "uncompressed delta";
-	}
-	else if( *is_compressed == 0 )
-	{
-		chunk_type = "uncompressed";
-	}
-	else
-	{
-		chunk_type = "compressed";
-	}
-	libnotify_verbose_printf(
-	 "%s: reading %s chunk %" PRIu32 " of %" PRIu32 " at offset: %" PRIu64 " with size: %" PRIzd ".\n",
-	 function,
-	 chunk_type,
-	 chunk,
-	 offset_table->amount_of_chunk_offsets,
-	 offset_table->chunk_offset[ chunk ].file_offset,
-	 offset_table->chunk_offset[ chunk ].size );
-#endif
-
-	/* Check if the chunk and crc buffers are aligned
-	 * if so read the chunk and crc at the same time
-	 */
-	if( ( *is_compressed == 0 )
-	 && ( *read_crc != 0 )
-	 && ( &( chunk_buffer[ chunk_size ] ) == crc_buffer ) )
-	{
-		chunk_size += sizeof( ewf_crc_t );
-	}
-	/* Read the chunk data
-	 */
-	read_count = libbfio_pool_read(
-	              io_handle->file_io_pool,
-	              segment_file_handle->file_io_pool_entry,
-	              chunk_buffer,
-	              chunk_size,
-	              error );
-
-	if( read_count != (ssize_t) chunk_size )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_IO,
-		 LIBERROR_IO_ERROR_READ_FAILED,
-		 "%s: unable to read chunk in segment file.",
-		 function );
-
-		return( -1 );
-	}
-	total_read_count += read_count;
-
-	/* Determine if the CRC should be read seperately
-	 */
-	if( *read_crc != 0 )
-	{
-		/* Check if the chunk and crc buffers are aligned
-		 * if not the chunk and crc need to be read separately
-		 */
-		if( &( chunk_buffer[ chunk_size ] ) != crc_buffer )
-		{
-			if( crc_buffer == NULL )
-			{
-				liberror_error_set(
-				 error,
-				 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-				 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-				 "%s: invalid crc buffer.",
-				 function );
-
-				return( -1 );
-			}
-			read_count = libbfio_pool_read(
-			              io_handle->file_io_pool,
-			              segment_file_handle->file_io_pool_entry,
-			              crc_buffer,
-			              sizeof( ewf_crc_t ),
-			              error );
-
-			if( read_count != (ssize_t) sizeof( ewf_crc_t ) )
-			{
-				liberror_error_set(
-				 error,
-				 LIBERROR_ERROR_DOMAIN_IO,
-				 LIBERROR_IO_ERROR_READ_FAILED,
-				 "%s: error reading CRC of chunk: %" PRIu32 " from segment file.",
-				 function,
-				 chunk );
-
-				return( -1 );
-			}
-			total_read_count += read_count;
-		}
-		byte_stream_copy_to_uint32_little_endian(
-		 crc_buffer,
-		 *chunk_crc );
-	}
-	return( total_read_count );
-}
-
-/* Reads a certain chunk of data from the segment file(s)
- * Will read until the requested size is filled or the entire chunk is read
- * Returns the amount of bytes read, 0 if no bytes can be read or -1 on error
- */
-ssize_t libewf_read_io_handle_read_chunk_data(
-         libewf_read_io_handle_t *read_io_handle,
-         libewf_io_handle_t *io_handle,
-         libewf_media_values_t *media_values,
-         libewf_offset_table_t *offset_table,
-         libewf_chunk_cache_t *chunk_cache,
-         uint32_t chunk,
-         uint32_t chunk_offset,
-         uint8_t *buffer,
-         size_t size,
-         liberror_error_t **error )
-{
-	uint8_t stored_crc_buffer[ 4 ];
-
-	uint8_t *chunk_buffer      = NULL;
-	uint8_t *chunk_read_buffer = NULL;
-	uint8_t *crc_read_buffer   = NULL;
 	static char *function      = "libewf_read_io_handle_read_chunk_data";
-	ewf_crc_t chunk_crc        = 0;
-	size_t chunk_data_size     = 0;
 	size_t chunk_size          = 0;
-	size_t bytes_available     = 0;
-	ssize_t read_count         = 0;
-	int64_t sector             = 0;
-	uint32_t amount_of_sectors = 0;
-	int chunk_cache_data_used  = 0;
-	uint8_t crc_mismatch       = 0;
-	int8_t is_compressed       = 0;
-	int8_t read_crc            = 0;
+	uint64_t start_sector      = 0;
+	uint32_t number_of_sectors = 0;
+	int result                 = 0;
 
 	if( read_io_handle == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid read io handle.",
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid read IO handle.",
 		 function );
 
 		return( -1 );
 	}
 	if( media_values == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid media values.",
 		 function );
 
 		return( -1 );
 	}
-	if( offset_table == NULL )
+	if( chunk_data == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid offset table.",
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 "%s: invalid chunk data.",
 		 function );
 
 		return( -1 );
 	}
-	if( offset_table->chunk_offset == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_MISSING,
-		 "%s: invalid offset table - missing chunk offsets.",
-		 function );
-
-		return( -1 );
-	}
-	if( chunk_cache == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid chunk cache.",
-		 function );
-
-		return( -1 );
-	}
-	if( buffer == NULL )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid buffer.",
-		 function );
-
-		return( -1 );
-	}
-	if( buffer == chunk_cache->compressed )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
-		 "%s: invalid buffer - same as chunk cache compressed.",
-		 function );
-
-		return( -1 );
-	}
-	/* Check if the chunk is not cached
+	/* This function will expand element groups
 	 */
-	if( ( chunk_cache->chunk != chunk )
-	 || ( chunk_cache->cached == 0 ) )
+	result = libmfdata_list_get_element_value_by_index(
+	          chunk_table_list,
+	          file_io_pool,
+	          chunk_table_cache,
+	          chunk_index,
+	          (intptr_t **) chunk_data,
+	          0,
+	          error );
+
+	if( result != 1 )
 	{
-		/* Determine the size of the chunk including the CRC
-		 */
-		chunk_size = offset_table->chunk_offset[ chunk ].size;
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+		 "%s: unable to retrieve chunk data: %d.",
+		 function,
+		 chunk_index );
 
-		/* Make sure the chunk cache is large enough
-		 */
-		chunk_cache_data_used = (int) ( buffer == chunk_cache->data );
-
-		if( chunk_size > chunk_cache->allocated_size )
+#if defined( HAVE_DEBUG_OUTPUT )
+		if( libcnotify_verbose != 0 )
 		{
-#if defined( HAVE_VERBOSE_OUTPUT )
-			libnotify_verbose_printf(
-			 "%s: reallocating chunk size: %" PRIzu ".\n",
-			 function,
-			 chunk_size );
+			if( ( error != NULL )
+			 && ( *error != NULL ) )
+			{
+				libcnotify_print_error_backtrace(
+				 *error );
+			}
+		}
 #endif
+		libcerror_error_free(
+		 error );
 
-			if( libewf_chunk_cache_resize(
-			     chunk_cache,
-			     chunk_size,
-			     error ) != 1 )
-			{
-				liberror_error_set(
-				 error,
-				 LIBERROR_ERROR_DOMAIN_RUNTIME,
-				 LIBERROR_RUNTIME_ERROR_RESIZE_FAILED,
-				 "%s: unable to resize chunk cache.",
-				 function );
+		chunk_size = media_values->chunk_size;
 
-				return( -1 );
-			}
-			/* Adjust chunk data buffer if necessary
-			 */
-			if( ( chunk_cache_data_used == 1 )
-			 && ( buffer != chunk_cache->data ) )
-			{
-				buffer = chunk_cache->data;
-			}
-		}
-		if( ( offset_table->chunk_offset[ chunk ].flags & LIBEWF_CHUNK_OFFSET_FLAGS_COMPRESSED ) == 0 )
+		if( (size64_t) ( chunk_offset + chunk_size ) > media_values->media_size )
 		{
-			is_compressed = 0;
+			chunk_size = (size_t) ( media_values->media_size - chunk_offset );
 		}
-		else
-		{
-			is_compressed = 1;
-		}
-		chunk_buffer = chunk_cache->data;
-
-		/* Directly read to the buffer if
-		 *  the buffer isn't the chunk cache
-		 *  and no data was previously copied into the chunk cache
-		 *  and the buffer contains the necessary amount of bytes to fill a chunk
-		 *  and the buffer is not compressed
-		 */
-		if( ( buffer != chunk_cache->data )
-		 && ( chunk_offset == 0 )
-		 && ( size >= (size_t) media_values->chunk_size )
-		 && ( is_compressed == 0 ) )
-		{
-			chunk_buffer = buffer;
-
-			/* The CRC is read seperately for uncompressed chunks
-			 */
-			chunk_size -= sizeof( ewf_crc_t );
-		}
-		/* Determine if the chunk data should be directly read into chunk data buffer
-		 * or to use the intermediate storage for a compressed chunk
-		 */
-		if( is_compressed == 1 )
-		{
-			chunk_read_buffer = chunk_cache->compressed;
-		}
-		else
-		{
-			chunk_read_buffer = chunk_buffer;
-		}
-		/* Use chunk and crc buffer alignment when the chunk cache data is directly being passed
-		 */
-		if( chunk_read_buffer == chunk_cache->data )
-		{
-			crc_read_buffer = &( chunk_read_buffer[ media_values->chunk_size ] );
-		}
-		else
-		{
-			crc_read_buffer = stored_crc_buffer;
-		}
-		/* Read the chunk
-		 */
-		read_count = libewf_read_io_handle_read_chunk(
-		              io_handle,
-		              offset_table,
-		              chunk,
-		              chunk_read_buffer,
-		              chunk_size,
-		              &is_compressed,
-		              crc_read_buffer,
-		              &chunk_crc,
-		              &read_crc,
-		              error );
-
-		if( read_count <= -1 )
-		{
-			liberror_error_set(
-			 error,
-			 LIBERROR_ERROR_DOMAIN_IO,
-			 LIBERROR_IO_ERROR_READ_FAILED,
-			 "%s: unable to read chunk.",
-			 function );
-
-			return( -1 );
-		}
-		if( is_compressed != 0 )
-		{
-			chunk_data_size = media_values->chunk_size
-			                + sizeof( ewf_crc_t );
-		}
-		else
-		{
-			chunk_data_size = chunk_size;
-		}
-		if( libewf_read_io_handle_process_chunk(
-		     chunk_read_buffer,
+		if( libewf_chunk_data_initialize(
+		     chunk_data,
 		     chunk_size,
-		     chunk_buffer,
-		     &chunk_data_size,
-		     is_compressed,
-		     chunk_crc,
-		     read_crc,
-		     &crc_mismatch,
-		     error ) == -1 )
+		     error ) != 1 )
 		{
-			liberror_error_set(
+			libcerror_error_set(
 			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_SET_FAILED,
-			 "%s: unable to process chunk data.",
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_INITIALIZE_FAILED,
+			 "%s: unable to create chunk data.",
 			 function );
 
 			return( -1 );
 		}
-		if( crc_mismatch != 0 )
+		if( *chunk_data == NULL )
 		{
-			/* Wipe the chunk if nescessary
-			 */
-			if( ( read_io_handle->wipe_on_error != 0 )
-			 && ( memory_set(
-			       chunk_read_buffer,
-			       0,
-			       size ) == NULL ) )
-			{
-				liberror_error_set(
-				 error,
-				 LIBERROR_ERROR_DOMAIN_MEMORY,
-				 LIBERROR_MEMORY_ERROR_SET_FAILED,
-				 "%s: unable to wipe chunk data.",
-				 function );
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_VALUE_MISSING,
+			 "%s: missing chunk data: %d.",
+			 function,
+			 chunk_index );
 
-				return( -1 );
-			}
-			/* Add CRC error
-			 */
-			sector            = (int64_t) chunk * (int64_t) media_values->sectors_per_chunk;
-			amount_of_sectors = media_values->sectors_per_chunk;
-
-			if( ( sector + amount_of_sectors ) > (int64_t) media_values->amount_of_sectors )
-			{
-				amount_of_sectors = (uint32_t) ( (int64_t) media_values->amount_of_sectors - sector );
-			}
-			if( libewf_sector_table_add_sector(
-			     read_io_handle->crc_errors,
-			     sector,
-			     amount_of_sectors,
-			     1,
-			     error ) != 1 )
-			{
-				liberror_error_set(
-				 error,
-				 LIBERROR_ERROR_DOMAIN_RUNTIME,
-				 LIBERROR_RUNTIME_ERROR_SET_FAILED,
-				 "%s: unable to set CRC error.",
-				 function );
-
-				return( -1 );
-			}
-			chunk_data_size = amount_of_sectors * media_values->bytes_per_sector;
+			return( -1 );
 		}
-		/* Flag that the chunk was cached
-		 */
-		if( chunk_buffer == chunk_cache->data )
+		( *chunk_data )->data_size  = chunk_size;
+		( *chunk_data )->is_corrupt = 1;
+
+		if( memory_set(
+		     ( *chunk_data )->data,
+		     0,
+		     ( *chunk_data )->data_size ) == NULL )
 		{
-			chunk_cache->chunk  = chunk;
-			chunk_cache->amount = chunk_data_size;
-			chunk_cache->offset = 0;
-			chunk_cache->cached = 1;
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_MEMORY,
+			 LIBCERROR_MEMORY_ERROR_SET_FAILED,
+			 "%s: unable to zero chunk data.",
+			 function );
+
+			libewf_chunk_data_free(
+			 chunk_data,
+			 NULL );
+
+			return( -1 );
+		}
+		if( libmfdata_list_set_element_by_index(
+		     chunk_table_list,
+		     chunk_index,
+		     -1,
+		     chunk_offset,
+		     chunk_size,
+		     0,
+		     error ) != 1 )
+		{
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to set chunk: %d in table.",
+			 function,
+			 chunk_index );
+
+			libewf_chunk_data_free(
+			 chunk_data,
+			 NULL );
+
+			return( -1 );
+		}
+		if( libmfdata_list_set_element_value_by_index(
+		     chunk_table_list,
+		     chunk_table_cache,
+		     chunk_index,
+		     (intptr_t *) *chunk_data,
+		     (int (*)(intptr_t **, libcerror_error_t **)) &libewf_chunk_data_free,
+		     LIBMFDATA_LIST_ELEMENT_VALUE_FLAG_MANAGED,
+		     error ) != 1 )
+		{
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+			 "%s: unable to set chunk data: %d as element value.",
+			 function,
+			 chunk_index );
+
+			libewf_chunk_data_free(
+			 chunk_data,
+			 NULL );
+
+			return( -1 );
 		}
 	}
 	else
 	{
-		chunk_buffer    = chunk_cache->data;
-		chunk_data_size = chunk_cache->amount;
-	}
-	/* Determine the available amount of data within the cached chunk
-	 */
-	if( chunk_offset > chunk_data_size )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_OUT_OF_RANGE,
-		 "%s: chunk offset exceeds amount of bytes available in chunk.",
-		 function );
-
-		return( -1 );
-	}
-	bytes_available = chunk_data_size - chunk_offset;
-
-	/* Correct the available amount of bytes is larger than the requested amount of bytes
-	 */
-	if( bytes_available > size )
-	{
-		bytes_available = size;
-	}
-	if( bytes_available > (size_t) INT32_MAX )
-	{
-		liberror_error_set(
-		 error,
-		 LIBERROR_ERROR_DOMAIN_RUNTIME,
-		 LIBERROR_RUNTIME_ERROR_VALUE_EXCEEDS_MAXIMUM,
-		 "%s: invalid available amount of bytes value exceeds maximum.",
-		 function );
-
-		return( -1 );
-	}
-	/* If the data was read into the chunk cache copy it to the buffer
-	 *  and the buffer is not the chunk cache itself
-	 */
-	if( ( chunk_buffer == chunk_cache->data )
-	 && ( buffer != chunk_cache->data ) )
-	{
-		/* Copy the relevant data to buffer
-		 */
-		if( ( bytes_available > 0 )
-		 && ( memory_copy(
-		       buffer,
-		       &( chunk_buffer[ chunk_offset ] ),
-		       bytes_available ) == NULL ) )
+		if( *chunk_data == NULL )
 		{
-			liberror_error_set(
+			libcerror_error_set(
 			 error,
-			 LIBERROR_ERROR_DOMAIN_MEMORY,
-			 LIBERROR_MEMORY_ERROR_COPY_FAILED,
-			 "%s: unable to set chunk data in buffer.",
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_VALUE_MISSING,
+			 "%s: missing chunk data: %d.",
+			 function,
+			 chunk_index );
+
+			return( -1 );
+		}
+		if( libewf_chunk_data_unpack(
+		     *chunk_data,
+		     media_values->chunk_size,
+		     error ) != 1 )
+		{
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_GENERIC,
+			 "%s: unable to unpack chunk data: %d.",
+			 function,
+			 chunk_index );
+
+			return( -1 );
+		}
+		if( ( *chunk_data )->is_corrupt != 0 )
+		{
+			if( read_io_handle->zero_on_error != 0 )
+			{
+				if( memory_set(
+				     ( *chunk_data )->data,
+				     0,
+				     ( *chunk_data )->data_size ) == NULL )
+				{
+					libcerror_error_set(
+					 error,
+					 LIBCERROR_ERROR_DOMAIN_MEMORY,
+					 LIBCERROR_MEMORY_ERROR_SET_FAILED,
+					 "%s: unable to zero chunk data.",
+					 function );
+
+					return( -1 );
+				}
+			}
+		}
+	}
+	if( ( *chunk_data )->is_corrupt != 0 )
+	{
+		/* Add checksum error
+		 */
+		start_sector      = (uint64_t) chunk_index * (uint64_t) media_values->sectors_per_chunk;
+		number_of_sectors = media_values->sectors_per_chunk;
+
+		if( ( start_sector + number_of_sectors ) > (uint64_t) media_values->number_of_sectors )
+		{
+			number_of_sectors = (uint32_t) ( (uint64_t) media_values->number_of_sectors - start_sector );
+		}
+		if( libcdata_range_list_append_range(
+		     read_io_handle->checksum_errors,
+		     start_sector,
+		     number_of_sectors,
+		     error ) != 1 )
+		{
+			libcerror_error_set(
+			 error,
+			 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+			 LIBCERROR_RUNTIME_ERROR_APPEND_FAILED,
+			 "%s: unable to append checksum error to range list.",
 			 function );
 
 			return( -1 );
 		}
 	}
-	return( (ssize_t) bytes_available );
+	return( 1 );
 }
 

@@ -3,6 +3,9 @@
 # Note: this currently doesn't work.
 #
 
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
+
 opt_megabytes = 4096
 min_range = 7
 max_range = 20

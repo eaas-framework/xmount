@@ -1,8 +1,7 @@
 /*
  * The internal type definitions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -34,7 +33,15 @@
 
 /* The following type definitions hide internal data structures
  */
+#if defined( HAVE_DEBUG_OUTPUT ) && !defined( WINAPI )
+typedef struct libewf_handle {}		libewf_handle_t;
+typedef struct libewf_file_entry {}	libewf_file_entry_t;
+
+#else
 typedef intptr_t libewf_handle_t;
+typedef intptr_t libewf_file_entry_t;
+
+#endif
 
 #endif
 

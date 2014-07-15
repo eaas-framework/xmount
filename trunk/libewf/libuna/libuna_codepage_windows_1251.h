@@ -1,8 +1,7 @@
 /*
  * Windows 1251 codepage (Cyrillic) functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -35,24 +34,6 @@ extern const uint16_t libuna_codepage_windows_1251_byte_stream_to_unicode_base_0
 extern const uint8_t libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x00a0[ 32 ];
 extern const uint8_t libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x0400[ 96 ];
 extern const uint8_t libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x2010[ 24 ];
-
-#define libuna_codepage_windows_1251_byte_stream_to_unicode( byte_stream_character ) \
-	( byte_stream_character < 0x80 ) ? byte_stream_character : libuna_codepage_windows_1251_byte_stream_to_unicode_base_0x80[ byte_stream_character - 0x80 ]
-
-#define libuna_codepage_windows_1251_unicode_to_byte_stream( unicode_character ) \
-	( unicode_character < 0x0080 ) ? (uint8_t) unicode_character : \
-	( ( unicode_character >= 0x00a0 ) && ( unicode_character < 0x00c0 ) ) ? libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x00a0[ unicode_character - 0x00a0 ] : \
-	( ( unicode_character >= 0x0400 ) && ( unicode_character < 0x0460 ) ) ? libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x0400[ unicode_character - 0x0400 ] : \
-	( unicode_character == 0x0490 ) ? 0xa5 : \
-	( unicode_character == 0x0491 ) ? 0xb4 : \
-	( ( unicode_character >= 0x2010 ) && ( unicode_character < 0x2028 ) ) ? libuna_codepage_windows_1251_unicode_to_byte_stream_base_0x2010[ unicode_character - 0x2010 ] : \
-	( unicode_character == 0x2030 ) ? 0x89 : \
-	( unicode_character == 0x2039 ) ? 0x8b : \
-	( unicode_character == 0x203a ) ? 0x9b : \
-	( unicode_character == 0x20ac ) ? 0x88 : \
-	( unicode_character == 0x2116 ) ? 0xb9 : \
-	( unicode_character == 0x2122 ) ? 0x99 : \
-	0x1a
 
 #if defined( __cplusplus )
 }

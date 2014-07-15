@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (c) 2005
+ * Copyright (c) 2005-2006
  *	Simson L. Garfinkel and Basis Technology, Inc. 
  *      All rights reserved.
  *
@@ -20,10 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
+ * 3. [omitted]
  * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
  *    contributors to this program may be used to endorse or promote
  *    products derived from this software without specific prior written
@@ -83,11 +80,11 @@ int opt_j_count = 0;
 int opt_stats = 0;
 
 struct page_stat_block {
-    unsigned long long zsectors;	// number of sectors that are all blank
-    unsigned long long badsectors;	// number of bad sectors
-    unsigned long long zpages;		// number of pages that are all blank
-    unsigned long long pages;		// total number of pages
-    unsigned long long sectors;		// total number of sectors
+    uint32_t long zsectors;	// number of sectors that are all blank
+    uint32_t long badsectors;	// number of bad sectors
+    uint32_t long zpages;		// number of pages that are all blank
+    uint32_t long pages;		// total number of pages
+    uint32_t long sectors;		// total number of sectors
 };
 
 
@@ -229,7 +226,7 @@ int xml_info(const char *infile)
 	
 	/* See how long the data is */
 	size_t datalen = 0;
-	unsigned long arg=0;
+	uint32_t arg=0;
 	
 	strcpy(segname,it->c_str());
 
@@ -260,7 +257,7 @@ int xml_info(const char *infile)
 
 	/* If datalen==0, just print the arg as an unsigned number */
 	if(datalen==0){
-	    printf("    <%s coding='base10'>%ld</%s>\n",segname,arg,segname);
+	    printf("    <%s coding='base10'>%"PRIu32"</%s>\n",segname,arg,segname);
 	    free(data);
 	    continue;
 	}
@@ -268,7 +265,7 @@ int xml_info(const char *infile)
 	/* Just handle it as binhex ... */
 	printf("    <%s",segname);
 	if(datalen==0){
-	    printf(" arg='%lu' />\n",arg);
+	    printf(" arg='%"PRIu32"' />\n",arg);
 	    free(data);
 	    continue;
 	}
@@ -307,7 +304,7 @@ int xml_info(const char *infile)
 	int  b64size = datalen*2+2;
 	char *b64buf = (char *)calloc(b64size,1);
 	int  b64size_real = b64_ntop(data,datalen,b64buf,b64size);
-	data[b64size_real] = 0;		// be sure it is null terminated
+	b64buf[b64size_real] = 0;		// be sure it is null terminated
 
 	printf(" coding='base64'>");
 	fputs(b64buf,stdout);
@@ -324,12 +321,11 @@ int xml_info(const char *infile)
 
 int main(int argc,char **argv)
 {
-    int bflag, ch;
+    int ch;
     const char *infile;
 
     /* Figure out how many cols the screen has... */
 
-    bflag = 0;
     while ((ch = getopt(argc, argv, "xj:h?Vs")) != -1) {
 	switch (ch) {
 	case 'j':

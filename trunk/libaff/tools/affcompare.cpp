@@ -3,46 +3,8 @@
  *
  * Compare the contents of an ISO file to an AFF file.
  * Optionally, if they are equal, delete the ISO file
- */
-
-/*
- * Copyright (c) 2005--2008
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
  *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -189,10 +151,10 @@ void print_sector(AFFILE *af,unsigned char *buf)
 }
 
 
-void print_info(char dir,const char *segname,unsigned long arg,size_t len,
+void print_info(char dir,const char *segname,uint32_t arg,size_t len,
 		unsigned char *data,int mcr)
 {
-    printf("    %c %s arg=%lu len=%d\n",dir,segname,arg,(int)len);
+    printf("    %c %s arg=%"PRIu32" len=%d\n",dir,segname,arg,(int)len);
     printf("          ");
     if((arg == AF_SEG_QUADWORD) && (len==8)){
 	printf("data=%"I64d" as a 64-bit value\n",af_decode_q(data));
@@ -217,11 +179,11 @@ int  compare_aff_metadata_segments(char *title,AFFILE *af1,AFFILE *af2,const cha
 {
     int ret = 0;
 
-    unsigned long arg1 = 0;
+    uint32_t arg1 = 0;
     size_t data1_len = 0;
     int r1 = af_get_seg(af1,segname,&arg1,0,&data1_len);
 
-    unsigned long arg2 = 0;
+    uint32_t arg2 = 0;
     size_t data2_len = 0;
     int r2 = af_get_seg(af2,segname,&arg2,0,&data2_len);
     
@@ -290,12 +252,12 @@ int  compare_aff_data_segments(char *title,AFFILE *af1,AFFILE *af2,int64_t pagen
     char segname[65];
     snprintf(segname,sizeof(segname),AF_SEG_D,pagenum);
 
-    unsigned long arg1=0;
+    uint32_t arg1=0;
     size_t data1_len=0;
     int r1 = af_get_seg(af1,pagename,&arg1,0,&data1_len);
     if(r1==-1) r1=af_get_seg(af1,segname,&arg1,0,&data1_len);
     
-    unsigned long arg2=0;
+    uint32_t arg2=0;
     size_t data2_len=0;
     int r2 = af_get_seg(af2,pagename,&arg2,0,&data2_len);
     if(r2 == -1) r2=af_get_seg(af2,segname,&arg2,0,&data2_len);
@@ -339,7 +301,7 @@ int  compare_aff_data_segments(char *title,AFFILE *af1,AFFILE *af2,int64_t pagen
 	err(1,"Cannot read page %"I64d" from %s",pagenum,af_filename(af2));
 
     if(data1_len != data2_len){
-	printf("page %"I64d" size %zd != size %zd\n",pagenum,data1_len,data2_len);
+	printf("page %"I64d" size %d != size %d\n",pagenum,(int)data1_len,(int)data2_len);
 	return 1;
     }
 
@@ -464,7 +426,7 @@ int compare_preen(AFFILE *af1,AFFILE *af2)
     }
     /* Now, compare each one */
     for(vector<int64_t>::const_iterator i = pages.begin(); i != pages.end(); i++){
-	unsigned long arg1,arg2;
+	uint32_t arg1,arg2;
 	size_t len1,len2;
 
 	if(af_get_page_raw(af1,*i,&arg1,0,&len1)){
@@ -531,10 +493,9 @@ int compare_aff_aff(const char *file1,const char *file2)
     if(af1->image_pagesize != af2->image_pagesize){
 	fprintf(stderr,"Currently, %s requires that both images have the "
 		"same image datsegsize.\n"
-		"pagesize(%s)=%ld\n"
-		"pagesize(%s)=%ld\n",
-		progname,file1,af1->image_pagesize,
-		file2,af2->image_pagesize);
+		"  pagesize(%s)=%"PRIu32"\n"
+		"  pagesize(%s)=%"PRIu32"\n",
+		progname,file1,af1->image_pagesize, file2,af2->image_pagesize);
 	fprintf(stderr,"Data segments will be ignored.\n");
 	no_data_segments = true;
     }
@@ -542,8 +503,8 @@ int compare_aff_aff(const char *file1,const char *file2)
     if(af1->image_sectorsize != af2->image_sectorsize){
 	fprintf(stderr,"Currently, %s requires that both images have the "
 		"same image sectorsize.\n"
-		"sectorsize(%s)=%ld\n"
-		"sectorsize(%s)=%ld\n",
+		"  sectorsize(%s)=%"PRIu32"\n"
+		"  sectorsize(%s)=%"PRIu32"\n",
 		progname,file1,af1->image_sectorsize, file2,af2->image_sectorsize);
 	fprintf(stderr,"Data segments will be ignored.\n");
 	no_data_segments = true;
@@ -749,14 +710,13 @@ int recurse(const char *dir1,const char *dir2)
 
 int main(int argc,char **argv)
 {
-    int bflag, ch;
+    int ch;
     int opt_recurse=0;
 
 #ifdef SIGINFO
     signal(SIGINFO,sig_info);
 #endif
 
-    bflag = 0;
     while ((ch = getopt(argc, argv, "P:Vabcempqrsh?v")) != -1) {
 	switch (ch) {
 	case 'P': opt_page = atoi(optarg); break;
@@ -787,7 +747,7 @@ int main(int argc,char **argv)
 	recurse(dir1,dir2);
 	if(errors.size()>0){
 	    fprintf(stderr,"================================\n");
-	    fprintf(stderr,"%zd affcompare errors:\n",errors.size());
+	    fprintf(stderr,"%d affcompare errors:\n",(int)errors.size());
 	    for(vector<string>::const_iterator i=errors.begin();
 		i!=errors.end();
 		i++){

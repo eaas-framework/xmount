@@ -1,3 +1,28 @@
+xmount (0.6.0) stable; urgency=low
+
+  * Added faster aff input support (using libaaff).
+  * Added support for split DD input files (using libdd).
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Fri, 26 Jul 2013 16:00:00 +0200
+
+xmount (0.5.0) stable; urgency=low
+
+  * Added support for virtual VHD image file emulation.
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Sun, 06 May 2012 12:00:00 +0200
+
+xmount (0.4.7) stable; urgency=low
+
+  * Made InitVirtImageInfoFile less picky about missing EWF infos.
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Mon, 30 Jan 2012 12:00:00 +0100
+
+xmount (0.4.6) stable; urgency=low
+
+  * Added support for libewf v2
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Tue, 11 Oct 2011 20:00:00 +0200
+
 xmount (0.4.5) stable; urgency=low
 
   * Added FUSE options to show mounted source in mount command output

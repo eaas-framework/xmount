@@ -1,8 +1,7 @@
 /*
  * EWF error2 section
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -30,15 +29,14 @@
 extern "C" {
 #endif
 
-typedef struct ewf_error2 ewf_error2_t;
-typedef struct ewf_error2_sector ewf_error2_sector_t;
+typedef struct ewf_error2_header ewf_error2_header_t;
 
-struct ewf_error2
+struct ewf_error2_header
 {
-	/* The amount of errors
+	/* The number of errors
 	 * consists of 4 bytes (32 bits)
 	 */
-	uint8_t amount_of_errors[ 4 ];
+	uint8_t number_of_errors[ 4 ];
 
 	/* Unknown
 	 * consists of 512 bytes
@@ -46,32 +44,34 @@ struct ewf_error2
 	 */
 	uint8_t unknown[ 512 ];
 
-	/* The section crc of all (previous) error2 data
+	/* The section checksum of all (previous) error2 data
 	 * consists of 4 bytes
 	 * starts with sector 76
 	 */
-	uint8_t crc[ 4 ];
+	uint8_t checksum[ 4 ];
 
 	/* The sector array
 	 * consists of 8 bytes per sector
 	 * as long as necessary
 	 */
 
-	/* The last sector is followed by a 4 byte CRC
+	/* The last sector is followed by a 4 byte checksum
 	 */
 };
 
+typedef struct ewf_error2_sector ewf_error2_sector_t;
+
 struct ewf_error2_sector
 {
-	/* The first error2 sector
+	/* The start error2 sector
 	 * consists of 4 bytes (32 bits)
 	 */
-	uint8_t first_sector[ 4 ];
+	uint8_t start_sector[ 4 ];
 
-	/* The amount of sectors
+	/* The number of sectors
 	 * consists of 4 bytes (32 bits)
 	 */
-	uint8_t amount_of_sectors[ 4 ];
+	uint8_t number_of_sectors[ 4 ];
 };
 
 #if defined( __cplusplus )

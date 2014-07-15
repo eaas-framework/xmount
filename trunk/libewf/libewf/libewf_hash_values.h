@@ -1,8 +1,7 @@
 /*
  * Hash values functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -26,10 +25,8 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
-#include "libewf_string.h"
-#include "libewf_values_table.h"
+#include "libewf_libcerror.h"
+#include "libewf_libfvalue.h"
 
 #if defined( __cplusplus )
 extern "C" {
@@ -37,71 +34,52 @@ extern "C" {
 
 enum LIBEWF_HASH_VALUES_INDEXES
 {
-	/* Value to indicate the amount of hash values
+	/* Value to indicate the number of hash values
 	 */
-	LIBEWF_HASH_VALUES_DEFAULT_AMOUNT
+	LIBEWF_HASH_VALUES_DEFAULT_NUMBER
 };
 
 int libewf_hash_values_initialize(
-     libewf_values_table_t **hash_values,
-     liberror_error_t **error );
+     libfvalue_table_t **hash_values,
+     libcerror_error_t **error );
 
 int libewf_hash_values_parse_md5_hash(
-     libewf_values_table_t *hash_values,
-     uint8_t *md5_hash,
+     libfvalue_table_t *hash_values,
+     const uint8_t *md5_hash,
      size_t md5_hash_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_hash_values_parse_sha1_hash(
-     libewf_values_table_t *hash_values,
-     uint8_t *sha1_hash,
+     libfvalue_table_t *hash_values,
+     const uint8_t *sha1_hash,
      size_t sha1_hash_size,
-     liberror_error_t **error );
-
-int libewf_hash_values_parse_hash_string_xml(
-     libewf_values_table_t *hash_values,
-     libewf_character_t *hash_string_xml,
-     size_t hash_string_xml_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_hash_values_parse_xhash(
-     libewf_values_table_t *hash_values,
-     uint8_t *xhash,
+     libfvalue_table_t *hash_values,
+     const uint8_t *xhash,
      size_t xhash_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
-int libewf_hash_values_convert_hash_string_to_xhash(
-     libewf_character_t *hash_string,
-     size_t hash_string_size,
+int libewf_hash_values_generate_xhash(
+     libfvalue_table_t *hash_values,
      uint8_t **xhash,
      size_t *xhash_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_hash_values_generate_md5_hash(
-     libewf_values_table_t *hash_values,
+     libfvalue_table_t *hash_values,
      uint8_t *md5_hash,
      size_t md5_hash_size,
      uint8_t *md5_hash_set,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 int libewf_hash_values_generate_sha1_hash(
-     libewf_values_table_t *hash_values,
+     libfvalue_table_t *hash_values,
      uint8_t *sha1_hash,
      size_t sha1_hash_size,
      uint8_t *sha1_hash_set,
-     liberror_error_t **error );
-
-int libewf_hash_values_generate_hash_string_xml(
-     libewf_values_table_t *hash_values,
-     libewf_character_t **hash_string,
-     size_t *hash_string_size,
-     liberror_error_t **error );
-
-int libewf_hash_values_generate_xhash_string_ewfx(
-     libewf_values_table_t *hash_values,
-     uint8_t **xhash,
-     size_t *xhash_size,
-     liberror_error_t **error );
+     libcerror_error_t **error );
 
 #if defined( __cplusplus )
 }

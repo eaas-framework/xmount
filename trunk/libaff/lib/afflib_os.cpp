@@ -2,6 +2,9 @@
  * afflib_os.cpp:
  *
  * The OS-specific features of AFFLIB
+ * 
+ * This file is a work of a US government employee and as such is in the Public domain.
+ * Simson L. Garfinkel, March 12, 2012
  */
 
 #include "affconfig.h"
@@ -80,9 +83,6 @@ int fseeko(FILE *stream,int64 offset,int whence)
  * versions above.
  */
 
-#ifdef linux
-typedef unsigned long long int u64;	// required for slackware
-#endif
 
 int	af_figure_media(int fd,struct af_figure_media_buf *afb)
 {

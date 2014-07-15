@@ -1,8 +1,7 @@
 /*
  * EWF data section
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -50,25 +49,25 @@ struct ewf_data
 	 */
 	uint8_t unknown1[ 3 ];
 
-	/* The amount of chunks
+	/* The number of chunks
 	 * consists of 4 bytes (32 bits)
 	 */
-	uint8_t amount_of_chunks[ 4 ];
+	uint8_t number_of_chunks[ 4 ];
 
-	/* The amount of sectors per chunks
+	/* The number of sectors per chunks
 	 * consists of 4 bytes (32 bits)
 	 */
 	uint8_t sectors_per_chunk[ 4 ];
 
-	/* The amount of bytes per chunks
+	/* The number of bytes per chunks
 	 * consists of 4 bytes (32 bits)
 	 */
 	uint8_t bytes_per_sector[ 4 ];
 
-	/* The amount of sectors
+	/* The number of sectors
 	 * consists of 8 bytes (64 bits)
 	 */
-	uint8_t amount_of_sectors[ 8 ];
+	uint8_t number_of_sectors[ 8 ];
 
 	/* C:H:S values
 	 * consists of 12 bytes, 4 bytes per value
@@ -123,7 +122,7 @@ struct ewf_data
 	 */
 	uint8_t unknown4[ 3 ];
 
-	/* The amount sectors to use for error granularity
+	/* The number of sectors to use for error granularity
 	 * consists of 4 bytes (32 bits)
 	 */
 	uint8_t error_granularity[ 4 ];
@@ -150,11 +149,11 @@ struct ewf_data
 	 */
 	uint8_t signature[ 5 ];
 
-	/* The section crc of all (previous) volume data
+	/* The section checksum of all (previous) volume data
 	 * consists of 4 bytes (32 bits)
 	 * starts with offset 76
 	 */
-	uint8_t crc[ 4 ];
+	uint8_t checksum[ 4 ];
 };
 
 #if defined( __cplusplus )

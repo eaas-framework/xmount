@@ -1,8 +1,7 @@
 /*
  * ISO 8859-3 codepage (Latin 3) functions
  *
- * Copyright (c) 2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2008-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -37,24 +36,6 @@ extern const uint8_t libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x01
 extern const uint8_t libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0118[ 16 ];
 extern const uint8_t libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0130[ 8 ];
 extern const uint8_t libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0158[ 8 ];
-
-#define libuna_codepage_iso_8859_3_byte_stream_to_unicode( byte_stream_character ) \
-	( byte_stream_character < 0xa0 ) ? byte_stream_character : libuna_codepage_iso_8859_3_byte_stream_to_unicode_base_0xa0[ byte_stream_character - 0xa0 ]
-
-#define libuna_codepage_iso_8859_3_unicode_to_byte_stream( unicode_character ) \
-	( unicode_character < 0x00a0 ) ? (uint8_t) unicode_character : \
-	( ( unicode_character >= 0x00a0 ) && ( unicode_character < 0x0100 ) ) ? libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x00a0[ unicode_character - 0x00a0 ] : \
-	( ( unicode_character >= 0x0108 ) && ( unicode_character < 0x0110 ) ) ? libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0108[ unicode_character - 0x0108 ] : \
-	( ( unicode_character >= 0x0118 ) && ( unicode_character < 0x0128 ) ) ? libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0118[ unicode_character - 0x0118 ] : \
-	( ( unicode_character >= 0x0130 ) && ( unicode_character < 0x0138 ) ) ? libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0130[ unicode_character - 0x0130 ] : \
-	( ( unicode_character >= 0x0158 ) && ( unicode_character < 0x0160 ) ) ? libuna_codepage_iso_8859_3_unicode_to_byte_stream_base_0x0158[ unicode_character - 0x0158 ] : \
-	( unicode_character == 0x016c ) ? 0xdd : \
-	( unicode_character == 0x016d ) ? 0xfd : \
-	( unicode_character == 0x017b ) ? 0xaf : \
-	( unicode_character == 0x017c ) ? 0xbf : \
-	( unicode_character == 0x02d8 ) ? 0xa2 : \
-	( unicode_character == 0x02d9 ) ? 0xff : \
-	0x1a
 
 #if defined( __cplusplus )
 }

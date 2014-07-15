@@ -1,16 +1,30 @@
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/common \
-	-I$(top_srcdir)/liberror \
-	-I$(top_srcdir)/libnotify \
+	@LIBCSTRING_CPPFLAGS@ \
+	@LIBCERROR_CPPFLAGS@ \
+	@LIBCERROR_CPPFLAGS@ \
+	@LIBCDATA_CPPFLAGS@ \
+	@LIBCLOCALE_CPPFLAGS@ \
+	@LIBCNOTIFY_CPPFLAGS@ \
+	@LIBCSPLIT_CPPFLAGS@ \
 	@LIBUNA_CPPFLAGS@ \
+	@LIBCFILE_CPPFLAGS@ \
+	@LIBCPATH_CPPFLAGS@ \
 	@LIBBFIO_CPPFLAGS@ \
-	@MEMWATCH_CPPFLAGS@
+	@LIBFCACHE_CPPFLAGS@ \
+	@LIBFVALUE_CPPFLAGS@ \
+	@LIBMFDATA_CPPFLAGS@ \
+	@ZLIB_CPPFLAGS@ \
+	@BZIP2_CPPFLAGS@ \
+	@LIBCRYPTO_CPPFLAGS@ \
+	@LIBHMAC_CPPFLAGS@ \
+	@LIBCAES_CPPFLAGS@
 
 lib_LTLIBRARIES = libewf.la
 
 libewf_la_SOURCES = \
-	ewf_crc.h \
+	ewf_checksum.h \
 	ewf_data.h \
 	ewf_definitions.h \
 	ewf_digest.h \
@@ -25,8 +39,8 @@ libewf_la_SOURCES = \
 	ewf_volume_smart.h \
 	ewfx_delta_chunk.h \
 	libewf.c \
-	libewf_chunk_cache.c libewf_chunk_cache.h \
-	libewf_chunk_offset.h \
+	libewf_chunk_data.c libewf_chunk_data.h \
+	libewf_chunk_table.c libewf_chunk_table.h \
 	libewf_codepage.h \
 	libewf_compression.c libewf_compression.h \
 	libewf_date_time.c libewf_date_time.h \
@@ -37,6 +51,7 @@ libewf_la_SOURCES = \
 	libewf_error.c libewf_error.h \
 	libewf_extern.h \
 	libewf_filename.c libewf_filename.h \
+	libewf_file_entry.c libewf_file_entry.h \
 	libewf_handle.c libewf_handle.h \
 	libewf_hash_sections.c libewf_hash_sections.h \
 	libewf_hash_values.c libewf_hash_values.h \
@@ -44,46 +59,66 @@ libewf_la_SOURCES = \
 	libewf_header_values.c libewf_header_values.h \
 	libewf_io_handle.c libewf_io_handle.h \
 	libewf_legacy.c libewf_legacy.h \
+	libewf_libcdata.h \
+	libewf_libcerror.h \
+	libewf_libclocale.h \
+	libewf_libcnotify.h \
+	libewf_libcstring.h \
 	libewf_libbfio.h \
+	libewf_libfcache.h \
+	libewf_libmfdata.h \
+	libewf_libfvalue.h \
 	libewf_libuna.h \
-	libewf_list_type.c libewf_list_type.h \
 	libewf_media_values.c libewf_media_values.h \
 	libewf_metadata.c libewf_metadata.h \
 	libewf_notify.c libewf_notify.h \
-	libewf_offset_table.c libewf_offset_table.h \
 	libewf_read_io_handle.c libewf_read_io_handle.h \
 	libewf_section.c libewf_section.h \
-	libewf_section_list.c libewf_section_list.h \
-	libewf_sector_table.c libewf_sector_table.h \
+	libewf_sector_range.c libewf_sector_range.h \
 	libewf_segment_file.c libewf_segment_file.h \
 	libewf_segment_file_handle.c libewf_segment_file_handle.h \
 	libewf_segment_table.c libewf_segment_table.h \
-	libewf_string.c libewf_string.h \
+	libewf_single_files.c libewf_single_files.h \
+	libewf_single_file_entry.c libewf_single_file_entry.h \
+	libewf_single_file_tree.c libewf_single_file_tree.h \
 	libewf_support.c libewf_support.h \
-	libewf_system_string.h \
 	libewf_types.h \
-	libewf_values_table.c libewf_values_table.h \
+	libewf_unused.h \
 	libewf_write_io_handle.c libewf_write_io_handle.h
 
 libewf_la_LIBADD = \
-	../liberror/liberror.la \
-	../libnotify/libnotify.la \
+	@LIBCSTRING_LIBADD@ \
+	@LIBCERROR_LIBADD@ \
+	@LIBCDATA_LIBADD@ \
+	@LIBCLOCALE_LIBADD@ \
+	@LIBCNOTIFY_LIBADD@ \
+	@LIBCSPLIT_LIBADD@ \
 	@LIBUNA_LIBADD@ \
-	@LIBBFIO_LIBADD@
+	@LIBCFILE_LIBADD@ \
+	@LIBCPATH_LIBADD@ \
+	@LIBBFIO_LIBADD@ \
+	@LIBFCACHE_LIBADD@ \
+	@LIBFVALUE_LIBADD@ \
+	@LIBMFDATA_LIBADD@ \
+	@ZLIB_LIBADD@ \
+	@LIBDL_LIBADD@
 
-if HAVE_V2_API
 libewf_la_LDFLAGS = -no-undefined -version-info 2:0:0
-else
-libewf_la_LDFLAGS = -no-undefined -version-info 1:4:0
-endif
 
 EXTRA_DIST = \
-	libewf_definitions.h.in
+	libewf_definitions.h.in \
+	libewf.rc \
+	libewf.rc.in
+
+MAINTAINERCLEANFILES = \
+	Makefile.in
 
 distclean: clean
+	/bin/rm -f libewf_definitions.h
+	/bin/rm -f libewf.rc
 	/bin/rm -f Makefile
 
 splint:
-	@echo "Running splint on libewf ..." 
-	-splint -preproc -redef $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(libewf_la_SOURCES) 
+	@echo "Running splint on libewf ..."
+	-splint -preproc -redef $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(libewf_la_SOURCES)
 

@@ -3,6 +3,8 @@
 # Make a random ISO, used by all of the test programs
 # Make sure that it is more than 3 pages in length (at least 48MB)
 
+# This file is a work of a US government employee and as such is in the Public domain.
+# Simson L. Garfinkel, March 12, 2012
 unset AFFLIB_PASSPHRASE
 
 if test "x" = "x$1" ;

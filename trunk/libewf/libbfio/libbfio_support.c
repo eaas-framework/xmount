@@ -1,8 +1,7 @@
 /*
  * Support functions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -23,11 +22,12 @@
 #include <common.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #include <stdio.h>
 
 #include "libbfio_definitions.h"
+#include "libbfio_libcerror.h"
+#include "libbfio_libclocale.h"
+#include "libbfio_libcstring.h"
 #include "libbfio_support.h"
 
 #if !defined( HAVE_LOCAL_LIBBFIO )
@@ -40,5 +40,57 @@ const char *libbfio_get_version(
 	return( (const char *) LIBBFIO_VERSION_STRING );
 }
 
-#endif
+/* Retrieves the narrow system string codepage
+ * A value of 0 represents no codepage, UTF-8 encoding is used instead
+ * Returns 1 if successful or -1 on error
+ */
+int libbfio_get_codepage(
+     int *codepage,
+     libcerror_error_t **error )
+{
+	static char *function = "libbfio_get_codepage";
+
+	if( libclocale_codepage_get(
+	     codepage,
+	     error ) != 1 )
+	{
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_GET_FAILED,
+		 "%s: unable to retrieve codepage.",
+		 function );
+
+		return( -1 );
+	}
+	return( 1 );
+}
+
+/* Sets the narrow system string codepage
+ * A value of 0 represents no codepage, UTF-8 encoding is used instead
+ * Returns 1 if successful or -1 on error
+ */
+int libbfio_set_codepage(
+     int codepage,
+     libcerror_error_t **error )
+{
+	static char *function = "libbfio_set_codepage";
+
+	if( libclocale_codepage_set(
+	     codepage,
+	     error ) != 1 )
+	{
+		libcerror_error_set(
+		 error,
+		 LIBCERROR_ERROR_DOMAIN_RUNTIME,
+		 LIBCERROR_RUNTIME_ERROR_SET_FAILED,
+		 "%s: unable to set codepage.",
+		 function );
+
+		return( -1 );
+	}
+	return( 1 );
+}
+
+#endif /* !defined( HAVE_LOCAL_LIBBFIO ) */
 

@@ -62,8 +62,8 @@ class aff_bom {
     char *notes;
     bool bom_open;
 public:
-    static void make_hash(u_char seghash[32], unsigned long arg,const char *segname,
-		     const u_char *pagebuf, unsigned long pagesize);
+    static void make_hash(u_char seghash[32], uint32_t arg,const char *segname,
+		     const u_char *pagebuf, uint32_t pagesize);
     bool opt_note;
     BIO *xml;
     aff_bom(bool flag):cert(0),privkey(0),notes(0),bom_open(false),opt_note(flag),xml(0) { }

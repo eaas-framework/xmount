@@ -1,9 +1,7 @@
 /*
- * ewfinfo
  * Shows information stored in an EWF file
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -25,26 +23,23 @@
 #include <memory.h>
 #include <types.h>
 
-#include <liberror.h>
-
 #if defined( HAVE_STDLIB_H ) || defined( WINAPI )
 #include <stdlib.h>
 #endif
 
-/* If libtool DLL support is enabled set LIBEWF_DLL_IMPORT
- * before including libewf.h
- */
-#if defined( _WIN32 ) && defined( DLL_EXPORT )
-#define LIBEWF_DLL_IMPORT
+#if defined( HAVE_SYS_RESOURCE_H )
+#include <sys/resource.h>
 #endif
-
-#include <libewf.h>
-
-#include <libsystem.h>
 
 #include "byte_size_string.h"
 #include "ewfinput.h"
 #include "ewfoutput.h"
+#include "ewftools_libcerror.h"
+#include "ewftools_libclocale.h"
+#include "ewftools_libcnotify.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libcsystem.h"
+#include "ewftools_libewf.h"
 #include "guid.h"
 #include "info_handle.h"
 
@@ -63,16 +58,21 @@ void usage_fprint(
 	fprintf( stream, "Use ewfinfo to determine information about the EWF format (Expert Witness\n"
 	                 "Compression Format).\n\n" );
 
-	fprintf( stream, "Usage: ewfinfo [ -A codepage ] [ -d date_format ] [ -ehimvV ] ewf_files\n\n" );
+	fprintf( stream, "Usage: ewfinfo [ -A codepage ] [ -d date_format ] [ -f format ]\n"
+	                 "               [ -ehimvVx ] ewf_files\n\n" );
 
 	fprintf( stream, "\tewf_files: the first or the entire set of EWF segment files\n\n" );
 
-	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default), windows-874,\n"
-	                 "\t           windows-1250, windows-1251, windows-1252, windows-1253, windows-1254,\n"
-	                 "\t           windows-1255, windows-1256, windows-1257, windows-1258\n" );
-	fprintf( stream, "\t-d:        specify the date format, options: ctime (default), dm (day/month),\n"
-	                 "\t           md (month/day), iso8601\n" );
+	fprintf( stream, "\t-A:        codepage of header section, options: ascii (default),\n"
+	                 "\t           windows-874, windows-932, windows-936, windows-949,\n"
+	                 "\t           windows-950, windows-1250, windows-1251, windows-1252,\n"
+	                 "\t           windows-1253, windows-1254, windows-1255, windows-1256,\n"
+	                 "\t           windows-1257 or windows-1258\n" );
+	fprintf( stream, "\t-d:        specify the date format, options: ctime (default),\n"
+	                 "\t           dm (day/month), md (month/day), iso8601\n" );
 	fprintf( stream, "\t-e:        only show EWF read error information\n" );
+	fprintf( stream, "\t-f:        specify the output format, options: text (default),\n"
+	                 "\t           dfxml\n" );
 	fprintf( stream, "\t-h:        shows this help\n" );
 	fprintf( stream, "\t-i:        only show EWF acquiry information\n" );
 	fprintf( stream, "\t-m:        only show EWF media information\n" );
@@ -83,10 +83,12 @@ void usage_fprint(
 /* Signal handler for ewfinfo
  */
 void ewfinfo_signal_handler(
-      libsystem_signal_t signal )
+      libcsystem_signal_t signal LIBCSYSTEM_ATTRIBUTE_UNUSED )
 {
-	liberror_error_t *error = NULL;
+	libcerror_error_t *error = NULL;
 	static char *function   = "ewfinfo_signal_handler";
+
+	LIBCSYSTEM_UNREFERENCED_PARAMETER( signal )
 
 	ewfinfo_abort = 1;
 
@@ -95,23 +97,21 @@ void ewfinfo_signal_handler(
 	       ewfinfo_info_handle,
 	       &error ) != 1 ) )
 	{
-		libsystem_notify_printf(
+		libcnotify_printf(
 		 "%s: unable to signal info handle to abort.\n",
 		 function );
 
-		libsystem_notify_print_error_backtrace(
+		libcnotify_print_error_backtrace(
 		 error );
-		liberror_error_free(
+		libcerror_error_free(
 		 &error );
-
-		return;
 	}
 	/* Force stdin to close otherwise any function reading it will remain blocked
 	 */
-	if( libsystem_file_io_close(
+	if( libcsystem_file_io_close(
 	     0 ) != 0 )
 	{
-		libsystem_notify_printf(
+		libcnotify_printf(
 		 "%s: unable to close stdin.\n",
 		 function );
 	}
@@ -119,188 +119,188 @@ void ewfinfo_signal_handler(
 
 /* The main program
  */
-#if defined( LIBSYSTEM_HAVE_WIDE_CHARACTER )
+#if defined( LIBCSTRING_HAVE_WIDE_SYSTEM_CHARACTER )
 int wmain( int argc, wchar_t * const argv[] )
 #else
 int main( int argc, char * const argv[] )
 #endif
 {
-	libsystem_character_t * const *argv_filenames = NULL;
-
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	libsystem_glob_t *glob                        = NULL;
+#if defined( HAVE_GETRLIMIT )
+	struct rlimit limit_data;
 #endif
-	info_handle_t *info_handle                    = NULL;
-	liberror_error_t *error                       = NULL;
+	libcstring_system_character_t * const *argv_filenames = NULL;
 
-	libsystem_character_t *program                = _LIBSYSTEM_CHARACTER_T_STRING( "ewfinfo" );
-	libsystem_integer_t option                    = 0;
-	uint8_t verbose                               = 0;
-	uint8_t date_format                           = LIBEWF_DATE_FORMAT_CTIME;
-	char info_option                              = 'a';
-	int amount_of_filenames                       = 0;
-	int header_codepage                           = LIBEWF_CODEPAGE_ASCII;
-	int result                                    = 0;
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	libcsystem_glob_t *glob                               = NULL;
+#endif
+	libcerror_error_t *error                              = NULL;
 
-	libsystem_notify_set_stream(
+	libcstring_system_character_t *option_date_format     = NULL;
+	libcstring_system_character_t *option_header_codepage = NULL;
+	libcstring_system_character_t *option_output_format   = NULL;
+	libcstring_system_character_t *program                = _LIBCSTRING_SYSTEM_STRING( "ewfinfo" );
+
+	libcstring_system_integer_t option                    = 0;
+	uint8_t verbose                                       = 0;
+	char info_option                                      = 'a';
+	int number_of_filenames                               = 0;
+	int print_header                                      = 1;
+	int result                                            = 0;
+
+	libcnotify_stream_set(
 	 stderr,
 	 NULL );
-	libsystem_notify_set_verbose(
+	libcnotify_verbose_set(
 	 1 );
 
-	if( libsystem_initialize(
+	if( libclocale_initialize(
+             "ewftools",
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
+		 "Unable to initialize locale values.\n" );
+
+		goto on_error;
+	}
+	if( libcsystem_initialize(
+	     _IONBF,
+	     &error ) != 1 )
+	{
+		ewfoutput_version_fprint(
+		 stderr,
+		 program );
+
+		fprintf(
+		 stderr,
 		 "Unable to initialize system values.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-	ewfoutput_version_fprint(
-	 stdout,
-	 program );
-
-	while( ( option = libsystem_getopt(
+	while( ( option = libcsystem_getopt(
 	                   argc,
 	                   argv,
-	                   _LIBSYSTEM_CHARACTER_T_STRING( "A:d:ehimvV" ) ) ) != (libsystem_integer_t) -1 )
+	                   _LIBCSTRING_SYSTEM_STRING( "A:d:ef:himvV" ) ) ) != (libcstring_system_integer_t) -1 )
 	{
 		switch( option )
 		{
-			case (libsystem_integer_t) '?':
+			case (libcstring_system_integer_t) '?':
 			default:
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
 				fprintf(
 				 stderr,
-				 "Invalid argument: %" PRIs_LIBSYSTEM "\n",
-				 argv[ optind ] );
+				 "Invalid argument: %" PRIs_LIBCSTRING_SYSTEM "\n",
+				 argv[ optind - 1 ] );
 
 				usage_fprint(
 				 stdout );
 
-				return( EXIT_FAILURE );
+				goto on_error;
 
-			case (libsystem_integer_t) 'A':
-				if( ewfinput_determine_header_codepage(
-				     optarg,
-				     &header_codepage,
-				     &error ) != 1 )
-				{
-					libsystem_notify_print_error_backtrace(
-					 error );
-					liberror_error_free(
-					 &error );
+			case (libcstring_system_integer_t) 'A':
+				option_header_codepage = optarg;
 
-					fprintf(
-					 stderr,
-					 "Unsuported header codepage defaulting to: ascii.\n" );
-
-					header_codepage = LIBEWF_CODEPAGE_ASCII;
-				}
 				break;
 
-			case (libsystem_integer_t) 'd':
-				if( libsystem_string_compare(
-				     optarg,
-				     _LIBSYSTEM_CHARACTER_T_STRING( "dm" ),
-				     3 ) == 0 )
-				{
-					date_format = LIBEWF_DATE_FORMAT_DAYMONTH;
-				}
-				else if( libsystem_string_compare(
-				          optarg,
-				          _LIBSYSTEM_CHARACTER_T_STRING( "md" ),
-				          3 ) == 0 )
-				{
-					date_format = LIBEWF_DATE_FORMAT_MONTHDAY;
-				}
-				else if( libsystem_string_compare(
-				          optarg,
-				          _LIBSYSTEM_CHARACTER_T_STRING( "iso8601" ),
-				          8 ) == 0 )
-				{
-					date_format = LIBEWF_DATE_FORMAT_ISO8601;
-				}
-				else if( libsystem_string_compare(
-				          optarg,
-				          _LIBSYSTEM_CHARACTER_T_STRING( "ctime" ),
-				          3 ) != 0 )
-				{
-					fprintf(
-					 stderr,
-					 "Unsupported date format: %" PRIs_LIBSYSTEM " using default ctime.\n",
-					 optarg );
-				}
+			case (libcstring_system_integer_t) 'd':
+				option_date_format = optarg;
+
 				break;
 
-			case (libsystem_integer_t) 'e':
+			case (libcstring_system_integer_t) 'e':
 				if( info_option != 'a' )
 				{
+					ewfoutput_version_fprint(
+					 stderr,
+					 program );
+
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
-					 option, info_option );
+					 "Conflicting options: %" PRIc_LIBCSTRING_SYSTEM " and %c\n",
+					 option,
+					 info_option );
 
 					usage_fprint(
 					 stdout );
 
-					return( EXIT_FAILURE );
+					goto on_error;
 				}
 				info_option = 'e';
 
 				break;
 
-			case (libsystem_integer_t) 'h':
+			case (libcstring_system_integer_t) 'f':
+				option_output_format = optarg;
+
+				break;
+
+			case (libcstring_system_integer_t) 'h':
+				ewfoutput_version_fprint(
+				 stdout,
+				 program );
+
 				usage_fprint(
 				 stdout );
 
 				return( EXIT_SUCCESS );
 
-			case (libsystem_integer_t) 'i':
+			case (libcstring_system_integer_t) 'i':
 				if( info_option != 'a' )
 				{
+					ewfoutput_version_fprint(
+					 stderr,
+					 program );
+
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
-					 option, info_option );
+					 "Conflicting options: %" PRIc_LIBCSTRING_SYSTEM " and %c\n",
+					 option,
+					 info_option );
 
 					usage_fprint(
 					 stdout );
 
-					return( EXIT_FAILURE );
+					goto on_error;
 				}
 				info_option = 'i';
 
 				break;
 
-			case (libsystem_integer_t) 'm':
+			case (libcstring_system_integer_t) 'm':
 				if( info_option != 'a' )
 				{
+					ewfoutput_version_fprint(
+					 stderr,
+					 program );
+
 					fprintf(
 					 stderr,
-					 "Conflicting options: %" PRIc_LIBSYSTEM " and %c\n",
-					 option, info_option );
+					 "Conflicting options: %" PRIc_LIBCSTRING_SYSTEM " and %c\n",
+					 option,
+					 info_option );
 
 					usage_fprint(
 					 stdout );
 
-					return( EXIT_FAILURE );
+					goto on_error;
 				}
 				info_option = 'm';
 
 				break;
 
-			case (libsystem_integer_t) 'v':
+			case (libcstring_system_integer_t) 'v':
 				verbose = 1;
 
 				break;
 
-			case (libsystem_integer_t) 'V':
+			case (libcstring_system_integer_t) 'V':
+				ewfoutput_version_fprint(
+				 stdout,
+				 program );
+
 				ewfoutput_copyright_fprint(
 				 stdout );
 
@@ -309,6 +309,10 @@ int main( int argc, char * const argv[] )
 	}
 	if( optind == argc )
 	{
+		ewfoutput_version_fprint(
+		 stderr,
+		 program );
+
 		fprintf(
 		 stderr,
 		 "Missing EWF image file(s).\n" );
@@ -316,307 +320,587 @@ int main( int argc, char * const argv[] )
 		usage_fprint(
 		 stdout );
 
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-	libsystem_notify_set_verbose(
+	libcnotify_verbose_set(
 	 verbose );
-#if defined( HAVE_V2_API )
+
+#if !defined( HAVE_LOCAL_LIBEWF )
 	libewf_notify_set_verbose(
 	 verbose );
 	libewf_notify_set_stream(
 	 stderr,
 	 NULL );
-#else
-	libewf_set_notify_values(
-	 stderr,
-	 verbose );
-#endif
-
-	if( libsystem_signal_attach(
-	     ewfinfo_signal_handler,
-	     &error ) != 1 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to attach signal handler.\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-	}
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	if( libsystem_glob_initialize(
-	     &glob,
-	     &error ) != 1 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to initialize glob.\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
-	}
-	if( libsystem_glob_resolve(
-	     glob,
-	     &argv[ optind ],
-	     argc - optind,
-	     &error ) != 1 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to resolve glob.\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-
-		return( EXIT_FAILURE );
-	}
-	argv_filenames      = glob->result;
-	amount_of_filenames = glob->amount_of_results;
-#else
-	argv_filenames      = &argv[ optind ];
-	amount_of_filenames = argc - optind;
-
 #endif
 
 	if( info_handle_initialize(
-	     &info_handle,
+	     &ewfinfo_info_handle,
 	     &error ) != 1 )
 	{
+		ewfoutput_version_fprint(
+		 stderr,
+		 program );
+
 		fprintf(
 		 stderr,
 		 "Unable to create info handle.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-#endif
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
-#if defined( HAVE_V2_API )
-	if( info_handle_set_header_codepage(
-	     info_handle,
-	     header_codepage,
+	if( option_output_format != NULL )
+	{
+		result = info_handle_set_output_format(
+		          ewfinfo_info_handle,
+		          option_output_format,
+		          &error );
+
+		if( result == -1 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			fprintf(
+			 stderr,
+			 "Unable to set output format.\n" );
+
+			goto on_error;
+		}
+		else if( result == 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+
+			fprintf(
+			 stderr,
+			 "Unsupported output format defaulting to: text.\n" );
+		}
+	}
+	if( ewfinfo_info_handle->output_format == INFO_HANDLE_OUTPUT_FORMAT_DFXML )
+	{
+		if( info_handle_dfxml_header_fprint(
+		     ewfinfo_info_handle,
+		     &error ) != 1 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			fprintf(
+			 stderr,
+			 "Unable to print header.\n" );
+
+			goto on_error;
+		}
+	}
+	else if( ewfinfo_info_handle->output_format == INFO_HANDLE_OUTPUT_FORMAT_TEXT )
+	{
+		ewfoutput_version_fprint(
+		 stdout,
+		 program );
+
+		print_header = 0;
+	}
+	if( ( option_output_format == NULL )
+	 && ( option_date_format != NULL ) )
+	{
+		result = info_handle_set_date_format(
+		          ewfinfo_info_handle,
+		          option_date_format,
+		          &error );
+
+		if( result == -1 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unable to set date format.\n" );
+
+			goto on_error;
+		}
+		else if( result == 0 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unsupported date format defaulting to: ctime.\n" );
+		}
+	}
+	if( option_header_codepage != NULL )
+	{
+		result = info_handle_set_header_codepage(
+		          ewfinfo_info_handle,
+		          option_header_codepage,
+		          &error );
+
+		if( result == -1 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unable to set header codepage in info handle.\n" );
+
+			goto on_error;
+		}
+		else if( result == 0 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unsupported header codepage defaulting to: ascii.\n" );
+		}
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( libcsystem_glob_initialize(
+	     &glob,
+	     &error ) != 1 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to initialize glob.\n" );
+
+		goto on_error;
+	}
+	if( libcsystem_glob_resolve(
+	     glob,
+	     &( argv[ optind ] ),
+	     argc - optind,
+	     &error ) != 1 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to resolve glob.\n" );
+
+		goto on_error;
+	}
+	argv_filenames      = glob->result;
+	number_of_filenames = glob->number_of_results;
+#else
+	argv_filenames      = &( argv[ optind ] );
+	number_of_filenames = argc - optind;
+
+#endif
+#if defined( HAVE_GETRLIMIT )
+	if( getrlimit(
+            RLIMIT_NOFILE,
+            &limit_data ) != 0 )
+	{
+		fprintf(
+		 stderr,
+		 "Unable to determine limit: number of open file descriptors.\n" );
+	}
+	if( limit_data.rlim_max > (rlim_t) INT_MAX )
+	{
+		limit_data.rlim_max = (rlim_t) INT_MAX;
+	}
+	if( limit_data.rlim_max > 0 )
+	{
+		limit_data.rlim_max /= 2;
+	}
+	if( info_handle_set_maximum_number_of_open_handles(
+	     ewfinfo_info_handle,
+	     (int) limit_data.rlim_max,
 	     &error ) != 1 )
 	{
 		fprintf(
 		 stderr,
-		 "Unable to set header codepage in info handle.\n" );
+		 "Unable to set maximum number of open file handles.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		info_handle_free(
-		 &info_handle,
-		 NULL );
-
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-		libsystem_glob_free(
-		 &glob,
-		 NULL );
-#endif
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 #endif
+	if( libcsystem_signal_attach(
+	     ewfinfo_signal_handler,
+	     &error ) != 1 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to attach signal handler.\n" );
+
+		libcnotify_print_error_backtrace(
+		 error );
+		libcerror_error_free(
+		 &error );
+	}
 	result = info_handle_open_input(
-	          info_handle,
+	          ewfinfo_info_handle,
 	          argv_filenames,
-	          amount_of_filenames,
+	          number_of_filenames,
 	          &error );
 
-#if !defined( LIBSYSTEM_HAVE_GLOB )
-	if( libsystem_glob_free(
+	if( ewfinfo_abort != 0 )
+	{
+		goto on_abort;
+	}
+	if( result != 1 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to open EWF file(s).\n" );
+
+		goto on_error;
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( libcsystem_glob_free(
 	     &glob,
 	     &error ) != 1 )
 	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
 		fprintf(
 		 stderr,
 		 "Unable to free glob.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 #endif
-
-	if( ( ewfinfo_abort == 0 )
-	 && ( result != 1 ) )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to open EWF file(s)" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		info_handle_free(
-		 &info_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
-	}
-	if( ( ewfinfo_abort == 0 )
-	 && ( ( info_option == 'a' )
-	  || ( info_option == 'i' ) ) )
+	if( ( info_option == 'a' )
+	 || ( info_option == 'i' ) )
 	{
 		if( info_handle_header_values_fprint(
-		     info_handle,
-		     date_format,
-		     stdout,
+		     ewfinfo_info_handle,
 		     &error ) != 1 )
 		{
-			libsystem_notify_print_error_backtrace(
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unable to print header values.\n" );
+
+			libcnotify_print_error_backtrace(
 			 error );
-			liberror_error_free(
+			libcerror_error_free(
 			 &error );
 		}
 	}
-	if( ( ewfinfo_abort == 0 )
-	 && ( ( info_option == 'a' )
-	  || ( info_option == 'm' ) ) )
+	if( ( info_option == 'a' )
+	 || ( info_option == 'm' ) )
 	{
 		if( info_handle_media_information_fprint(
-		     info_handle,
-		     stdout,
+		     ewfinfo_info_handle,
 		     &error ) != 1 )
 		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
 			fprintf(
 			 stderr,
 			 "Unable to print media information.\n" );
 
-			libsystem_notify_print_error_backtrace(
+			libcnotify_print_error_backtrace(
 			 error );
-			liberror_error_free(
+			libcerror_error_free(
 			 &error );
 		}
 		if( info_handle_hash_values_fprint(
-		     info_handle,
-		     stdout,
+		     ewfinfo_info_handle,
 		     &error ) != 1 )
 		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
 			fprintf(
 			 stderr,
 			 "Unable to print hash values.\n" );
 
-			libsystem_notify_print_error_backtrace(
+			libcnotify_print_error_backtrace(
 			 error );
-			liberror_error_free(
+			libcerror_error_free(
 			 &error );
 		}
 		if( info_handle_sessions_fprint(
-		     info_handle,
-		     stdout,
+		     ewfinfo_info_handle,
 		     &error ) != 1 )
 		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
 			fprintf(
 			 stderr,
 			 "Unable to print sessions.\n" );
 
-			libsystem_notify_print_error_backtrace(
+			libcnotify_print_error_backtrace(
 			 error );
-			liberror_error_free(
+			libcerror_error_free(
+			 &error );
+		}
+		if( info_handle_tracks_fprint(
+		     ewfinfo_info_handle,
+		     &error ) != 1 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unable to print tracks.\n" );
+
+			libcnotify_print_error_backtrace(
+			 error );
+			libcerror_error_free(
 			 &error );
 		}
 	}
-	if( ( ewfinfo_abort == 0 )
-	 && ( ( info_option == 'a' )
-	  || ( info_option == 'e' ) ) )
+	if( ( info_option == 'a' )
+	 || ( info_option == 'e' ) )
 	{
 		if( info_handle_acquiry_errors_fprint(
-		     info_handle,
-		     stdout,
+		     ewfinfo_info_handle,
 		     &error ) != 1 )
 		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
 			fprintf(
 			 stderr,
 			 "Unable to print acquiry errors.\n" );
 
-			libsystem_notify_print_error_backtrace(
+			libcnotify_print_error_backtrace(
 			 error );
-			liberror_error_free(
+			libcerror_error_free(
 			 &error );
 		}
 	}
-	if( libsystem_signal_detach(
+	if( info_handle_single_files_fprint(
+	     ewfinfo_info_handle,
 	     &error ) != 1 )
 	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to print single files.\n" );
+
+		libcnotify_print_error_backtrace(
+		 error );
+		libcerror_error_free(
+		 &error );
+	}
+	if( ewfinfo_info_handle->output_format == INFO_HANDLE_OUTPUT_FORMAT_DFXML )
+	{
+		if( info_handle_dfxml_footer_fprint(
+		     ewfinfo_info_handle,
+		     &error ) != 1 )
+		{
+			if( print_header != 0 )
+			{
+				ewfoutput_version_fprint(
+				 stderr,
+				 program );
+
+				print_header = 0;
+			}
+			fprintf(
+			 stderr,
+			 "Unable to print footer.\n" );
+
+			goto on_error;
+		}
+	}
+on_abort:
+	if( info_handle_close(
+	     ewfinfo_info_handle,
+	     &error ) != 0 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
+		fprintf(
+		 stderr,
+		 "Unable to close info handle.\n" );
+
+		goto on_error;
+	}
+	if( libcsystem_signal_detach(
+	     &error ) != 1 )
+	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
 		fprintf(
 		 stderr,
 		 "Unable to detach signal handler.\n" );
 
-		libsystem_notify_print_error_backtrace(
+		libcnotify_print_error_backtrace(
 		 error );
-		liberror_error_free(
+		libcerror_error_free(
 		 &error );
-	}
-	if( info_handle_close(
-	     info_handle,
-	     &error ) != 0 )
-	{
-		fprintf(
-		 stderr,
-		 "Unable to close EWF file(s).\n" );
-
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		info_handle_free(
-		 &info_handle,
-		 NULL );
-
-		return( EXIT_FAILURE );
 	}
 	if( info_handle_free(
-	     &info_handle,
+	     &ewfinfo_info_handle,
 	     &error ) != 1 )
 	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
 		fprintf(
 		 stderr,
 		 "Unable to free info handle.\n" );
 
-		libsystem_notify_print_error_backtrace(
-		 error );
-		liberror_error_free(
-		 &error );
-
-		return( EXIT_FAILURE );
+		goto on_error;
 	}
 	if( ewfinfo_abort != 0 )
 	{
+		if( print_header != 0 )
+		{
+			ewfoutput_version_fprint(
+			 stderr,
+			 program );
+
+			print_header = 0;
+		}
 		fprintf(
-		 stdout, "%" PRIs_LIBSYSTEM ": ABORTED\n",
+		 stdout,
+		 "%" PRIs_LIBCSTRING_SYSTEM ": ABORTED\n",
 		 program );
 
 		return( EXIT_FAILURE );
 	}
 	return( EXIT_SUCCESS );
+
+on_error:
+	if( error != NULL )
+	{
+		libcnotify_print_error_backtrace(
+		 error );
+		libcerror_error_free(
+		 &error );
+	}
+	if( ewfinfo_info_handle != NULL )
+	{
+		info_handle_free(
+		 &ewfinfo_info_handle,
+		 NULL );
+	}
+#if !defined( LIBCSYSTEM_HAVE_GLOB )
+	if( glob != NULL )
+	{
+		libcsystem_glob_free(
+		 &glob,
+		 NULL );
+	}
+#endif
+	return( EXIT_FAILURE );
 }
 

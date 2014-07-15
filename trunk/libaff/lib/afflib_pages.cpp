@@ -1,45 +1,6 @@
 /*
  * The AFFLIB page abstraction.
- */
-
-/*
- * Copyright (c) 2005, 2006
- *	Simson L. Garfinkel and Basis Technology, Inc. 
- *      All rights reserved.
- *
- * This code is derrived from software contributed by
- * Simson L. Garfinkel
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Simson L. Garfinkel
- *    and Basis Technology Corp.
- * 4. Neither the name of Simson Garfinkel, Basis Technology, or other
- *    contributors to this program may be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY SIMSON GARFINKEL, BASIS TECHNOLOGY,
- * AND CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL SIMSON GARFINKEL, BAIS TECHNOLOGy,
- * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.  
+ * Distributed under the Berkeley 4-part license
  */
 
 #include "affconfig.h"
@@ -99,6 +60,11 @@ int af_page_size(AFFILE *af)
     return af->image_pagesize;
 }
 
+int af_get_pagesize(AFFILE *af)
+{
+    return af->image_pagesize;
+}
+
 /* af_set_sectorsize:
  * Sets the sectorsize.
  * Fails with -1 if imagesize >=0 unless these changes permitted
@@ -131,7 +97,7 @@ int	af_get_sectorsize(AFFILE *af)	// returns sector size
  * af_set_pagesize:
  * Sets the pagesize. Fails with -1 if it can't be changed.
  */
-int af_set_pagesize(AFFILE *af,u_long pagesize)
+int af_set_pagesize(AFFILE *af,uint32_t pagesize)
 {
     /* Allow the pagesize to be changed if it hasn't been set yet
      * and if this format doesn't support metadata updating (which is the raw formats)
@@ -164,7 +130,7 @@ int af_set_pagesize(AFFILE *af,u_long pagesize)
  *** page-level interface
  ****************************************************************/
 
-int af_get_page_raw(AFFILE *af,int64_t pagenum,unsigned long *arg,
+int af_get_page_raw(AFFILE *af,int64_t pagenum,uint32_t *arg,
 		    unsigned char *data,size_t *bytes)
 {
     char segname[AF_MAX_NAME_LEN];
@@ -194,11 +160,11 @@ int af_get_page_raw(AFFILE *af,int64_t pagenum,unsigned long *arg,
 
 int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 {
-    unsigned long arg=0;
+    uint32_t arg=0;
     size_t page_len=0;
 
     if (af_trace){
-	fprintf(af_trace,"af_get_page(%p,pagenum=%"I64d",buf=%p,bytes=%zu)\n",af,pagenum,data,*bytes);
+	fprintf(af_trace,"af_get_page(%p,pagenum=%"I64d",buf=%p,bytes=%u)\n",af,pagenum,data,(int)*bytes);
     }
 
     /* Find out the size of the segment and if it is compressed or not.
@@ -220,12 +186,14 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 	return r;		// segment doesn't exist
     }
        
-    /* If no data buffer was provided, just return */
-    if(data==0) return 0;
 
     /* If the segment isn't compressed, just get it*/
-    unsigned long pageflag = 0;
+    uint32_t pageflag = 0;
     if((arg & AF_PAGE_COMPRESSED)==0){
+	if(data==0){			// if no data provided, just return size of the segment if requested
+	    if(bytes) *bytes = page_len;	// set the number of bytes in the page if requested
+	    return 0;
+	}
 	int ret = af_get_page_raw(af,pagenum,&pageflag,data,bytes);
 	if(*bytes > page_len) *bytes = page_len; // we only read this much
 	if(ret!=0) return ret;		// some error happened?
@@ -244,8 +212,16 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 	    return -3;			// read error
 	}
 
-	/* Now uncompress directly into the buffer provided by the caller. */
+	/* Now uncompress directly into the buffer provided by the caller, unless the caller didn't
+	 * provide a buffer. If that happens, allocate our own...
+	 */
 	int res = -1;			// 0 is success
+	bool free_data = false;
+	if(data==0){
+	    data = (unsigned char *)malloc(af->image_pagesize);
+	    free_data = true;
+	    *bytes = af->image_pagesize; // I can hold this much
+	}
 
 	switch((pageflag & AF_PAGE_COMP_ALG_MASK)){
 	case AF_PAGE_COMP_ALG_ZERO:
@@ -283,8 +259,8 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 #ifdef USE_LZMA
 	case AF_PAGE_COMP_ALG_LZMA:
 	    res = lzma_uncompress(data,bytes,compressed_data,compressed_data_len);
-	    if (af_trace) fprintf(af_trace,"   LZMA decompressed page %"I64d". %zd bytes => %zd bytes\n",
-				  pagenum,compressed_data_len,*bytes);
+	    if (af_trace) fprintf(af_trace,"   LZMA decompressed page %"I64d". %d bytes => %u bytes\n",
+				  pagenum,(int)compressed_data_len,(int)*bytes);
 	    switch(res){
 	    case 0:break;		// OK
 	    case 1:(*af->error_reporter)("LZMA header error decompressing segment %"I64d"\n",pagenum);
@@ -301,6 +277,10 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
 	    break;
 	}
 
+	if(free_data){
+	    free(data);
+	    data = 0;			// restore the way it was
+	}
 	free(compressed_data);		// don't need this one anymore
 	af->pages_decompressed++;
 	if(res!=Z_OK) return -1;
@@ -310,7 +290,7 @@ int af_get_page(AFFILE *af,int64_t pagenum,unsigned char *data,size_t *bytes)
      * make sure that the rest of the sector is zeroed, and that the
      * rest after that has the 'bad block' notation.
      */
-    if(af->image_pagesize > af->image_sectorsize){
+    if(data && (af->image_pagesize > af->image_sectorsize)){
 	const int SECTOR_SIZE = af->image_sectorsize;	// for ease of typing
 	size_t bytes_left_in_sector = (SECTOR_SIZE - (*bytes % SECTOR_SIZE)) % SECTOR_SIZE;
 	for(size_t i=0;i<bytes_left_in_sector;i++){
@@ -402,10 +382,10 @@ int af_update_page(AFFILE *af,int64_t pagenum,unsigned char *data,int datalen)
     /* Compress and write the data, if we are allowed to compress */
     if(af->compression_type != AF_COMPRESSION_ALG_NONE){
 	unsigned char *cdata = (unsigned char *)malloc(destLen); // compressed data
-	unsigned long *ldata = (unsigned long *)cdata; // allows me to reference as a buffer of unsigned longs
+	uint32_t *ldata = (uint32_t *)cdata; // allows me to reference as a buffer of uint32_ts
 	if(cdata!=0){		// If data could be allocated
 	    int cres = -1;		// compression results
-	    unsigned int flag = 0;	// flag for data segment
+	    uint32_t flag = 0;	// flag for data segment
 	    int dont_compress = 0;
 
 	    /* Try zero compression first; it's the best algorithm we have  */
@@ -523,12 +503,6 @@ int af_update_page(AFFILE *af,int64_t pagenum,unsigned char *data,int datalen)
  *
  * af_cache_writethrough(af,page,buf,buflen)
  *      - used for write bypass
- *
- * af_cache_load(af,page) - 
- *      - If page is already in the cache, return it.
- *      - If cache is filled, randomly discard a page
- *      - if page is on the disk, load the page.
- *      - Sets af->bp to be the page that was loaded.
  *
  */
 

@@ -1,8 +1,7 @@
 /*
  * Platform functions
  *
- * Copyright (c) 2006-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2006-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -21,31 +20,28 @@
  */
 
 #include <common.h>
-#include <narrow_string.h>
 #include <types.h>
-#include <wide_string.h>
-
-#include <liberror.h>
 
 #if defined( HAVE_SYS_UTSNAME_H )
 #include <sys/utsname.h>
 #endif
 
-#include <libsystem.h>
-
+#include "ewftools_libcerror.h"
+#include "ewftools_libcstring.h"
+#include "ewftools_libcsystem.h"
 #include "platform.h"
 
 #if !defined( LIBEWF_OPERATING_SYSTEM )
-#define LIBEWF_OPERATING_SYSTEM "Unknown"
+#define LIBEWF_OPERATING_SYSTEM		"Unknown"
 #endif
 
 /* Determines the operating system string
- * Return 1 if successful or -1 on error
+ * Returns 1 if successful or -1 on error
  */
 int platform_get_operating_system(
-     libsystem_character_t *operating_system_string,
+     libcstring_system_character_t *operating_system_string,
      size_t operating_system_string_size,
-     liberror_error_t **error )
+     libcerror_error_t **error )
 {
 #if defined( HAVE_UNAME ) && !defined( WINAPI )
 	struct utsname utsname_buffer;
@@ -56,9 +52,9 @@ int platform_get_operating_system(
 	size_t operating_system_length = 0;
 
 #if defined( WINAPI )
-	DWORD windows_version          = 0; 
+	DWORD windows_version          = 0;
 	DWORD windows_major_version    = 0;
-	DWORD windows_minor_version    = 0; 
+	DWORD windows_minor_version    = 0;
 /*
 	DWORD windows_build_number     = 0;
  */
@@ -66,10 +62,10 @@ int platform_get_operating_system(
 
 	if( operating_system_string == NULL )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_INVALID_VALUE,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_INVALID_VALUE,
 		 "%s: invalid operating system string.",
 		 function );
 
@@ -79,7 +75,7 @@ int platform_get_operating_system(
 	operating_system = "Windows";
 
 	windows_version = GetVersion();
- 
+
 	windows_major_version = (DWORD) ( LOBYTE( LOWORD( windows_version ) ) );
 	windows_minor_version = (DWORD) ( HIBYTE( LOWORD( windows_version ) ) );
 
@@ -175,31 +171,31 @@ int platform_get_operating_system(
 	operating_system = LIBEWF_OPERATING_SYSTEM;
 #endif
 
-	operating_system_length = narrow_string_length(
+	operating_system_length = libcstring_narrow_string_length(
 	                           operating_system );
 
 	if( operating_system_string_size < ( operating_system_length + 1 ) )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_ARGUMENTS,
-		 LIBERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
+		 LIBCERROR_ERROR_DOMAIN_ARGUMENTS,
+		 LIBCERROR_ARGUMENT_ERROR_VALUE_TOO_SMALL,
 		 "%s: operating system string too small.",
 		 function );
 
 		return( -1 );
 	}	
-	if( libsystem_string_copy_from_utf8_string(
+	if( libcsystem_string_copy_from_utf8_string(
 	     operating_system_string,
 	     operating_system_string_size,
 	     (uint8_t *) operating_system,
 	     operating_system_length + 1,
 	     error ) != 1 )
 	{
-		liberror_error_set(
+		libcerror_error_set(
 		 error,
-		 LIBERROR_ERROR_DOMAIN_CONVERSION,
-		 LIBERROR_CONVERSION_ERROR_GENERIC,
+		 LIBCERROR_ERROR_DOMAIN_CONVERSION,
+		 LIBCERROR_CONVERSION_ERROR_GENERIC,
 		 "%s: unable to set operating system string.",
 		 function );
 

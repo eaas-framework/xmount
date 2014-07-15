@@ -1,8 +1,7 @@
 /*
  * The internal definitions
  *
- * Copyright (c) 2008-2009, Joachim Metz <forensics@hoffmannbv.nl>,
- * Hoffmann Investigations.
+ * Copyright (c) 2009-2013, Joachim Metz <joachim.metz@gmail.com>
  *
  * Refer to AUTHORS for acknowledgements.
  *
@@ -34,43 +33,57 @@
  * for local use of libbfio
  */
 #else
-#define LIBBFIO_VERSION					20091114
+#define LIBBFIO_VERSION					20130103
 
 /* The libbfio version string
  */
-#define LIBBFIO_VERSION_STRING				"20091114"
+#define LIBBFIO_VERSION_STRING				"20130103"
 
-/* The libbfio file access
+/* The library flags definitions
+ */
+enum LIBBFIO_FLAGS
+{
+	/* The IO handle is not managed by the library
+	 */
+        LIBBFIO_FLAG_IO_HANDLE_NON_MANAGED		= 0x00,
+
+	/* The IO handle is managed by the library
+	 */
+        LIBBFIO_FLAG_IO_HANDLE_MANAGED			= 0x01,
+
+	/* The IO handle is cloned by the function
+	 */
+        LIBBFIO_FLAG_IO_HANDLE_CLONE_BY_FUNCTION	= 0x00,
+
+	/* The IO handle is not cloned, but passed as a reference
+	 */
+        LIBBFIO_FLAG_IO_HANDLE_CLONE_BY_REFERENCE	= 0x02,
+};
+
+/* The access flags definitions
  * bit 1	set to 1 for read access
  * bit 2	set to 1 for write access
  * bit 3	set to 1 to truncate an existing file on write
  * bit 4-8	not used
  */
-#define LIBBFIO_FLAG_READ				0x01
-#define LIBBFIO_FLAG_WRITE				0x02
-#define LIBBFIO_FLAG_TRUNCATE				0x04
+enum LIBBFIO_ACCESS_FLAGS
+{
+	LIBBFIO_ACCESS_FLAG_READ			= 0x01,
+	LIBBFIO_ACCESS_FLAG_WRITE			= 0x02,
+	LIBBFIO_ACCESS_FLAG_TRUNCATE			= 0x04
+};
 
-/* The libbfio file access macros
+/* The file access macros
  */
-#define LIBBFIO_OPEN_READ				( LIBBFIO_FLAG_READ )
-#define LIBBFIO_OPEN_WRITE				( LIBBFIO_FLAG_WRITE )
-#define LIBBFIO_OPEN_READ_WRITE				( LIBBFIO_FLAG_READ | LIBBFIO_FLAG_WRITE )
-#define LIBBFIO_OPEN_WRITE_TRUNCATE			( LIBBFIO_FLAG_WRITE | LIBBFIO_FLAG_TRUNCATE )
-#define LIBBFIO_OPEN_READ_WRITE_TRUNCATE		( LIBBFIO_FLAG_READ | LIBBFIO_FLAG_WRITE | LIBBFIO_FLAG_TRUNCATE )
+#define LIBBFIO_OPEN_READ				( LIBBFIO_ACCESS_FLAG_READ )
+#define LIBBFIO_OPEN_WRITE				( LIBBFIO_ACCESS_FLAG_WRITE )
+#define LIBBFIO_OPEN_READ_WRITE				( LIBBFIO_ACCESS_FLAG_READ | LIBBFIO_ACCESS_FLAG_WRITE )
+#define LIBBFIO_OPEN_WRITE_TRUNCATE			( LIBBFIO_ACCESS_FLAG_WRITE | LIBBFIO_ACCESS_FLAG_TRUNCATE )
+#define LIBBFIO_OPEN_READ_WRITE_TRUNCATE		( LIBBFIO_ACCESS_FLAG_READ | LIBBFIO_ACCESS_FLAG_WRITE | LIBBFIO_ACCESS_FLAG_TRUNCATE )
 
-#define LIBBFIO_POOL_UNLIMITED_AMOUNT_OF_OPEN_HANDLES	0
+#define LIBBFIO_POOL_UNLIMITED_NUMBER_OF_OPEN_HANDLES	0
 
 #endif /* HAVE_LOCAL_LIBBFIO */
-
-/* Platform specific macros
- */
-#if defined( _MSC_VER )
-#define LIBBFIO_LARGE_INTEGER_ZERO			{ 0, 0 }
-
-#elif defined( __BORLANDC__ )
-#define LIBBFIO_LARGE_INTEGER_ZERO			{ 0 }
-
-#endif
 
 #endif
 
