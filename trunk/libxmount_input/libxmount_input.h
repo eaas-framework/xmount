@@ -23,6 +23,8 @@
 
 #define LIBXMOUNT_INPUT_API_VERSION 1
 
+#include <stdint.h>
+
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountInputFunctions {
   /*!
@@ -93,6 +95,12 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*GetInfofileContent)(void *p_handle,
                             const char **pp_info_buf);
+  /*!
+   * Function to free buffers that were allocated by lib
+   *
+   * \param p_buf Buffer to free
+   */
+  void (*FreeBuffer)(void *p_buf);
 } ts_LibXmountInputFunctions, *pts_LibXmountInputFunctions;
 
 //! Get library API version
@@ -113,7 +121,7 @@ void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len);
 /*!
  * \param pp_functions Functions
  */
-void LibXmount_Input_GetFunctions(tsLibXmountInputFunctions **pp_functions);
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions **pp_functions);
 
 #endif // LIBXMOUNT_INPUT_H
 

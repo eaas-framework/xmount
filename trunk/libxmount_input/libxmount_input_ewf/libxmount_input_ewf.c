@@ -20,19 +20,16 @@
 
 #undef HAVE_LIBEWF_STATIC
 
-#include "config.h"
-
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_LIBEWF
+#include "../libxmount_input.h"
+
+#ifndef HAVE_LIBEWF_STATIC
   #include <libewf.h>
-#endif
-#ifdef HAVE_LIBEWF_STATIC
+#else
   #include "libewf/include/libewf.h"
 #endif
-
-#include "../libxmount_input.h"
 
 /*******************************************************************************
  * Forward declarations
@@ -53,21 +50,28 @@ int EwfOptionsParse(void *p_handle,
                     char **pp_error);
 int EwfGetInfofileContent(void *p_handle,
                           const char **pp_info_buf);
+void EwfFreeBuffer(void *p_buf);
 
 /*******************************************************************************
  * LibXmount_Input API implementation
  ******************************************************************************/
+/*
+ * LibXmount_Input_GetApiVersion
+ */
 void LibXmount_Input_GetApiVersion(uint8_t *p_ver) {
   *p_ver=LIBXMOUNT_INPUT_API_VERSION;
 }
 
+/*
+ * LibXmount_Input_GetSupportedFormats
+ */
 void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len) {
-  *ppp_arr=(char*)malloc(sizeof(char*));
+  // Alloc array containing 1 element with content "ewf"
+  *ppp_arr=(char**)malloc(sizeof(char*));
   if(*ppp_arr==NULL) {
     *p_arr_len=0;
     return;
   }
-
   **ppp_arr=(char*)malloc(sizeof(char)*4);
   if(**ppp_arr==NULL) {
     free(*ppp_arr);
@@ -75,14 +79,16 @@ void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len) {
     *p_arr_len=0;
     return;
   }
-
   strcpy(**ppp_arr,"ewf");
   *p_arr_len=1;
 }
 
-void LibXmount_Input_GetFunctions(tsLibXmountInputFunctions **pp_functions) {
+/*
+ * LibXmount_Input_GetFunctions
+ */
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions **pp_functions) {
   *pp_functions=
-    (ptsLibXmountInputFunctions)malloc(sizeof(tsLibXmountInputFunctions));
+    (pts_LibXmountInputFunctions)malloc(sizeof(ts_LibXmountInputFunctions));
   if(*pp_functions==NULL) return;
 
   (*pp_functions)->Open=&EwfOpen;
@@ -92,81 +98,66 @@ void LibXmount_Input_GetFunctions(tsLibXmountInputFunctions **pp_functions) {
   (*pp_functions)->OptionsHelp=&EwfOptionsHelp;
   (*pp_functions)->OptionsParse=&EwfOptionsParse;
   (*pp_functions)->GetInfofileContent=&EwfGetInfofileContent;
+  (*pp_functions)->FreeBuffer=&EwfFreeBuffer;
 }
 
 /*******************************************************************************
  * Private
  ******************************************************************************/
+/*
+ * EwfOpen
+ */
 int EwfOpen(void **pp_handle,
             const char **pp_filename_arr,
             uint64_t filename_arr_len)
 {
-#if defined( HAVE_LIBEWF_V2_API )
-    static libewf_handle_t *hEwfFile=NULL;
-#else
-    static LIBEWF_HANDLE *hEwfFile=NULL;
-#endif
+  // We need at least one file
+  if(filename_arr_len==0) return 1;
 
+  // Make sure all files are EWF files
+  for(uint64_t i=0;i<filename_arr_len;i++) {
+    if(libewf_check_file_signature(pp_filename_arr[i],NULL)!=1) return 1;
+  }
 
-#if defined( HAVE_LIBEWF_V2_API )
-      if(libewf_check_file_signature(ppInputFilenames[i],NULL)!=1) {
-#else
-      if(libewf_check_file_signature(ppInputFilenames[i])!=1) {
-#endif
+  // Init handle
+  *pp_handle=NULL;
+  if(libewf_handle_initialize((libewf_handle_t**)pp_handle,NULL)!=1) {
+    // LOG_ERROR("Couldn't create EWF handle!\n")
+    return 1;
+  }
 
-#if defined( HAVE_LIBEWF_V2_API )
-      if( libewf_handle_initialize(
-           &hEwfFile,
-           NULL ) != 1 )
-      {
-        LOG_ERROR("Couldn't create EWF handle!\n")
-        return 1;
-      }
-      if( libewf_handle_open(
-           hEwfFile,
-           ppInputFilenames,
-           InputFilenameCount,
-           libewf_get_access_flags_read(),
-           NULL ) != 1 )
-      {
-        LOG_ERROR("Couldn't open EWF file(s)!\n")
-        return 1;
-      }
-#else
-      hEwfFile=libewf_open(ppInputFilenames,
-                           InputFilenameCount,
-                           libewf_get_flags_read());
-      if(hEwfFile==NULL) {
-        LOG_ERROR("Couldn't open EWF file(s)!\n")
-        return 1;
-      }
-      // Parse EWF header
-      if(libewf_parse_header_values(hEwfFile,LIBEWF_DATE_FORMAT_ISO8601)!=1) {
-        LOG_ERROR("Couldn't parse ewf header values!\n")
-        return 1;
-      }
-#endif
+  // Open EWF file
+  if(libewf_handle_open((libewf_handle_t*)*pp_handle,
+                        (char* const*)pp_filename_arr,
+                        filename_arr_len,
+                        libewf_get_access_flags_read(),
+                        NULL)!=1)
+  {
+    // LOG_ERROR("Couldn't open EWF file(s)!\n")
+    return 1;
+  }
 
-  return 1;
+  return 0;
 }
 
+/*
+ * EwfSize
+ */
 int EwfSize(void *p_handle, uint64_t *p_size) {
-#if defined( HAVE_LIBEWF_V2_API )
-  if(libewf_handle_get_media_size((libewf_handle_t*)p_handle,p_size,NULL)!=1)
-#else
-  if(libewf_get_media_size((LIBEWF_HANDLE*)p_handle,p_size)!=1)
-#endif
+  if(libewf_handle_get_media_size((libewf_handle_t*)p_handle,p_size,NULL)!=1) {
     return 1;
   }
   return 0;
 }
 
+/*
+ * EwfRead
+ */
 int EwfRead(void *p_handle,
             uint64_t offset,
             unsigned char *p_buf,
             uint32_t count)
 {
-#if defined( HAVE_LIBEWF_V2_API )
   if(libewf_handle_seek_offset((libewf_handle_t*)p_handle,
                                offset,
                                SEEK_SET,
@@ -177,10 +168,6 @@ int EwfRead(void *p_handle,
                                  count,
                                  NULL)!=count)
     {
-#else
-  if(libewf_seek_offset((LIBEWF_HANDLE*)p_handle,offset)!=-1) {
-    if(libewf_read_buffer((LIBEWF_HANDLE*)p_handle,p_buf,count)!=count) {
-#endif
       return 1;
     }
   } else {
@@ -189,25 +176,42 @@ int EwfRead(void *p_handle,
   return 0;
 }
 
+/*
+ * EwfClose
+ */
 int EwfClose(void **pp_handle) {
-#if defined( HAVE_LIBEWF_V2_API )
-  libewf_handle_close((libewf_handle_t*)*pp_handle,NULL);
-  libewf_handle_free((libewf_handle_t*)pp_handle,NULL);
-#else
-  libewf_close((LIBEWF_HANDLE*)*pp_handle);
-#endif
+  // Close EWF handle
+  if(libewf_handle_close((libewf_handle_t*)*pp_handle,NULL)!=0) {
+    return 1;
+  }
+
+  // Free EWF handle
+  if(libewf_handle_free((libewf_handle_t**)pp_handle,NULL)!=1) {
+    return 1;
+  }
+
+  *pp_handle=NULL;
   return 0;
 }
 
+/*
+ * EwfOptionsHelp
+ */
 int EwfOptionsHelp(const char **pp_help) {
   *pp_help=NULL;
   return 0;
 }
 
+/*
+ * EwfOptionsParse
+ */
 int EwfOptionsParse(void *p_handle, char *p_options, char **pp_error) {
   return 0;
 }
 
+/*
+ * EwfGetInfofileContent
+ */
 int EwfGetInfofileContent(void *p_handle, const char **pp_info_buf) {
 /*
 #define M_SAVE_VALUE(DESC,SHORT_DESC) { \
@@ -277,4 +281,17 @@ int EwfGetInfofileContent(void *p_handle, const char **pp_info_buf) {
   *pp_info_buf=NULL;
   return 0;
 }
+
+/*
+ * EwfFreeBuffer
+ */
+void EwfFreeBuffer(void *p_buf) {
+  free(p_buf);
+}
+
+/*
+  ----- Change history -----
+  20140724: * Initial version implementing EwfOpen, EwfSize, EwfRead, EwfClose,
+              EwfOptionsHelp, EwfOptionsParse and EwfFreeBuffer
+*/
 

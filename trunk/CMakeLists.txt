@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project(xmount)
+set(CMAKE_C_FLAGS "-std=c99 -Wall")
+add_subdirectory(libxmount_input)
+#add_subdirectory(src)
