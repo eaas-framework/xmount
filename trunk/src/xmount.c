@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2013 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
 * vdi, vhd or vmdk files and enable virtual write access to them.              *
@@ -18,36 +18,18 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#undef HAVE_LIBEWF_STATIC
-#undef HAVE_LIBAFF_STATIC
-#define WITH_LIBAEWF
-#define WITH_LIBAAFF
+//#include "config.h"
 
-#include "config.h"
+//#ifndef HAVE_LIBZ
+//  #undef WITH_LIBAEWF
+//#endif
 
-#ifdef HAVE_LIBEWF_STATIC
-  #define WITH_LIBEWF
-#else
-  #ifdef HAVE_LIBEWF
-    #define WITH_LIBEWF
-  #endif
-#endif
-
-#ifdef HAVE_LIBAFF_STATIC
-  #define WITH_LIBAFF
-#else
-  #ifdef HAVE_LIBAFFLIB
-    #define WITH_LIBAFF
-  #endif
-#endif
-
-#ifndef HAVE_LIBZ
-  #undef WITH_LIBAEWF
-#endif
+#define XMOUNT_LIBRARY_PATH "/usr/lib/xmount"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <errno.h>
 //#include <fcntl.h>
 #include <unistd.h>
@@ -56,65 +38,34 @@
   #include <linux/fs.h>
 #endif
 #include <pthread.h>
-#include <stdint.h>
 #include <time.h>
-#ifdef HAVE_LIBEWF
-  #include <libewf.h>
-#endif
-#ifdef HAVE_LIBEWF_STATIC
-  #include "libewf/include/libewf.h"
-#endif
-#ifdef HAVE_LIBAFFLIB
-  #include <afflib/afflib.h>
-#endif
-#ifdef HAVE_LIBAFF_STATIC
-  #include "libaff/lib/afflib.h"
-#endif
-#include "libdd/dd.h"
-#ifdef WITH_LIBAEWF
-  #include "libaewf/aewf.h"
-#endif
-#ifdef WITH_LIBAAFF
-  #include "libaaff/aaff.h"
-#endif
 
 #include "xmount.h"
 #include "md5.h"
+#include "../libxmount_input/libxmount_input.h"
 
-#if ( defined( HAVE_LIBEWF ) || defined( HAVE_LIBEWF_STATIC ) ) && !defined( LIBEWF_HANDLE )
-  // libewf version 2 no longer defines LIBEWF_HANDLE
-  #define HAVE_LIBEWF_V2_API
-#endif
-
+/*******************************************************************************
+ * Global vars
+ ******************************************************************************/
 // Struct that contains various runtime configuration options
 static TXMountConfData XMountConfData;
-// Handles for input image types
-static t_pdd hDdFile=NULL;
-#ifdef WITH_LIBEWF
-  #if defined( HAVE_LIBEWF_V2_API )
-    static libewf_handle_t *hEwfFile=NULL;
-  #else
-    static LIBEWF_HANDLE *hEwfFile=NULL;
-  #endif
-#endif
-#ifdef WITH_LIBAEWF
-  static t_pAewf hAewfFile=NULL;
-#endif
-#ifdef WITH_LIBAFF
-  static AFFILE *hAffFile=NULL;
-#endif
-#ifdef WITH_LIBAAFF
-  static t_pAaff hAaffFile=NULL;
-#endif
+
+// Struct containing pointers to the libxmount_input functions
+static void *p_libxmount_in=NULL
+static ts_LibXmountInputFunctions libxmount_in_functions;
+
 // Pointer to virtual info file
 static char *pVirtualImageInfoFile=NULL;
+
 // Vars needed for VDI emulation
 static TVdiFileHeader *pVdiFileHeader=NULL;
 static uint32_t VdiFileHeaderSize=0;
 static char *pVdiBlockMap=NULL;
 static uint32_t VdiBlockMapSize=0;
+
 // Vars needed for VHD emulation
 static TVhdFileHeader *pVhdFileHeader=NULL;
+
 // Vars needed for VMDK emulation
 static char *pVirtualVmdkFile=NULL;
 static int VirtualVmdkFileSize=0;
@@ -123,10 +74,12 @@ static char *pVirtualVmdkLockDir2=NULL;
 static char *pVirtualVmdkLockFileData=NULL;
 static int VirtualVmdkLockFileDataSize=0;
 static char *pVirtualVmdkLockFileName=NULL;
+
 // Vars needed for virtual write access
 static FILE *hCacheFile=NULL;
 static pTCacheFileHeader pCacheFileHeader=NULL;
 static pTCacheFileBlockIndex pCacheFileBlockIndex=NULL;
+
 // Mutexes to control concurrent read & write access
 static pthread_mutex_t mutex_image_rw;
 static pthread_mutex_t mutex_info_read;
@@ -2840,6 +2793,29 @@ static int InitCacheFile() {
 }
 
 /*
+ * SearchInputLib
+ */
+int SearchInputLib() {
+  DIR *p_dir=NULL;
+  struct dirent *p_dirent=NULL;
+
+  // Open lib dir
+  p_dir=opendir(XMOUNT_LIBRARY_PATH);
+  if(p_dir==NULL) {
+    LOG_ERROR("Unable to access xmount library directory '%s'!",
+              XMOUNT_LIBRARY_PATH);
+    return 0;
+  }
+
+  while((p_dirent=readdir(p_dir))!=NULL) {
+    if(strncmp(p_dirent->d_name,"libxmount_input_",16)!=0) continue;
+//    p_libxmount_in=dlopen(
+  }
+
+  //libxmount_in_functions
+}
+
+/*
  * Struct containing implemented FUSE functions
  */
 static struct fuse_operations xmount_operations = {
@@ -2924,22 +2900,6 @@ int main(int argc, char *argv[])
     printf("\n");
   }
 
-#ifdef WITH_LIBEWF
-  // Check for valid ewf files
-  if(XMountConfData.OrigImageType==TOrigImageType_EWF) {
-    for(i=0;i<InputFilenameCount;i++) {
-#if defined( HAVE_LIBEWF_V2_API )
-      if(libewf_check_file_signature(ppInputFilenames[i],NULL)!=1) {
-#else
-      if(libewf_check_file_signature(ppInputFilenames[i])!=1) {
-#endif
-        LOG_ERROR("File \"%s\" isn't a valid ewf file!\n",ppInputFilenames[i])
-        return 1;
-      }
-    }
-  }
-#endif
-
   // TODO: Check if mountpoint is a valid dir
 
   // Init mutexes
@@ -2959,6 +2919,11 @@ int main(int argc, char *argv[])
   srand(time(NULL));
 
   // Open input image
+  
+  
+  
+  
+  
   switch(XMountConfData.OrigImageType) {
     case TOrigImageType_DD:
       // Input image is a DD file

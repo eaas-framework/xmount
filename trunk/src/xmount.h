@@ -61,27 +61,11 @@ typedef enum TVirtImageType {
 } TVirtImageType;
 
 /*
- * Input image types
- */
-typedef enum TOrigImageType {
-  /** Input image is a DD file */
-  TOrigImageType_DD,
-  /** Input image is an EWF file (use libewf) */
-  TOrigImageType_EWF,
-  /** Input image is an EWF file (use libaewf) */
-  TOrigImageType_AEWF,
-  /** Input image is an AFF file (use libaff) */
-  TOrigImageType_AFF,
-  /** Input image is an AFF file (use libaaff) */
-  TOrigImageType_AAFF,
-} TOrigImageType;
-
-/*
- * Various mountimg runtime options
+ * Various xmount runtime options
  */
 typedef struct TXMountConfData {
   /** Input image type */
-  TOrigImageType OrigImageType;
+  char *p_orig_image_type;
   /** Virtual image type */
   TVirtImageType VirtImageType;
   /** Enable debug output */

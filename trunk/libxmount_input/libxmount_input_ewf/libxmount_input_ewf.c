@@ -31,6 +31,11 @@
   #include "libewf/include/libewf.h"
 #endif
 
+#if !defined(LIBEWF_HANDLE)
+  // libewf version 2 no longer defines LIBEWF_HANDLE
+  #define HAVE_LIBEWF_V2_API
+#endif
+
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
