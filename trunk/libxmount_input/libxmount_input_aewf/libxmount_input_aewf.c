@@ -908,7 +908,7 @@ int AewfClose(void **pp_handle) {
 
   for(unsigned i=0;i<p_aewf->Segments;i++) {
     p_segment=&p_aewf->pSegmentArr[i];
-    if(p_segment->pFile) CloseFile(&pSegment->pFile);
+    if(p_segment->pFile) CloseFile(&p_segment->pFile);
     free(p_segment->pName);
   }
 
