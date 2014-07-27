@@ -71,23 +71,6 @@ uint8_t LibXmount_Input_GetApiVersion() {
  * LibXmount_Input_GetSupportedFormats
  */
 const char* LibXmount_Input_GetSupportedFormats() {
-/*
-  // Alloc array containing 1 element with content "ewf"
-  *ppp_arr=(char**)malloc(sizeof(char*));
-  if(*ppp_arr==NULL) {
-    *p_arr_len=0;
-    return;
-  }
-  **ppp_arr=(char*)malloc(sizeof(char)*4);
-  if(**ppp_arr==NULL) {
-    free(*ppp_arr);
-    *ppp_arr=NULL;
-    *p_arr_len=0;
-    return;
-  }
-  strcpy(**ppp_arr,"ewf");
-  *p_arr_len=1;
-*/
   return "ewf\0\0";
 }
 

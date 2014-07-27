@@ -26,13 +26,6 @@
 
 typedef struct _t_dd *t_pdd;
 
-int ddOpen  (t_pdd *ppdd, unsigned FilenameArrLen, const char **pFilenameArr);
-int ddInfo  (t_pdd   pdd, char **ppInfoBuff);
-int ddSize  (t_pdd   pdd, unsigned long long *pSize);
-int ddRead  (t_pdd   pdd, unsigned long long Seek, unsigned char *pBuffer, unsigned int Count);
-int ddClose (t_pdd *ppdd);
-
-
 // Possible error codes
 enum
 {

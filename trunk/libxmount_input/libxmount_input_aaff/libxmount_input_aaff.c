@@ -32,139 +32,66 @@
 #include <limits.h>
 #include <zlib.h>
 
-#include "aaff.h"
-
-// ----------------------
-//  Constant definitions
-// ----------------------
+#include "../libxmount_input.h"
 
 //#define AAFF_DEBUG
+#include "libxmount_input_aaff.h"
 
-#define AAFF_DEFAULT_PAGE_SEEK_MAX_ENTRIES 1000000  // Default max. number of cached seek points for fast page access
+/*******************************************************************************
+ * Forward declarations
+ ******************************************************************************/
+int AaffOpen(void **pp_handle,
+             const char **pp_filename_arr,
+             uint64_t filename_arr_len);
+int AaffSize(void *p_handle,
+             uint64_t *p_size);
+int AaffRead(void *p_handle,
+             uint64_t seek,
+             char *p_buf,
+             uint32_t count);
+int AaffClose(void **pp_handle);
+int AaffOptionsHelp(const char **pp_help);
+int AaffOptionsParse(void *p_handle,
+                     char *p_options,
+                     char **pp_error);
+int AaffGetInfofileContent(void *p_handle,
+                           const char **pp_info_buf);
+void AaffFreeBuffer(void *p_buf);
 
-#define AAFF_CURRENTPAGE_NOTSET ULONG_LONG_MAX
+/*******************************************************************************
+ * LibXmount_Input API implementation
+ ******************************************************************************/
+/*
+ * LibXmount_Input_GetApiVersion
+ */
+uint8_t LibXmount_Input_GetApiVersion() {
+  return LIBXMOUNT_INPUT_API_VERSION;
+}
 
-#define GETMAX(a,b) ((a)>(b)?(a):(b))
-#define GETMIN(a,b) ((a)<(b)?(a):(b))
+/*
+ * LibXmount_Input_GetSupportedFormats
+ */
+const char* LibXmount_Input_GetSupportedFormats() {
+  return "aaff\0\0";
+}
 
-// -----------------
-//  AFF definitions
-// -----------------
+/*
+ * LibXmount_Input_GetFunctions
+ */
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->Open=&AaffOpen;
+  p_functions->Size=&AaffSize;
+  p_functions->Read=&AaffRead;
+  p_functions->Close=&AaffClose;
+  p_functions->OptionsHelp=&AaffOptionsHelp;
+  p_functions->OptionsParse=&AaffOptionsParse;
+  p_functions->GetInfofileContent=&AaffGetInfofileContent;
+  p_functions->FreeBuffer=&AaffFreeBuffer;
+}
 
-#define AFF_GID_LENGTH   16
-#define AFF_SEGARG_U64   2  // Used as argument for segments that contain a 64 bit unsigned in the data field
-
-#define AFF_HEADER                    "AFF10\r\n"
-#define AFF_SEGMENT_HEADER_MAGIC      "AFF"
-#define AFF_SEGMENT_FOOTER_MAGIC      "ATT"
-#define AFF_BADSECTOR_HEADER          "BAD SECTOR"
-#define AFF_FILE_TYPE                 "AFF"
-
-#define AFF_SEGNAME_BADFLAG           "badflag"
-#define AFF_SEGNAME_AFFLIB_VERSION    "afflib_version"
-#define AFF_SEGNAME_FILETYPE          "aff_file_type"
-#define AFF_SEGNAME_GID               "image_gid"
-#define AFF_SEGNAME_SECTORS           "devicesectors"
-#define AFF_SEGNAME_SECTORSIZE        "sectorsize"
-#define AFF_SEGNAME_IMAGESIZE         "imagesize"
-#define AFF_SEGNAME_PAGESIZE          "pagesize"
-#define AFF_SEGNAME_BADSECTORS        "badsectors"
-#define AFF_SEGNAME_MD5               "md5"
-#define AFF_SEGNAME_SHA256            "sha256"
-#define AFF_SEGNAME_DURATION          "acquisition_seconds"
-#define AFF_SEGNAME_PAGE              "page"
-
-#define AAFF_SEGNAME_COMMAND_LINE "acquisition_commandline"
-#define AAFF_SEGNAME_MACADDR      "acquisition_macaddr"
-#define AAFF_SEGNAME_DATE         "acquisition_date"        // Format: YYYY-MM-DD HH:MM:SS TZT
-#define AAFF_SEGNAME_DEVICE       "acquisition_device"
-#define AAFF_SEGNAME_MODEL        "device_model"
-#define AAFF_SEGNAME_SN           "device_sn"
-
-#define AFF_PAGEFLAGS_UNCOMPRESSED    0x0000
-#define AFF_PAGEFLAGS_COMPRESSED_ZLIB 0x0001
-#define AFF_PAGEFLAGS_COMPRESSED_ZERO 0x0033
-
-#define AAFF_MD5_LEN                16
-#define AAFF_SHA256_LEN             32
-#define AAFF_BADSECTORMARKER_MAXLEN 65536
-
-typedef struct
-{
-   char         Magic[4];
-   unsigned int NameLen;
-   unsigned int DataLen;
-   unsigned int Argument;          // Named "flags" in original aff source, named "arg" in afinfo output.
-   char         Name[];            //lint !e1501
-} __attribute__ ((packed)) t_AffSegmentHeader;
-typedef t_AffSegmentHeader *t_pAffSegmentHeader;
-
-// Between header and footer lie the segment name and the data
-
-typedef struct
-{
-   char         Magic[4];
-   unsigned int SegmentLen;
-} __attribute__ ((packed)) t_AffSegmentFooter;
-
-const int AaffInfoBuffLen = 1024*1024;
-
-typedef struct _t_Aaff
-{
-   char                *pFilename;
-   FILE                *pFile;
-
-   char                 *pLibVersion;  // AFF File Header info
-   char                 *pFileType;
-   unsigned int           PageSize;
-   unsigned int           SectorSize;
-   unsigned long long     Sectors;
-   unsigned long long     ImageSize;
-   unsigned long long     TotalPages;
-
-   char                *pNameBuff;     // Buffers
-   unsigned char       *pDataBuff;
-   unsigned int          NameBuffLen;
-   unsigned int          DataBuffLen;
-
-   unsigned long long    CurrentPage;
-   unsigned char       *pPageBuff;        // Length is PageSize, contains data of CurrentPage
-   unsigned int          PageBuffDataLen; // Length of current data in PageBuff (the same for all pages, but the last one might contain less data)
-
-   char                *pInfoBuff;
-   char                *pInfoBuffConst;
-
-   unsigned long long  *pPageSeekArr;
-   unsigned long long    PageSeekArrLen;
-   unsigned long long    Interleave;  // The number of pages lying between 2 entries in the PageSeekArr
-} t_Aaff;
-
-
-// ----------------
-//  Error handling
-// ----------------
-
-#ifdef AAFF_DEBUG
-   #define CHK(ChkVal)    \
-   {                                                                  \
-      int ChkValRc;                                                   \
-      if ((ChkValRc=(ChkVal)) != AAFF_OK)                             \
-      {                                                               \
-         printf ("Err %d in %s, %d\n", ChkValRc, __FILE__, __LINE__); \
-         return ChkValRc;                                             \
-      }                                                               \
-   }
-   #define DEBUG_PRINTF(pFormat, ...) \
-      printf (pFormat, ##__VA_ARGS__);
-#else
-   #define CHK(ChkVal)                      \
-   {                                        \
-      int ChkValRc;                         \
-      if ((ChkValRc=(ChkVal)) != AAFF_OK)   \
-         return ChkValRc;                   \
-   }
-   #define DEBUG_PRINTF(...)
-#endif
+/*******************************************************************************
+ * Private
+ ******************************************************************************/
 
 // ---------------------------
 //  Internal static functions
@@ -205,10 +132,10 @@ static int AaffDestroyHandle (t_pAaff *ppAaff)
    return AAFF_OK;
 }
 
-unsigned long long AaffU64 (unsigned char *pData)
+uint64_t AaffU64 (char *pData)
 {
-   unsigned long long Val=0;
-   int                i;
+   uint64_t Val=0;
+   int      i;
 
    for (i=4; i<8; i++)  Val = (Val << 8) | pData[i];
    for (i=0; i<4; i++)  Val = (Val << 8) | pData[i];
@@ -216,7 +143,7 @@ unsigned long long AaffU64 (unsigned char *pData)
    return Val;
 }
 
-static int AaffPageNumberFromSegmentName (char *pSegmentName, unsigned long long *pPageNumber)
+static int AaffPageNumberFromSegmentName (char *pSegmentName, uint64_t *pPageNumber)
 {
    char *pSegmentNamePageNumber;
    char *pTail;
@@ -229,12 +156,12 @@ static int AaffPageNumberFromSegmentName (char *pSegmentName, unsigned long long
    return AAFF_OK;
 }
 
-static inline unsigned long long AaffGetCurrentSeekPos (t_Aaff *pAaff)
+static inline uint64_t AaffGetCurrentSeekPos (t_Aaff *pAaff)
 {
    return ftello (pAaff->pFile);
 }
 
-static inline unsigned long long AaffSetCurrentSeekPos (t_Aaff *pAaff, unsigned long long Val, int Whence)
+static inline uint64_t AaffSetCurrentSeekPos (t_Aaff *pAaff, uint64_t Val, int Whence)
 {
    if (fseeko (pAaff->pFile, Val, Whence) != 0)
       return AAFF_CANNOT_SEEK;
@@ -242,7 +169,7 @@ static inline unsigned long long AaffSetCurrentSeekPos (t_Aaff *pAaff, unsigned 
 }
 
 
-static int AaffReadFile (t_Aaff *pAaff, void *pData, unsigned int DataLen)
+static int AaffReadFile (t_Aaff *pAaff, void *pData, uint32_t DataLen)
 {
    if (fread (pData, DataLen, 1, pAaff->pFile) != 1)
       return AAFF_CANNOT_READ_DATA;
@@ -250,7 +177,7 @@ static int AaffReadFile (t_Aaff *pAaff, void *pData, unsigned int DataLen)
    return AAFF_OK;
 }
 
-static int AaffRealloc (void **ppBuff, unsigned int *pCurrentLen, unsigned int NewLen)
+static int AaffRealloc (void **ppBuff, uint32_t *pCurrentLen, uint32_t NewLen)
 {
    if (NewLen > *pCurrentLen)
    {
@@ -262,7 +189,7 @@ static int AaffRealloc (void **ppBuff, unsigned int *pCurrentLen, unsigned int N
    return AAFF_OK;
 }
 
-static int AaffReadSegment (t_pAaff pAaff, char **ppName, unsigned int *pArg, unsigned char **ppData, unsigned int *pDataLen)
+static int AaffReadSegment (t_pAaff pAaff, char **ppName, uint32_t *pArg, char **ppData, uint32_t *pDataLen)
 {
    t_AffSegmentHeader Header;
    t_AffSegmentFooter Footer;
@@ -296,7 +223,7 @@ static int AaffReadSegment (t_pAaff pAaff, char **ppName, unsigned int *pArg, un
    return AAFF_OK;
 }
 
-static int AaffReadSegmentPage (t_pAaff pAaff, unsigned long long SearchPage, unsigned long long *pFoundPage, unsigned char **ppData, unsigned int *pDataLen)
+static int AaffReadSegmentPage (t_pAaff pAaff, uint64_t SearchPage, uint64_t *pFoundPage, char **ppData, uint32_t *pDataLen)
 {
    t_AffSegmentHeader Header;
    t_AffSegmentFooter Footer;
@@ -305,7 +232,7 @@ static int AaffReadSegmentPage (t_pAaff pAaff, unsigned long long SearchPage, un
 
    *ppData   = NULL;
    *pDataLen = 0;
-   sprintf (SearchPageStr, "page%llu", SearchPage);
+   sprintf (SearchPageStr, "page%" PRIu64, SearchPage);
 
    CHK (AaffReadFile (pAaff, &Header, offsetof(t_AffSegmentHeader, Name)))
    if (strcmp (&Header.Magic[0], AFF_SEGMENT_HEADER_MAGIC) != 0)
@@ -346,7 +273,7 @@ static int AaffReadSegmentPage (t_pAaff pAaff, unsigned long long SearchPage, un
             CHK (AaffRealloc ((void**)&pAaff->pDataBuff, &pAaff->DataBuffLen, Header.DataLen));
             CHK (AaffReadFile (pAaff, pAaff->pDataBuff, Header.DataLen))                     // read into pDataBuff
             ZLen = pAaff->PageSize;                                                          // size of pPageBuff
-            zrc = uncompress (pAaff->pPageBuff, &ZLen, pAaff->pDataBuff, Header.DataLen);    // uncompress into pPageBuff
+            zrc = uncompress ((unsigned char*)(pAaff->pPageBuff), &ZLen, (unsigned char*)(pAaff->pDataBuff), Header.DataLen);    // uncompress into pPageBuff
             pAaff->PageBuffDataLen = ZLen;
             if (zrc != Z_OK)
                return AAFF_UNCOMPRESS_FAILED;
@@ -373,7 +300,7 @@ static int AaffReadSegmentPage (t_pAaff pAaff, unsigned long long SearchPage, un
    return rc;
 }
 
-static int AaffReadPage (t_pAaff pAaff, unsigned long long Page, unsigned char **ppBuffer, unsigned int *pLen)
+static int AaffReadPage (t_pAaff pAaff, uint64_t Page, char **ppBuffer, uint32_t *pLen)
 {
     if (Page >= pAaff->TotalPages)
        return AAFF_READ_BEYOND_LAST_PAGE;
@@ -398,7 +325,7 @@ static int AaffReadPage (t_pAaff pAaff, unsigned long long Page, unsigned char *
    }
    else                                            // Find the closest entry in PageSeekArr
    {
-      long long Entry;
+      int64_t Entry;
 
       Entry = Page / pAaff->Interleave;
       while (pAaff->pPageSeekArr[Entry] == 0)
@@ -413,16 +340,16 @@ static int AaffReadPage (t_pAaff pAaff, unsigned long long Page, unsigned char *
 
    // Run through segment list until page is found
    // --------------------------------------------
-   unsigned long long Seek;
-   unsigned long long FoundPage;
+   uint64_t Seek;
+   uint64_t FoundPage;
    int                rc;
 
-   DEBUG_PRINTF ("\nSearching for page %llu, MaxHops=%d -- ", Page, MaxHops);
+   DEBUG_PRINTF ("\nSearching for page %" PRIu64 ", MaxHops=%d -- ", Page, MaxHops);
    while (MaxHops--)
    {
       Seek = AaffGetCurrentSeekPos (pAaff);
       rc = AaffReadSegmentPage (pAaff, Page, &FoundPage, ppBuffer, pLen);
-      DEBUG_PRINTF ("  %llu (%d)", FoundPage, rc);
+      DEBUG_PRINTF ("  %" PRIu64 " (%d)", FoundPage, rc);
       if ((FoundPage % pAaff->Interleave) == 0)
          pAaff->pPageSeekArr[FoundPage/pAaff->Interleave] = Seek;
       if (rc == AAFF_FOUND)
@@ -439,216 +366,260 @@ static int AaffReadPage (t_pAaff pAaff, unsigned long long Page, unsigned char *
 //  API functions
 // ---------------
 
-int AaffOpen (t_pAaff *ppAaff, const char *pFilename, unsigned long long MaxPageArrMem)
+/*
+ * AaffOpen
+ */
+int AaffOpen(void **pp_handle,
+             const char **pp_filename_arr,
+             uint64_t filename_arr_len)
 {
-   t_pAaff            pAaff;
-   char                Signature[strlen(AFF_HEADER)+1];
-   unsigned long long  Seek;
+  t_pAaff pAaff;
+  char Signature[strlen(AFF_HEADER)+1];
+  uint64_t Seek;
 
-   *ppAaff = NULL;
-   CHK (AaffCreateHandle (&pAaff))
+  if(filename_arr_len!=1) {
+    // Split aff files are not supported
+    // TODO: Set correct error
+    return 1;
+  }
 
-   pAaff->pFilename = strdup (pFilename);
-   pAaff->pFile = fopen (pFilename, "r");
-   if (pAaff->pFile == NULL)
-   {
-      AaffDestroyHandle (&pAaff);
-      return AAFF_FILE_OPEN_FAILED;
-   }
+  *pp_handle=NULL;
+  CHK(AaffCreateHandle(&pAaff))
 
-   // Check signature
-   // ---------------
-   CHK (AaffReadFile (pAaff, &Signature, sizeof(Signature)))
-   if (memcmp (Signature, AFF_HEADER, sizeof(Signature)) != 0)
-   {
-      (void) AaffClose (&pAaff);
-      return AAFF_INVALID_SIGNATURE;
-   }
+  pAaff->pFilename=strdup(pp_filename_arr[0]);
+  pAaff->pFile=fopen(pp_filename_arr[0],"r");
+  if(pAaff->pFile==NULL) {
+    AaffDestroyHandle(&pAaff);
+    return AAFF_FILE_OPEN_FAILED;
+  }
 
-   // Read header segments
-   // --------------------
-   char          *pName;
-   unsigned int    Arg;
-   unsigned char *pData;
-   unsigned int    DataLen;
-   const int       MAX_HEADER_SEGMENTS = 100;
-   int             Seg;
-   unsigned int    i;
-   int             wr;
-   int             Pos = 0;
-   const unsigned  HexStrLen = 32;
-   char            HexStr[HexStrLen+1];
+  // Check signature
+  // ---------------
+  CHK(AaffReadFile(pAaff,&Signature,sizeof(Signature)))
+  if(memcmp(Signature,AFF_HEADER,sizeof(Signature))!=0) {
+    (void)AaffClose((void**)&pAaff);
+    return AAFF_INVALID_SIGNATURE;
+  }
 
-   #define REM (AaffInfoBuffLen-Pos)
+  // Read header segments
+  // --------------------
+  char          *pName;
+  uint32_t        Arg;
+  char          *pData;
+  uint32_t        DataLen;
+  const int       MAX_HEADER_SEGMENTS = 100;
+  int             Seg;
+  unsigned int    i;
+  int             wr;
+  int             Pos = 0;
+  const unsigned  HexStrLen = 32;
+  char            HexStr[HexStrLen+1];
 
-   pAaff->pInfoBuffConst = malloc (AaffInfoBuffLen);
-   pAaff->pInfoBuff      = malloc (AaffInfoBuffLen*2);
-   for (Seg=0; Seg<MAX_HEADER_SEGMENTS; Seg++)   // Search for known segments at the image start
-   {
-      Seek = AaffGetCurrentSeekPos (pAaff);
-      CHK (AaffReadSegment (pAaff, &pName, &Arg, &pData, &DataLen))
+  #define REM (AaffInfoBuffLen-Pos)
 
-      if       (strcmp  (pName, AFF_SEGNAME_PAGESIZE      ) == 0) pAaff->PageSize    = Arg;
-      else if  (strcmp  (pName, AFF_SEGNAME_SECTORSIZE    ) == 0) pAaff->SectorSize  = Arg;
-      else if  (strcmp  (pName, AFF_SEGNAME_SECTORS       ) == 0) pAaff->Sectors     = AaffU64 (pData);
-      else if  (strcmp  (pName, AFF_SEGNAME_IMAGESIZE     ) == 0) pAaff->ImageSize   = AaffU64 (pData);
-      else if  (strcmp  (pName, AFF_SEGNAME_AFFLIB_VERSION) == 0) pAaff->pLibVersion = strdup  ((char*)pData);
-      else if  (strcmp  (pName, AFF_SEGNAME_FILETYPE      ) == 0) pAaff->pFileType   = strdup  ((char*)pData);
-      else if ((strcmp  (pName, AFF_SEGNAME_GID           ) == 0) ||
-               (strcmp  (pName, AFF_SEGNAME_BADFLAG       ) == 0))
-      {
-         wr=0;
-         for (i=0; i<GETMIN(DataLen,HexStrLen/2); i++)
-            wr += sprintf (&HexStr[wr], "%02X", pData[i]);
-         HexStr[i] = '\0';
-         Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"%-25s %s", pName, HexStr);
-         if (i<DataLen)
-            Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"...");
-         Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"\n");
-      }
-      else if  (strncmp (pName, AFF_SEGNAME_PAGE, strlen(AFF_SEGNAME_PAGE)) == 0) break;
-      else
-      {
-         if ((Arg == 0) && DataLen)
-            Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"%-25s %s\n", pName, pData);
-      }
-   }
-   #undef REM
+  pAaff->pInfoBuffConst = malloc (AaffInfoBuffLen);
+  pAaff->pInfoBuff      = malloc (AaffInfoBuffLen*2);
+  // Search for known segments at the image start
+  for (Seg=0; Seg<MAX_HEADER_SEGMENTS; Seg++) {
+    Seek = AaffGetCurrentSeekPos (pAaff);
+    CHK (AaffReadSegment (pAaff, &pName, &Arg, &pData, &DataLen))
 
-   if (Seg >= MAX_HEADER_SEGMENTS)
-   {
-      (void) AaffClose (&pAaff);
-      return AAFF_TOO_MANY_HEADER_SEGEMENTS;
-   }
+    if(strcmp(pName,AFF_SEGNAME_PAGESIZE)==0) {
+      pAaff->PageSize=Arg;
+    } else if(strcmp(pName,AFF_SEGNAME_SECTORSIZE)==0) {
+      pAaff->SectorSize=Arg;
+    } else if(strcmp(pName,AFF_SEGNAME_SECTORS)==0) {
+      pAaff->Sectors=AaffU64(pData);
+    } else if(strcmp(pName,AFF_SEGNAME_IMAGESIZE)==0) {
+      pAaff->ImageSize=AaffU64(pData);
+    } else if(strcmp(pName,AFF_SEGNAME_AFFLIB_VERSION)==0) {
+      pAaff->pLibVersion=strdup((char*)pData);
+    } else if(strcmp(pName,AFF_SEGNAME_FILETYPE)==0) {
+      pAaff->pFileType=strdup((char*)pData);
+    } else if((strcmp(pName,AFF_SEGNAME_GID)==0) ||
+              (strcmp(pName, AFF_SEGNAME_BADFLAG)==0))
+    {
+      wr=0;
+      for (i=0; i<GETMIN(DataLen,HexStrLen/2); i++)
+        wr += sprintf (&HexStr[wr], "%02X", pData[i]);
+      HexStr[i] = '\0';
+      Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"%-25s %s", pName, HexStr);
+      if (i<DataLen) Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"...");
+      Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"\n");
+    } else if(strncmp(pName,AFF_SEGNAME_PAGE,strlen(AFF_SEGNAME_PAGE))==0) {
+      break;
+    } else {
+      if ((Arg == 0) && DataLen)
+      Pos += snprintf (&(pAaff->pInfoBuffConst[Pos]), REM,"%-25s %s\n", pName, pData);
+    }
+  }
+  #undef REM
 
-   if (strstr (pAaff->pLibVersion, "Guymager") == NULL)
-   {
-      (void) AaffClose (&pAaff);
-      return AAFF_NOT_CREATED_BY_GUYMAGER;
-   }
+  if (Seg >= MAX_HEADER_SEGMENTS) {
+    (void) AaffClose ((void**)&pAaff);
+    return AAFF_TOO_MANY_HEADER_SEGEMENTS;
+  }
 
-   // Prepare page seek array
-   // -----------------------
-   unsigned long long MaxEntries;
-   int                ArrBytes;
+  if (strstr (pAaff->pLibVersion, "Guymager") == NULL) {
+    (void) AaffClose ((void**)&pAaff);
+    return AAFF_NOT_CREATED_BY_GUYMAGER;
+  }
 
-   pAaff->TotalPages = pAaff->ImageSize / pAaff->PageSize;
-   if (pAaff->ImageSize % pAaff->PageSize)
-      pAaff->TotalPages++;
+  // Prepare page seek array
+  // -----------------------
+  uint64_t MaxEntries;
+  int      ArrBytes;
 
-   if (MaxPageArrMem)
-        MaxEntries = (MaxPageArrMem / sizeof (unsigned long long *)) + 1;  // +1 in order not to risk a result of 0
-   else MaxEntries = AAFF_DEFAULT_PAGE_SEEK_MAX_ENTRIES;
+  pAaff->TotalPages = pAaff->ImageSize / pAaff->PageSize;
+  if (pAaff->ImageSize % pAaff->PageSize) pAaff->TotalPages++;
 
-   MaxEntries = GETMIN (MaxEntries, pAaff->TotalPages);
-   pAaff->Interleave = pAaff->TotalPages / MaxEntries;
-   if (pAaff->TotalPages % MaxEntries)
-      pAaff->Interleave++;
+  // TODO: MaxPageArrMem was a uint64_t parameter of this function
+  MaxEntries = AAFF_DEFAULT_PAGE_SEEK_MAX_ENTRIES;
+/*
+  if (MaxPageArrMem) {
+    // +1 in order not to risk a result of 0
+    MaxEntries = (MaxPageArrMem / sizeof (unsigned long long *)) + 1;
+  } else MaxEntries = AAFF_DEFAULT_PAGE_SEEK_MAX_ENTRIES;
+*/
 
-   pAaff->PageSeekArrLen = pAaff->TotalPages / pAaff->Interleave;
-   ArrBytes = pAaff->PageSeekArrLen * sizeof(unsigned long long *);
-   pAaff->pPageSeekArr = (unsigned long long *)malloc (ArrBytes);
-   memset (pAaff->pPageSeekArr, 0, ArrBytes);
-   CHK (AaffPageNumberFromSegmentName (pName, &pAaff->CurrentPage));
-   if (pAaff->CurrentPage != 0)
-   {
-      (void) AaffClose (&pAaff);
-      return AAFF_UNEXPECTED_PAGE_NUMBER;
-   }
-   pAaff->pPageSeekArr[0] = Seek;
+  MaxEntries = GETMIN (MaxEntries, pAaff->TotalPages);
+  pAaff->Interleave = pAaff->TotalPages / MaxEntries;
+  if (pAaff->TotalPages % MaxEntries) pAaff->Interleave++;
 
-   // Alloc Buffers
-   // -------------
-   pAaff->pPageBuff   = malloc (pAaff->PageSize);
-   pAaff->CurrentPage = AAFF_CURRENTPAGE_NOTSET;
+  pAaff->PageSeekArrLen = pAaff->TotalPages / pAaff->Interleave;
+  ArrBytes = pAaff->PageSeekArrLen * sizeof(uint64_t *);
+  pAaff->pPageSeekArr = (uint64_t*)malloc (ArrBytes);
+  memset (pAaff->pPageSeekArr, 0, ArrBytes);
+  CHK (AaffPageNumberFromSegmentName (pName, &pAaff->CurrentPage));
+  if (pAaff->CurrentPage != 0)
+  {
+    (void) AaffClose ((void**)&pAaff);
+    return AAFF_UNEXPECTED_PAGE_NUMBER;
+  }
+  pAaff->pPageSeekArr[0] = Seek;
 
-   *ppAaff = pAaff;
+  // Alloc Buffers
+  // -------------
+  pAaff->pPageBuff   = malloc (pAaff->PageSize);
+  pAaff->CurrentPage = AAFF_CURRENTPAGE_NOTSET;
 
-   return AAFF_OK;
+  *pp_handle=(void*)pAaff;
+
+  return AAFF_OK;
 }
 
-int AaffClose (t_pAaff *ppAaff)
-{
-   int rc = AAFF_OK;
+/*
+ * AaffClose
+ */
+int AaffClose(void **pp_handle) {
+  int rc=AAFF_OK;
 
-   if (fclose ((*ppAaff)->pFile))
-      rc = AAFF_CANNOT_CLOSE_FILE;
+  if(fclose((*(t_pAaff*)pp_handle)->pFile)) rc=AAFF_CANNOT_CLOSE_FILE;
+  CHK(AaffDestroyHandle((t_pAaff*)pp_handle))
 
-   CHK (AaffDestroyHandle (ppAaff))
-
-   return rc;
+  return rc;
 }
 
-int AaffInfo (t_pAaff pAaff, char **ppInfoBuff)
-{
-   unsigned long long i;
-   unsigned long long Entries = 0;
-   int                Pos     = 0;
+/*
+ * AaffGetInfofileContent
+ */
+int AaffGetInfofileContent(void *p_handle, const char **pp_info_buf) {
+   uint64_t i;
+   uint64_t Entries = 0;
+   int      Pos     = 0;
    #define REM (AaffInfoBuffLen-Pos)
 
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM,   "AFF IMAGE INFORMATION");
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\n---------------------");
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nAFF file    %s"  , pAaff->pFilename  );
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM,   "AFF IMAGE INFORMATION");
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n---------------------");
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nAFF file    %s"  , ((t_pAaff)p_handle)->pFilename  );
 
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nPage size   %u"  , pAaff->PageSize   );
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nSector size %d"  , pAaff->SectorSize );
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nSectors     %llu", pAaff->Sectors    );
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nImage size  %llu (%0.1f GiB)", pAaff->ImageSize, pAaff->ImageSize/(1024.0*1024.0*1024.0));
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nTotal pages %llu", pAaff->TotalPages );
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\n");
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\n%s", pAaff->pInfoBuffConst);
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\n");
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nCurrent page       ");
-   if (pAaff->CurrentPage == AAFF_CURRENTPAGE_NOTSET)
-        Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "not set");
-   else Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "%llu", pAaff->CurrentPage);
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nSeek array length  %llu", pAaff->PageSeekArrLen);
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nSeek interleave    %llu", pAaff->Interleave);
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nPage size   %u"  , ((t_pAaff)p_handle)->PageSize   );
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nSector size %d"  , ((t_pAaff)p_handle)->SectorSize );
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nSectors     %" PRIu64, ((t_pAaff)p_handle)->Sectors    );
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nImage size  %" PRIu64 " (%0.1f GiB)", ((t_pAaff)p_handle)->ImageSize, ((t_pAaff)p_handle)->ImageSize/(1024.0*1024.0*1024.0));
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nTotal pages %" PRIu64, ((t_pAaff)p_handle)->TotalPages );
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n");
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n%s", ((t_pAaff)p_handle)->pInfoBuffConst);
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n");
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nCurrent page       ");
+   if (((t_pAaff)p_handle)->CurrentPage == AAFF_CURRENTPAGE_NOTSET)
+        Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "not set");
+   else Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "%" PRIu64, ((t_pAaff)p_handle)->CurrentPage);
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nSeek array length  %" PRIu64, ((t_pAaff)p_handle)->PageSeekArrLen);
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nSeek interleave    %" PRIu64, ((t_pAaff)p_handle)->Interleave);
 
-   for (i=0; i<pAaff->PageSeekArrLen; i++)
-      if (pAaff->pPageSeekArr[i])
+   for (i=0; i<((t_pAaff)p_handle)->PageSeekArrLen; i++)
+      if (((t_pAaff)p_handle)->pPageSeekArr[i])
          Entries++;
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\nSeek array entries %llu", Entries);
-   Pos += snprintf (&pAaff->pInfoBuff[Pos], REM, "\n");
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\nSeek array entries %" PRIu64, Entries);
+   Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n");
    #undef REM
 
-   *ppInfoBuff = pAaff->pInfoBuff;
+   *pp_info_buf = ((t_pAaff)p_handle)->pInfoBuff;
 
    return AAFF_OK;
 }
 
-int AaffSize (t_pAaff pAaff, unsigned long long *pSize)
-{
-   *pSize = pAaff->ImageSize;
-   return AAFF_OK;
+/*
+ * AaffSize
+ */
+int AaffSize(void *p_handle, uint64_t *p_size) {
+  *p_size=((t_pAaff)p_handle)->ImageSize;
+  return AAFF_OK;
 }
 
-int AaffRead (t_pAaff pAaff, unsigned long long Seek, unsigned char *pBuffer, unsigned int Count)
+/*
+ * AaffRead
+ */
+int AaffRead(void *p_handle,
+             uint64_t seek,
+             char *p_buf,
+             uint32_t count)
 {
-   unsigned long long   Page;
-   unsigned char      *pPageBuffer;
-   unsigned int         PageLen;
-   unsigned int         Ofs;
-   unsigned int         ToCopy;
+  uint64_t page;
+  char *p_page_buffer;
+  uint32_t page_len, ofs, to_copy;
 
-   if ((Seek+Count) > pAaff->ImageSize)
-      return AAFF_READ_BEYOND_IMAGE_LENGTH;
+  if((seek+count)>((t_pAaff)p_handle)->ImageSize) {
+    return AAFF_READ_BEYOND_IMAGE_LENGTH;
+  }
 
-   Page = Seek / pAaff->PageSize;
-   Ofs  = Seek % pAaff->PageSize;
+  page=seek/((t_pAaff)p_handle)->PageSize;
+  ofs=seek%((t_pAaff)p_handle)->PageSize;
 
-   while (Count)
-   {
-      CHK (AaffReadPage (pAaff, Page, &pPageBuffer, &PageLen))
-      ToCopy = GETMIN (PageLen-Ofs, Count);
-      memcpy (pBuffer, pPageBuffer+Ofs, ToCopy);
-      Count   -= ToCopy;
-      pBuffer += ToCopy;
-      Ofs      = 0;
-      Page++;
-   }
+  while(count) {
+    CHK(AaffReadPage((t_pAaff)p_handle,page,&p_page_buffer,&page_len))
+    to_copy=GETMIN(page_len-ofs,count);
+    memcpy(p_buf,p_page_buffer+ofs,to_copy);
+    count-=to_copy;
+    p_buf+=to_copy;
+    ofs=0;
+    page++;
+  }
 
-   return AAFF_OK;
+  return AAFF_OK;
+}
+
+/*
+ * AaffOptionsHelp
+ */
+int AaffOptionsHelp(const char **pp_help) {
+  *pp_help=NULL;
+  return AAFF_OK;
+}
+
+/*
+ * AaffOptionsParse
+ */
+int AaffOptionsParse(void *p_handle, char *p_options, char **pp_error) {
+  return AAFF_OK;
+}
+
+/*
+ * AaffFreeBuffer
+ */
+void AaffFreeBuffer(void *p_buf) {
+  free(p_buf);
 }
 
 // -----------------------------------------------------
@@ -660,13 +631,13 @@ int AaffRead (t_pAaff pAaff, unsigned long long Seek, unsigned char *pBuffer, un
 
 int main(int argc, char *argv[])
 {
-   t_pAaff             pAaff;
-   char               *pInfoBuff;
-   unsigned long long   Remaining;
-   unsigned long long   CurrentPos=0;
-   int                  rc;
-   int                  Percent;
-   int                  PercentOld;
+   t_pAaff   pAaff;
+   char     *pInfoBuff;
+   uint64_t   Remaining;
+   uint64_t   CurrentPos=0;
+   int        rc;
+   int        Percent;
+   int        PercentOld;
 
    setbuf (stdout, NULL);
    setbuf (stderr, NULL);
@@ -680,7 +651,7 @@ int main(int argc, char *argv[])
    }
 
 //   rc = AaffOpen (&pAaff, argv[1], 1024); // weird seek array size for testing
-   rc = AaffOpen (&pAaff, argv[1], 0);
+   rc = AaffOpen (&pAaff, argv[1], 1);
    if (rc)
    {
       printf ("Error %d while opening file %s\n", rc, argv[1]);
@@ -739,3 +710,4 @@ int main(int argc, char *argv[])
 }
 
 #endif
+
