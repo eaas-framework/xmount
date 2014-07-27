@@ -46,7 +46,7 @@ int EwfSize(void *p_handle,
             uint64_t *p_size);
 int EwfRead(void *p_handle,
             uint64_t seek,
-            unsigned char *p_buf,
+            char *p_buf,
             uint32_t count);
 int EwfClose(void **pp_handle);
 int EwfOptionsHelp(const char **pp_help);
@@ -63,14 +63,15 @@ void EwfFreeBuffer(void *p_buf);
 /*
  * LibXmount_Input_GetApiVersion
  */
-void LibXmount_Input_GetApiVersion(uint8_t *p_ver) {
-  *p_ver=LIBXMOUNT_INPUT_API_VERSION;
+uint8_t LibXmount_Input_GetApiVersion() {
+  return LIBXMOUNT_INPUT_API_VERSION;
 }
 
 /*
  * LibXmount_Input_GetSupportedFormats
  */
-void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len) {
+const char* LibXmount_Input_GetSupportedFormats() {
+/*
   // Alloc array containing 1 element with content "ewf"
   *ppp_arr=(char**)malloc(sizeof(char*));
   if(*ppp_arr==NULL) {
@@ -86,24 +87,22 @@ void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len) {
   }
   strcpy(**ppp_arr,"ewf");
   *p_arr_len=1;
+*/
+  return "ewf\0\0";
 }
 
 /*
  * LibXmount_Input_GetFunctions
  */
-void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions **pp_functions) {
-  *pp_functions=
-    (pts_LibXmountInputFunctions)malloc(sizeof(ts_LibXmountInputFunctions));
-  if(*pp_functions==NULL) return;
-
-  (*pp_functions)->Open=&EwfOpen;
-  (*pp_functions)->Size=&EwfSize;
-  (*pp_functions)->Read=&EwfRead;
-  (*pp_functions)->Close=&EwfClose;
-  (*pp_functions)->OptionsHelp=&EwfOptionsHelp;
-  (*pp_functions)->OptionsParse=&EwfOptionsParse;
-  (*pp_functions)->GetInfofileContent=&EwfGetInfofileContent;
-  (*pp_functions)->FreeBuffer=&EwfFreeBuffer;
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->Open=&EwfOpen;
+  p_functions->Size=&EwfSize;
+  p_functions->Read=&EwfRead;
+  p_functions->Close=&EwfClose;
+  p_functions->OptionsHelp=&EwfOptionsHelp;
+  p_functions->OptionsParse=&EwfOptionsParse;
+  p_functions->GetInfofileContent=&EwfGetInfofileContent;
+  p_functions->FreeBuffer=&EwfFreeBuffer;
 }
 
 /*******************************************************************************
@@ -160,7 +159,7 @@ int EwfSize(void *p_handle, uint64_t *p_size) {
  */
 int EwfRead(void *p_handle,
             uint64_t offset,
-            unsigned char *p_buf,
+            char *p_buf,
             uint32_t count)
 {
   if(libewf_handle_seek_offset((libewf_handle_t*)p_handle,

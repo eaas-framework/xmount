@@ -58,7 +58,7 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*Read)(void *p_handle,
               uint64_t offset,
-              unsigned char *p_buf,
+              char *p_buf,
               uint32_t count);
   /*!
    * Function to close an opened input image
@@ -107,21 +107,26 @@ typedef struct s_LibXmountInputFunctions {
 /*!
  * \param p_ver Supported version
  */
-void LibXmount_Input_GetApiVersion(uint8_t *p_ver);
+uint8_t LibXmount_Input_GetApiVersion();
+typedef uint8_t (*t_LibXmount_Input_GetApiVersion)();
+
 //! Get a list of supported formats
 /*!
  * Gets a list of supported input image formats. These are the strings
  * specified with xmount's --in <string> command line option.
  *
  * \param ppp_arr Array containing supported format strings
- * \param p_arr_len Length of pp_arr
+ * \return Length of ppp_arr
  */
-void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len);
+const char* LibXmount_Input_GetSupportedFormats();
+typedef const char* (*t_LibXmount_Input_GetSupportedFormats)();
+
 //! Get the lib's s_LibXmountInputFunctions structure
 /*!
  * \param pp_functions Functions
  */
-void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions **pp_functions);
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions);
+typedef void (*t_LibXmount_Input_GetFunctions)(ts_LibXmountInputFunctions*);
 
 #endif // LIBXMOUNT_INPUT_H
 

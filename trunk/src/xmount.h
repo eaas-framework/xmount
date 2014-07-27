@@ -24,6 +24,8 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
+#include "../libxmount_input/libxmount_input.h"
+
 #undef FALSE
 #undef TRUE
 #define FALSE 0
@@ -45,29 +47,43 @@
 /*
  * Virtual image types
  */
-typedef enum TVirtImageType {
+typedef enum e_VirtImageType {
   /** Virtual image is a DD file */
-  TVirtImageType_DD,
+  VirtImageType_DD,
   /** Virtual image is a DMG file */
-  TVirtImageType_DMG,
+  VirtImageType_DMG,
   /** Virtual image is a VDI file */
-  TVirtImageType_VDI,
+  VirtImageType_VDI,
   /** Virtual image is a VMDK file (IDE bus)*/
-  TVirtImageType_VMDK,
+  VirtImageType_VMDK,
   /** Virtual image is a VMDK file (SCSI bus)*/
-  TVirtImageType_VMDKS,
+  VirtImageType_VMDKS,
   /** Virtual image is a VHD file*/
-  TVirtImageType_VHD
-} TVirtImageType;
+  VirtImageType_VHD
+} te_VirtImageType;
+
+/*
+ * Infos about input libs
+ */
+typedef struct s_InputLib {
+  // Filename of lib
+  char *p_name;
+  // Handle to the loaded lib
+  void *p_lib;
+  // Array of supported input types
+  char *p_supported_input_types;
+  // Struct containing lib functions
+  ts_LibXmountInputFunctions lib_functions;
+} ts_InputLib, *pts_InputLib;
 
 /*
  * Various xmount runtime options
  */
-typedef struct TXMountConfData {
+typedef struct s_XmountConfData {
   /** Input image type */
   char *p_orig_image_type;
   /** Virtual image type */
-  TVirtImageType VirtImageType;
+  te_VirtImageType VirtImageType;
   /** Enable debug output */
   uint32_t Debug;
   /** Path of virtual image file */
@@ -93,20 +109,20 @@ typedef struct TXMountConfData {
   uint64_t orig_img_offset;
   /** lib params */
   char *p_lib_params;
-} TXMountConfData;
+} ts_XmountConfData;
 
 /*
  * VDI Binary File Header structure
  */
 #define VDI_FILE_COMMENT "<<< This is a virtual VDI image >>>"
 #define VDI_HEADER_COMMENT "This VDI was emulated using xmount v" \
-                           PACKAGE_VERSION
+                           XMOUNT_VERSION
 #define VDI_IMAGE_SIGNATURE 0xBEDA107F // 1:1 copy from hp
 #define VDI_IMAGE_VERSION 0x00010001 // Vers 1.1
 #define VDI_IMAGE_TYPE_FIXED 0x00000002 // Type 2 (fixed size)
 #define VDI_IMAGE_FLAGS 0
 #define VDI_IMAGE_BLOCK_SIZE (1024*1024) // 1 Megabyte
-typedef struct TVdiFileHeader {
+typedef struct s_VdiFileHeader {
 // ----- VDIPREHEADER ------
   /** Just text info about image type, for eyes only. */
   char szFileInfo[64];
@@ -172,7 +188,7 @@ typedef struct TVdiFileHeader {
   uint64_t padding4;
   uint64_t padding5;
   uint64_t padding6;
-} __attribute__ ((packed)) TVdiFileHeader, *pTVdiFileHeader;
+} __attribute__ ((packed)) ts_VdiFileHeader, *pts_VdiFileHeader;
 
 //    /** The way the UUID is declared by the DCE specification. */
 //    struct
@@ -215,7 +231,7 @@ typedef struct TVdiFileHeader {
 #define VHD_IMAGE_HVAL_DISK_TYPE 0x02000000
 // Seconds from January 1st, 1970 to January 1st, 2000
 #define VHD_IMAGE_TIME_CONVERSION_OFFSET 0x386D97E0
-typedef struct TVhdFileHeader {
+typedef struct s_VhdFileHeader {
   uint64_t cookie;
   uint32_t features;
   uint32_t file_format_version;
@@ -235,7 +251,7 @@ typedef struct TVhdFileHeader {
   uint64_t uuid_h;
   uint8_t saved_state;
   char Reserved[427];
-} __attribute__ ((packed)) TVhdFileHeader, *pTVhdFileHeader;
+} __attribute__ ((packed)) ts_VhdFileHeader, *pts_VhdFileHeader;
 
 /*
  * Cache file block index array element
@@ -245,12 +261,12 @@ typedef struct TVhdFileHeader {
 #else
   #define CACHE_BLOCK_FREE 0xFFFFFFFFFFFFFFFFLL 
 #endif
-typedef struct TCacheFileBlockIndex {
+typedef struct s_CacheFileBlockIndex {
   /** Set to 1 if block is assigned (This block has data in cache file) */
   uint32_t Assigned;
   /** Offset to data in cache file */
   uint64_t off_data;
-} __attribute__ ((packed)) TCacheFileBlockIndex, *pTCacheFileBlockIndex;
+} __attribute__ ((packed)) ts_CacheFileBlockIndex, *pts_CacheFileBlockIndex;
 
 /*
  * Cache file header structures
@@ -266,7 +282,7 @@ typedef struct TCacheFileBlockIndex {
                                    // "unique" hash for every input image
                                    // (10MByte)
 // Current header
-typedef struct TCacheFileHeader {
+typedef struct s_CacheFileHeader {
   /** Simple signature to identify cache files */
   uint64_t FileSignature;
   /** Cache file version */
@@ -295,10 +311,10 @@ typedef struct TCacheFileHeader {
   
   /** Padding until offset 512 to ease further additions */
   char HeaderPadding[432];
-} __attribute__ ((packed)) TCacheFileHeader, *pTCacheFileHeader;
+} __attribute__ ((packed)) ts_CacheFileHeader, *pts_CacheFileHeader;
 
 // Old v1 header
-typedef struct TCacheFileHeader_v1 {
+typedef struct s_CacheFileHeader_v1 {
   /** Simple signature to identify cache files */
   uint64_t FileSignature;
   /** Cache file version */
@@ -312,7 +328,7 @@ typedef struct TCacheFileHeader_v1 {
   /** Offset to cached VDI file header */
   uint64_t pVdiFileHeader;
   /** Set to 1 if VMDK file is cached */
-} TCacheFileHeader_v1, *pTCacheFileHeader_v1;
+} ts_CacheFileHeader_v1, *pts_CacheFileHeader_v1;
 
 /*
  * Macros to ease debugging and error reporting
@@ -322,7 +338,7 @@ typedef struct TCacheFileHeader_v1 {
 #define LOG_WARNING(...) \
   LogMessage("WARNING",(char*)__FUNCTION__,__LINE__,__VA_ARGS__);
 #define LOG_DEBUG(...) { \
-  if(XMountConfData.Debug) \
+  if(glob_xmount_cfg.Debug) \
     LogMessage("DEBUG",(char*)__FUNCTION__,__LINE__,__VA_ARGS__); \
 }
 
@@ -488,7 +504,7 @@ typedef struct TCacheFileHeader_v1 {
             * Added TOrigImageType enum to identify input image type.
             * Added TMountimgConfData struct to hold various mountimg runtime
               options.
-            * Renamed VDIFILEHEADER to TVdiFileHeader.
+            * Renamed VDIFILEHEADER to ts_VdiFileHeader.
   20090228: * Added LOG_ERROR and LOG_DEBUG macros
             * Added defines for various static VDI header values
             * Added defines for TRUE and FALSE
@@ -496,7 +512,7 @@ typedef struct TCacheFileHeader_v1 {
             * Added VdiFileHeaderCached and pVdiFileHeader values to be able to
               cache the VDI file header separatly.
   20090519: * Added new cache file header structure and moved old one to
-              TCacheFileHeader_v1.
+              ts_CacheFileHeader_v1.
             * New cache file structure includes VmdkFileCached and pVmdkFile to
               cache virtual VMDK file and makes room for further additions so
               current cache file version 2 cache files can be easily converted
@@ -508,6 +524,6 @@ typedef struct TCacheFileHeader_v1 {
               different sizes on i386 and amd64.
   20111109: * Added TVirtImageType_DMG type.
   20120130: * Added LOG_WARNING macro.
-  20120507: * Added TVhdFileHeader structure.
+  20120507: * Added ts_VhdFileHeader structure.
   20120511: * Added endianess conversation macros
 */
