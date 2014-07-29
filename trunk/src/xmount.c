@@ -652,9 +652,9 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
  * Returns:
  *   "TRUE" on success, "FALSE" on error
  */
-static int GetVirtImageSize(uint64_t *size) {
+static int GetVirtImageSize(uint64_t *p_size) {
   if(glob_xmount_cfg.VirtImageSize!=0) {
-    *size=glob_xmount_cfg.VirtImageSize;
+    *p_size=glob_xmount_cfg.VirtImageSize;
     return TRUE;
   }
 
@@ -665,7 +665,7 @@ static int GetVirtImageSize(uint64_t *size) {
     case VirtImageType_VMDKS:
       // Virtual image is a DD, DMG or VMDK file. Just return the size of the
       // original image
-      if(!GetOrigImageSize(size,FALSE)) {
+      if(!GetOrigImageSize(p_size,FALSE)) {
         LOG_ERROR("Couldn't get size of input image!\n")
         return FALSE;
       }
@@ -673,11 +673,11 @@ static int GetVirtImageSize(uint64_t *size) {
     case VirtImageType_VDI:
       // Virtual image is a VDI file. Get size of original image and add size
       // of VDI header etc.
-      if(!GetOrigImageSize(size,FALSE)) {
+      if(!GetOrigImageSize(p_size,FALSE)) {
         LOG_ERROR("Couldn't get size of input image!\n")
         return FALSE;
       }
-      (*size)+=(sizeof(ts_VdiFileHeader)+glob_p_vdi_block_map_size);
+      (*p_size)+=(sizeof(ts_VdiFileHeader)+glob_p_vdi_block_map_size);
       break;
     case VirtImageType_VHD:
       // Virtual image is a VHD file. Get size of original image and add size
@@ -686,13 +686,14 @@ static int GetVirtImageSize(uint64_t *size) {
         LOG_ERROR("Couldn't get size of input image!\n")
         return FALSE;
       }
-      (*size)+=sizeof(ts_VhdFileHeader);
+      (*p_size)+=sizeof(ts_VhdFileHeader);
       break;
     default:
       LOG_ERROR("Unsupported image type!\n")
       return FALSE;
   }
-  glob_xmount_cfg.VirtImageSize=*size;
+
+  glob_xmount_cfg.VirtImageSize=*p_size;
   return TRUE;
 }
 
@@ -2863,8 +2864,6 @@ int main(int argc, char *argv[])
   glob_xmount_cfg.VirtImageType=VirtImageType_DMG;
 #endif
   glob_xmount_cfg.Debug=FALSE;
-// TODO: Remove
-  glob_xmount_cfg.Debug=TRUE;
   glob_xmount_cfg.pVirtualImagePath=NULL;
   glob_xmount_cfg.pVirtualVmdkPath=NULL;
   glob_xmount_cfg.pVirtualImageInfoPath=NULL;
@@ -3279,6 +3278,9 @@ int main(int argc, char *argv[])
             * Added libaaff to replace libaff (thx to Guy Voncken).
             * Added libdd to replace raw dd input file handling and finally
               support split dd files (thx to Guy Voncken).
-  20140311: v0.7.0 released
-            * Added libaewf (thx to Guy Voncken).
+  20140311: * Added libaewf (thx to Guy Voncken).
+  20140726: * Added support for dynamically loading of input libs.
+            * Moved input image functions to their corresponding lib.
+            * Prepended "glob_" to all global vars for better identification.
+            
 */
