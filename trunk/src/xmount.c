@@ -94,29 +94,29 @@ static pthread_mutex_t glob_mutex_info_read;
  *   Print error and debug messages to stdout
  *
  * Params:
- *  pMessageType: "ERROR" or "DEBUG"
- *  pCallingFunction: Name of calling function
+ *  p_msg_type: "ERROR" or "DEBUG"
+ *  p_calling_fun: Name of calling function
  *  line: Line number of call
- *  pMessage: Message string
+ *  p_msg: Message string
  *  ...: Variable params with values to include in message string
  *
  * Returns:
  *   n/a
  */
-static void LogMessage(char *pMessageType,
-                       char *pCallingFunction,
+static void LogMessage(char *p_msg_type,
+                       char *p_calling_fun,
                        int line,
-                       char *pMessage,
+                       char *p_msg,
                        ...)
 {
-  va_list VaList;
+  va_list var_list;
 
   // Print message "header"
-  printf("%s: %s.%s@%u : ",pMessageType,pCallingFunction,XMOUNT_VERSION,line);
+  printf("%s: %s.%s@%u : ",p_msg_type,p_calling_fun,XMOUNT_VERSION,line);
   // Print message with variable parameters
-  va_start(VaList,pMessage);
-  vprintf(pMessage,VaList);
-  va_end(VaList);
+  va_start(var_list,p_msg);
+  vprintf(p_msg,var_list);
+  va_end(var_list);
 }
 
 /*
@@ -124,21 +124,21 @@ static void LogMessage(char *pMessageType,
  *   Print warning messages to stdout
  *
  * Params:
- *  pMessage: Message string
+ *  p_msg: Message string
  *  ...: Variable params with values to include in message string
  *
  * Returns:
  *   n/a
  */
-static void LogWarnMessage(char *pMessage,...) {
-  va_list VaList;
+static void LogWarnMessage(char *p_msg,...) {
+  va_list var_list;
 
   // Print message "header"
   printf("WARNING: ");
   // Print message with variable parameters
-  va_start(VaList,pMessage);
-  vprintf(pMessage,VaList);
-  va_end(VaList);
+  va_start(var_list,p_msg);
+  vprintf(p_msg,var_list);
+  va_end(var_list);
 }
 
 /*
@@ -146,19 +146,19 @@ static void LogWarnMessage(char *pMessage,...) {
  *   Print usage instructions (cmdline options etc..)
  *
  * Params:
- *   pProgramName: Program name (argv[0])
+ *   p_prog_name: Program name (argv[0])
  *
  * Returns:
  *   n/a
  */
-static void PrintUsage(char *pProgramName) {
+static void PrintUsage(char *p_prog_name) {
   char *p_buf;
   int first=1;
 
   printf("\nxmount v%s copyright (c) 2008-2014 by Gillen Daniel "
          "<gillen.dan@pinguin.lu>\n",XMOUNT_VERSION);
   printf("\nUsage:\n");
-  printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",pProgramName);
+  printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",p_prog_name);
   printf("Options:\n");
   printf("  fopts:\n");
   printf("    -d : Enable FUSE's and xmount's debug mode.\n");
@@ -516,20 +516,20 @@ static int ParseCmdLine(const int argc,
  *   Extract virtual file name from input image name
  *
  * Params:
- *   pOrigName: Name of input image (Can include a path)
+ *   p_orig_name: Name of input image (Can include a path)
  *
  * Returns:
  *   "TRUE" on success, "FALSE" on error
  */
-static int ExtractVirtFileNames(char *pOrigName) {
+static int ExtractVirtFileNames(char *p_orig_name) {
   char *tmp;
 
   // Truncate any leading path
-  tmp=strrchr(pOrigName,'/');
-  if(tmp!=NULL) pOrigName=tmp+1;
+  tmp=strrchr(p_orig_name,'/');
+  if(tmp!=NULL) p_orig_name=tmp+1;
 
   // Extract file extension
-  tmp=strrchr(pOrigName,'.');
+  tmp=strrchr(p_orig_name,'.');
 
   // Set leading '/'
   XMOUNT_STRSET(glob_xmount_cfg.pVirtualImagePath,"/")
@@ -543,24 +543,24 @@ static int ExtractVirtFileNames(char *pOrigName) {
   // Copy filename
   if(tmp==NULL) {
     // Input image filename has no extension
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,pOrigName)
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,pOrigName)
+    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,p_orig_name)
+    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,p_orig_name)
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
        glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
     {
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualVmdkPath,pOrigName)
+      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualVmdkPath,p_orig_name)
     }
     XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,".info")
   } else {
-    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImagePath,pOrigName,
-                   strlen(pOrigName)-strlen(tmp))
-    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImageInfoPath,pOrigName,
-                   strlen(pOrigName)-strlen(tmp))
+    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImagePath,p_orig_name,
+                   strlen(p_orig_name)-strlen(tmp))
+    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImageInfoPath,p_orig_name,
+                   strlen(p_orig_name)-strlen(tmp))
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
        glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
     {
-      XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualVmdkPath,pOrigName,
-                     strlen(pOrigName)-strlen(tmp))
+      XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualVmdkPath,p_orig_name,
+                     strlen(p_orig_name)-strlen(tmp))
     }
     XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,".info")
   }
@@ -1000,14 +1000,14 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
  *   Write data to virtual VDI file header
  *
  * Params:
- *   buf: Buffer containing data to write
+ *   p_buf: Buffer containing data to write
  *   offset: Offset of changes
  *   size: Amount of bytes to write
  *
  * Returns:
  *   Number of written bytes on success or "-1" on error
  */
-static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
+static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
   if(offset+size>glob_vdi_header_size) size=glob_vdi_header_size-offset;
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
             " from VDI header\n",size,offset)
@@ -1021,7 +1021,7 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
                 PRIu64 "\n",glob_p_cache_header->pVdiFileHeader+offset)
       return -1;
     }
-    if(fwrite(buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                 PRIu64 "\n",size,
                 glob_p_cache_header->pVdiFileHeader+offset)
@@ -1055,7 +1055,7 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
                 offset,glob_p_cache_header->pVdiFileHeader)
     }
     // Cache changed data
-    if(fwrite(buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                 PRIu64 "\n",size,
                 glob_p_cache_header->pVdiFileHeader+offset)
@@ -1106,14 +1106,14 @@ static int SetVdiFileHeaderData(char *buf,off_t offset,size_t size) {
  *   Write data to virtual VHD file footer
  *
  * Params:
- *   buf: Buffer containing data to write
+ *   p_buf: Buffer containing data to write
  *   offset: Offset of changes
  *   size: Amount of bytes to write
  *
  * Returns:
  *   Number of written bytes on success or "-1" on error
  */
-static int SetVhdFileHeaderData(char *buf,off_t offset,size_t size) {
+static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
             " from VHD footer\n",size,offset)
   if(glob_p_cache_header->VhdFileHeaderCached==1) {
@@ -1126,7 +1126,7 @@ static int SetVhdFileHeaderData(char *buf,off_t offset,size_t size) {
                 PRIu64 "\n",glob_p_cache_header->pVhdFileHeader+offset)
       return -1;
     }
-    if(fwrite(buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                 PRIu64 "\n",size,
                 glob_p_cache_header->pVhdFileHeader+offset)
@@ -1160,7 +1160,7 @@ static int SetVhdFileHeaderData(char *buf,off_t offset,size_t size) {
                 offset,glob_p_cache_header->pVhdFileHeader)
     }
     // Cache changed data
-    if(fwrite(buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                 PRIu64 "\n",size,
                 glob_p_cache_header->pVhdFileHeader+offset)
@@ -1211,14 +1211,14 @@ static int SetVhdFileHeaderData(char *buf,off_t offset,size_t size) {
  *   Write data to virtual image
  *
  * Params:
- *   buf: Buffer containing data to write
+ *   p_buf: Buffer containing data to write
  *   offset: Offset to start writing at
  *   size: Size of data to be written
  *
  * Returns:
  *   Number of written bytes on success or "-1" on error
  */
-static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
+static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   uint64_t CurBlock=0;
   uint64_t VirtImageSize;
   uint64_t OrigImageSize;
@@ -1227,8 +1227,8 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
   size_t CurToWrite=0;
   off_t FileOff=offset;
   off_t BlockOff=0;
-  char *WriteBuf=(char*)buf;
-  char *buf2;
+  char *WriteBuf=(char*)p_buf;
+  char *p_buf2;
   ssize_t ret;
 
   // Get virtual image size
@@ -1329,12 +1329,12 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
       if(BlockOff!=0) {
         // Changed data does not begin at block boundry. Need to prepend
         // with data from virtual image file
-        XMOUNT_MALLOC(buf2,char*,BlockOff*sizeof(char))
-        if(GetOrigImageData(buf2,FileOff-BlockOff,BlockOff)!=BlockOff) {
+        XMOUNT_MALLOC(p_buf2,char*,BlockOff*sizeof(char))
+        if(GetOrigImageData(p_buf2,FileOff-BlockOff,BlockOff)!=BlockOff) {
           LOG_ERROR("Couldn't read data from original image file!\n")
           return -1;
         }
-        if(fwrite(buf2,BlockOff,1,glob_p_cache_file)!=1) {
+        if(fwrite(p_buf2,BlockOff,1,glob_p_cache_file)!=1) {
           LOG_ERROR("Couldn't writing %" PRIu64 " bytes "
                     "to cache file at offset %" PRIu64 "!\n",
                     BlockOff,
@@ -1344,7 +1344,7 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
         LOG_DEBUG("Prepended changed data with %" PRIu64
                   " bytes from virtual image file at offset %" PRIu64
                   "\n",BlockOff,FileOff-BlockOff)
-        free(buf2);
+        free(p_buf2);
       }
       if(fwrite(WriteBuf,CurToWrite,1,glob_p_cache_file)!=1) {
         LOG_ERROR("Error while writing %zd bytes "
@@ -1356,12 +1356,12 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
       if(BlockOff+CurToWrite!=CACHE_BLOCK_SIZE) {
         // Changed data does not end at block boundry. Need to append
         // with data from virtual image file
-        XMOUNT_MALLOC(buf2,char*,(CACHE_BLOCK_SIZE-
+        XMOUNT_MALLOC(p_buf2,char*,(CACHE_BLOCK_SIZE-
                                  (BlockOff+CurToWrite))*sizeof(char))
-        memset(buf2,0,CACHE_BLOCK_SIZE-(BlockOff+CurToWrite));
+        memset(p_buf2,0,CACHE_BLOCK_SIZE-(BlockOff+CurToWrite));
         if((FileOff-BlockOff)+CACHE_BLOCK_SIZE>OrigImageSize) {
           // Original image is smaller than full cache block
-          if(GetOrigImageData(buf2,
+          if(GetOrigImageData(p_buf2,
                FileOff+CurToWrite,
                OrigImageSize-(FileOff+CurToWrite))!=
              OrigImageSize-(FileOff+CurToWrite))
@@ -1370,7 +1370,7 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
             return -1;
           }
         } else {
-          if(GetOrigImageData(buf2,
+          if(GetOrigImageData(p_buf2,
                FileOff+CurToWrite,
                CACHE_BLOCK_SIZE-(BlockOff+CurToWrite))!=
              CACHE_BLOCK_SIZE-(BlockOff+CurToWrite))
@@ -1379,7 +1379,7 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
             return -1;
           }
         }
-        if(fwrite(buf2,
+        if(fwrite(p_buf2,
                   CACHE_BLOCK_SIZE-(BlockOff+CurToWrite),
                   1,
                   glob_p_cache_file)!=1)
@@ -1391,7 +1391,7 @@ static int SetVirtImageData(const char *buf, off_t offset, size_t size) {
                       BlockOff+CurToWrite);
           return -1;
         }
-        free(buf2);
+        free(p_buf2);
       }
       // All important data for this cache block has been written,
       // flush all buffers and mark cache block as assigned
@@ -1482,76 +1482,76 @@ static int GetVirtFileAccess(const char *path, int perm) {
  *
  * Params:
  *   path: Path of file to get attributes from
- *   stbuf: Pointer to stat structure to save attributes to
+ *   p_stat: Pointer to stat structure to save attributes to
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int GetVirtFileAttr(const char *path, struct stat *stbuf) {
-  memset(stbuf,0,sizeof(struct stat));
+static int GetVirtFileAttr(const char *path, struct stat *p_stat) {
+  memset(p_stat,0,sizeof(struct stat));
   if(strcmp(path,"/")==0) {
     // Attributes of mountpoint
-    stbuf->st_mode=S_IFDIR | 0777;
-    stbuf->st_nlink=2;
+    p_stat->st_mode=S_IFDIR | 0777;
+    p_stat->st_nlink=2;
   } else if(strcmp(path,glob_xmount_cfg.pVirtualImagePath)==0) {
     // Attributes of virtual image
-    if(!glob_xmount_cfg.Writable) stbuf->st_mode=S_IFREG | 0444;
-    else stbuf->st_mode=S_IFREG | 0666;
-    stbuf->st_nlink=1;
+    if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+    else p_stat->st_mode=S_IFREG | 0666;
+    p_stat->st_nlink=1;
     // Get virtual image file size
-    if(!GetVirtImageSize((uint64_t*)&(stbuf->st_size))) {
+    if(!GetVirtImageSize((uint64_t*)&(p_stat->st_size))) {
       LOG_ERROR("Couldn't get image size!\n");
       return -ENOENT;
     }
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VHD) {
       // Make sure virtual image seems to be fully allocated (not sparse file).
       // Without this, Windows won't attach the vhd file!
-      stbuf->st_blocks=stbuf->st_size/512;
-      if(stbuf->st_size%512!=0) stbuf->st_blocks++;
+      p_stat->st_blocks=p_stat->st_size/512;
+      if(p_stat->st_size%512!=0) p_stat->st_blocks++;
     }
   } else if(strcmp(path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
     // Attributes of virtual image info file
-    stbuf->st_mode=S_IFREG | 0444;
-    stbuf->st_nlink=1;
+    p_stat->st_mode=S_IFREG | 0444;
+    p_stat->st_nlink=1;
     // Get virtual image info file size
     if(glob_p_info_file!=NULL) {
-      stbuf->st_size=strlen(glob_p_info_file);
-    } else stbuf->st_size=0;
+      p_stat->st_size=strlen(glob_p_info_file);
+    } else p_stat->st_size=0;
   } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
             glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     // Some special files only present when emulating VMDK files
     if(strcmp(path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
       // Attributes of virtual vmdk file
-      if(!glob_xmount_cfg.Writable) stbuf->st_mode=S_IFREG | 0444;
-      else stbuf->st_mode=S_IFREG | 0666;
-      stbuf->st_nlink=1;
+      if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+      else p_stat->st_mode=S_IFREG | 0666;
+      p_stat->st_nlink=1;
       // Get virtual image info file size
       if(glob_p_vmdk_file!=NULL) {
-        stbuf->st_size=glob_vmdk_file_size;
-      } else stbuf->st_size=0;
+        p_stat->st_size=glob_vmdk_file_size;
+      } else p_stat->st_size=0;
     } else if(glob_p_vmdk_lockdir1!=NULL &&
               strcmp(path,glob_p_vmdk_lockdir1)==0)
     {
-      stbuf->st_mode=S_IFDIR | 0777;
-      stbuf->st_nlink=2;
+      p_stat->st_mode=S_IFDIR | 0777;
+      p_stat->st_nlink=2;
     } else if(glob_p_vmdk_lockdir2!=NULL &&
               strcmp(path,glob_p_vmdk_lockdir2)==0)
     {
-      stbuf->st_mode=S_IFDIR | 0777;
-      stbuf->st_nlink=2;
+      p_stat->st_mode=S_IFDIR | 0777;
+      p_stat->st_nlink=2;
     } else if(glob_p_vmdk_lockfile_name!=NULL &&
               strcmp(path,glob_p_vmdk_lockfile_name)==0)
     {
-      stbuf->st_mode=S_IFREG | 0666;
+      p_stat->st_mode=S_IFREG | 0666;
       if(glob_p_vmdk_lockfile_name!=NULL) {
-        stbuf->st_size=strlen(glob_p_vmdk_lockfile_name);
-      } else stbuf->st_size=0;
+        p_stat->st_size=strlen(glob_p_vmdk_lockfile_name);
+      } else p_stat->st_size=0;
     } else return -ENOENT;
   } else return -ENOENT;
   // Set uid and gid of all files to uid and gid of current process
-  stbuf->st_uid=getuid();
-  stbuf->st_gid=getgid();
+  p_stat->st_uid=getuid();
+  p_stat->st_gid=getgid();
   return 0;
 }
 
@@ -1560,13 +1560,13 @@ static int GetVirtFileAttr(const char *path, struct stat *stbuf) {
  *   FUSE mkdir implementation
  *
  * Params:
- *   path: Directory path
+ *   p_path: Directory path
  *   mode: Directory permissions
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int CreateVirtDir(const char *path, mode_t mode) {
+static int CreateVirtDir(const char *p_path, mode_t mode) {
   // Only allow creation of VMWare's lock directories
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
@@ -1574,29 +1574,29 @@ static int CreateVirtDir(const char *path, mode_t mode) {
     if(glob_p_vmdk_lockdir1==NULL)  {
       char aVmdkLockDir[strlen(glob_xmount_cfg.pVirtualVmdkPath)+5];
       sprintf(aVmdkLockDir,"%s.lck",glob_xmount_cfg.pVirtualVmdkPath);
-      if(strcmp(path,aVmdkLockDir)==0) {
+      if(strcmp(p_path,aVmdkLockDir)==0) {
         LOG_DEBUG("Creating virtual directory \"%s\"\n",aVmdkLockDir)
         XMOUNT_STRSET(glob_p_vmdk_lockdir1,aVmdkLockDir)
         return 0;
       } else {
-        LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",path)
+        LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
         LOG_DEBUG("Supposed: %s\n",aVmdkLockDir)
         return -1;
       }
     } else if(glob_p_vmdk_lockdir2==NULL &&
-              strncmp(path,glob_p_vmdk_lockdir1,strlen(glob_p_vmdk_lockdir1))==0)
+              strncmp(p_path,glob_p_vmdk_lockdir1,strlen(glob_p_vmdk_lockdir1))==0)
     {
-      LOG_DEBUG("Creating virtual directory \"%s\"\n",path)
-      XMOUNT_STRSET(glob_p_vmdk_lockdir2,path)
+      LOG_DEBUG("Creating virtual directory \"%s\"\n",p_path)
+      XMOUNT_STRSET(glob_p_vmdk_lockdir2,p_path)
       return 0;
     } else {
-      LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",path)
+      LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
       LOG_DEBUG("Compared to first %u chars of \"%s\"\n",strlen(glob_p_vmdk_lockdir1),glob_p_vmdk_lockdir1)
       return -1;
     }
   }
   LOG_ERROR("Attempt to create directory \"%s\" "
-            "on read-only filesystem!\n",path)
+            "on read-only filesystem!\n",p_path)
   return -1;
 }
 
@@ -1606,14 +1606,14 @@ static int CreateVirtDir(const char *path, mode_t mode) {
  *   Only allows to create VMWare's lock file!
  *
  * Params:
- *   path: File to create
+ *   p_path: File to create
  *   mode: File mode
  *   dev: ??? but not used
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int CreateVirtFile(const char *path,
+static int CreateVirtFile(const char *p_path,
                           mode_t mode,
                           dev_t dev)
 {
@@ -1621,11 +1621,11 @@ static int CreateVirtFile(const char *path,
       glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS) &&
      glob_p_vmdk_lockdir1!=NULL && glob_p_vmdk_lockfile_name==NULL)
   {
-    LOG_DEBUG("Creating virtual file \"%s\"\n",path)
-    XMOUNT_STRSET(glob_p_vmdk_lockfile_name,path);
+    LOG_DEBUG("Creating virtual file \"%s\"\n",p_path)
+    XMOUNT_STRSET(glob_p_vmdk_lockfile_name,p_path);
     return 0;
   } else {
-    LOG_ERROR("Attempt to create illegal file \"%s\"\n",path)
+    LOG_ERROR("Attempt to create illegal file \"%s\"\n",p_path)
     return -1;
   }
 }
@@ -1635,7 +1635,7 @@ static int CreateVirtFile(const char *path,
  *   FUSE readdir implementation
  *
  * Params:
- *   path: Path from where files should be listed
+ *   p_path: Path from where files should be listed
  *   buf: Buffer to write file entrys to
  *   filler: Function to write file entrys to buffer
  *   offset: ??? but not used
@@ -1644,7 +1644,7 @@ static int CreateVirtFile(const char *path,
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int GetVirtFiles(const char *path,
+static int GetVirtFiles(const char *p_path,
                         void *buf,
                         fuse_fill_dir_t filler,
                         off_t offset,
@@ -1653,7 +1653,7 @@ static int GetVirtFiles(const char *path,
   (void)offset;
   (void)fi;
 
-  if(strcmp(path,"/")==0) {
+  if(strcmp(p_path,"/")==0) {
     // Add std . and .. entrys
     filler(buf,".",NULL,0);
     filler(buf,"..",NULL,0);
@@ -1674,14 +1674,14 @@ static int GetVirtFiles(const char *path,
             glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     // For VMDK emulation, there could be a lock directory
-    if(glob_p_vmdk_lockdir1!=NULL && strcmp(path,glob_p_vmdk_lockdir1)==0) {
+    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
       filler(buf,".",NULL,0);
       filler(buf,"..",NULL,0);
       if(glob_p_vmdk_lockfile_name!=NULL) {
         filler(buf,glob_p_vmdk_lockfile_name+strlen(glob_p_vmdk_lockdir1)+1,NULL,0);
       }
     } else if(glob_p_vmdk_lockdir2!=NULL &&
-              strcmp(path,glob_p_vmdk_lockdir2)==0)
+              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
     {
       filler(buf,".",NULL,0);
       filler(buf,"..",NULL,0);
@@ -1695,52 +1695,52 @@ static int GetVirtFiles(const char *path,
  *   FUSE open implementation
  *
  * Params:
- *   path: Path to file to open
- *   fi: ??? but not used
+ *   p_path: Path to file to open
+ *   p_fi: File info struct
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int OpenVirtFile(const char *path, struct fuse_file_info *fi) {
-  if(strcmp(path,glob_xmount_cfg.pVirtualImagePath)==0 ||
-     strcmp(path,glob_xmount_cfg.pVirtualImageInfoPath)==0)
+static int OpenVirtFile(const char *p_path, struct fuse_file_info *p_fi) {
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0 ||
+     strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0)
   {
     // Check open permissions
-    if(!glob_xmount_cfg.Writable && (fi->flags & 3)!=O_RDONLY) {
+    if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {
       // Attempt to open a read-only file for writing
-      LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",path)
+      LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",p_path)
       return -EACCES;
     }
     return 0;
   } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
             glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
-    if(strcmp(path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
       // Check open permissions
-      if(!glob_xmount_cfg.Writable && (fi->flags & 3)!=O_RDONLY) {
+      if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {
         // Attempt to open a read-only file for writing
-        LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",path)
+        LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",p_path)
         return -EACCES;
       }
       return 0;
     } else if(glob_p_vmdk_lockfile_name!=NULL &&
-              strcmp(path,glob_p_vmdk_lockfile_name)==0)
+              strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
     {
       // Check open permissions
-      if(!glob_xmount_cfg.Writable && (fi->flags & 3)!=O_RDONLY) {
+      if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {
         // Attempt to open a read-only file for writing
-        LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",path)
+        LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n",p_path)
         return -EACCES;
       }
       return 0;
     } else {
       // Attempt to open a non existant file
-      LOG_DEBUG("Attempt to open non existant file \"%s\".\n",path)
+      LOG_DEBUG("Attempt to open non existant file \"%s\".\n",p_path)
       return -ENOENT;
     }
   } else {
     // Attempt to open a non existant file
-    LOG_DEBUG("Attempt to open non existant file \"%s\".\n",path)
+    LOG_DEBUG("Attempt to open non existant file \"%s\".\n",p_path)
     return -ENOENT;
   }
 }
@@ -1862,25 +1862,25 @@ static int ReadVirtFile(const char *p_path,
  *   FUSE rename implementation
  *
  * Params:
- *   path: File to rename
- *   npath: New filename
+ *   p_path: File to rename
+ *   p_npath: New filename
  *
  * Returns:
  *   "0" on error, negated error code on error
  */
-static int RenameVirtFile(const char *path, const char *npath) {
+static int RenameVirtFile(const char *p_path, const char *p_npath) {
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     if(glob_p_vmdk_lockfile_name!=NULL &&
-       strcmp(path,glob_p_vmdk_lockfile_name)==0)
+       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
     {
       LOG_DEBUG("Renaming virtual lock file from \"%s\" to \"%s\"\n",
                 glob_p_vmdk_lockfile_name,
-                npath)
+                p_npath)
       XMOUNT_REALLOC(glob_p_vmdk_lockfile_name,char*,
-                     (strlen(npath)+1)*sizeof(char));
-      strcpy(glob_p_vmdk_lockfile_name,npath);
+                     (strlen(p_npath)+1)*sizeof(char));
+      strcpy(glob_p_vmdk_lockfile_name,p_npath);
       return 0;
     }
   }
@@ -1892,23 +1892,23 @@ static int RenameVirtFile(const char *path, const char *npath) {
  *   FUSE rmdir implementation
  *
  * Params:
- *   path: Directory to delete
+ *   p_path: Directory to delete
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int DeleteVirtDir(const char *path) {
+static int DeleteVirtDir(const char *p_path) {
   // Only VMWare's lock directories can be deleted
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
-    if(glob_p_vmdk_lockdir1!=NULL && strcmp(path,glob_p_vmdk_lockdir1)==0) {
+    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
       LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
       free(glob_p_vmdk_lockdir1);
       glob_p_vmdk_lockdir1=NULL;
       return 0;
     } else if(glob_p_vmdk_lockdir2!=NULL &&
-              strcmp(path,glob_p_vmdk_lockdir2)==0)
+              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
     {
       LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
       free(glob_p_vmdk_lockdir2);
@@ -1924,18 +1924,18 @@ static int DeleteVirtDir(const char *path) {
  *   FUSE unlink implementation
  *
  * Params:
- *   path: File to delete
+ *   p_path: File to delete
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
-static int DeleteVirtFile(const char *path) {
+static int DeleteVirtFile(const char *p_path) {
   // Only VMWare's lock file can be deleted
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     if(glob_p_vmdk_lockfile_name!=NULL &&
-       strcmp(path,glob_p_vmdk_lockfile_name)==0)
+       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
     {
       LOG_DEBUG("Deleting virtual file \"%s\"\n",glob_p_vmdk_lockfile_name)
       free(glob_p_vmdk_lockfile_name);
@@ -1954,14 +1954,14 @@ static int DeleteVirtFile(const char *path) {
  *   FUSE statfs implementation
  *
  * Params:
- *   path: Get stats for fs that the specified file resides in
+ *   p_path: Get stats for fs that the specified file resides in
  *   stats: Stats
  *
  * Returns:
  *   "0" on success, negated error code on error
  */
 /*
-static int GetVirtFsStats(const char *path, struct statvfs *stats) {
+static int GetVirtFsStats(const char *p_path, struct statvfs *stats) {
   struct statvfs CacheFileFsStats;
   int ret;
 
@@ -1988,7 +1988,7 @@ static int GetVirtFsStats(const char *path, struct statvfs *stats) {
  *   FUSE write implementation
  *
  * Params:
- *   buf: Buffer containing data to write
+ *   p_buf: Buffer containing data to write
  *   size: Number of bytes to write
  *   offset: Offset to start writing at
  *   fi: ?? but not used
@@ -1996,15 +1996,15 @@ static int GetVirtFsStats(const char *path, struct statvfs *stats) {
  * Returns:
  *   Written bytes on success, negated error code on error
  */
-static int WriteVirtFile(const char *path,
-                         const char *buf,
+static int WriteVirtFile(const char *p_path,
+                         const char *p_buf,
                          size_t size,
                          off_t offset,
                          struct fuse_file_info *fi)
 {
   uint64_t len;
 
-  if(strcmp(path,glob_xmount_cfg.pVirtualImagePath)==0) {
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
     // Wait for other threads to end reading/writing data
     pthread_mutex_lock(&glob_mutex_image_rw);
 
@@ -2016,7 +2016,7 @@ static int WriteVirtFile(const char *path,
     }
     if(offset<len) {
       if(offset+size>len) size=len-offset;
-      if(SetVirtImageData(buf,offset,size)!=size) {
+      if(SetVirtImageData(p_buf,offset,size)!=size) {
         LOG_ERROR("Couldn't write data to virtual image file!\n")
         pthread_mutex_unlock(&glob_mutex_image_rw);
         return 0;
@@ -2029,7 +2029,7 @@ static int WriteVirtFile(const char *path,
 
     // Allow other threads to read/write data again
     pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
     pthread_mutex_lock(&glob_mutex_image_rw);
     len=glob_vmdk_file_size;
     if((offset+size)>len) {
@@ -2044,10 +2044,10 @@ static int WriteVirtFile(const char *path,
       glob_vmdk_file_size=offset+size;
     }
     // Copy data to buffer
-    memcpy(glob_p_vmdk_file+offset,buf,size);
+    memcpy(glob_p_vmdk_file+offset,p_buf,size);
     pthread_mutex_unlock(&glob_mutex_image_rw);
   } else if(glob_p_vmdk_lockfile_name!=NULL &&
-            strcmp(path,glob_p_vmdk_lockfile_name)==0)
+            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
   {
     pthread_mutex_lock(&glob_mutex_image_rw);
     if((offset+size)>glob_vmdk_lockfile_size) {
@@ -2063,15 +2063,15 @@ static int WriteVirtFile(const char *path,
       }
     }
     // Copy data to buffer
-    memcpy(glob_p_vmdk_lockfile_data+offset,buf,size);
+    memcpy(glob_p_vmdk_lockfile_data+offset,p_buf,size);
     pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
     // Attempt to write data to read only image info file
     LOG_DEBUG("Attempt to write data to virtual info file\n");
     return -ENOENT;
   } else {
     // Attempt to write to non existant file
-    LOG_DEBUG("Attempt to write to the non existant file \"%s\"\n",path)
+    LOG_DEBUG("Attempt to write to the non existant file \"%s\"\n",p_path)
     return -ENOENT;
   }
 
@@ -2092,22 +2092,22 @@ static int WriteVirtFile(const char *path,
 static int CalculateInputImageHash(uint64_t *pHashLow, uint64_t *pHashHigh) {
   char hash[16];
   md5_state_t md5_state;
-  char *buf;
-  XMOUNT_MALLOC(buf,char*,HASH_AMOUNT*sizeof(char))
-  size_t read_data=GetOrigImageData(buf,0,HASH_AMOUNT);
+  char *p_buf;
+  XMOUNT_MALLOC(p_buf,char*,HASH_AMOUNT*sizeof(char))
+  size_t read_data=GetOrigImageData(p_buf,0,HASH_AMOUNT);
   if(read_data>0) {
     // Calculate MD5 hash
     md5_init(&md5_state);
-    md5_append(&md5_state,(const md5_byte_t*)buf,HASH_AMOUNT);
+    md5_append(&md5_state,(const md5_byte_t*)p_buf,HASH_AMOUNT);
     md5_finish(&md5_state,(md5_byte_t*)hash);
     // Convert MD5 hash into two 64bit integers
     *pHashLow=*((uint64_t*)hash);
     *pHashHigh=*((uint64_t*)(hash+8));
-    free(buf);
+    free(p_buf);
     return TRUE;
   } else {
     LOG_ERROR("Couldn't read data from original image file!\n")
-    free(buf);
+    free(p_buf);
     return FALSE;
   }
 }
@@ -3287,5 +3287,6 @@ int main(int argc, char *argv[])
               loadable libs.
             * Prepended "glob_" to all global vars for better identification.
   20140731: * Added --offset option as requested by HPM.
+            * Began massive code cleanup
             
 */
