@@ -3281,7 +3281,8 @@ int main(int argc, char *argv[])
             * Added libdd to replace raw dd input file handling and finally
               support split dd files (thx to Guy Voncken).
   20140311: * Added libaewf (thx to Guy Voncken).
-  20140726: * Added support for dynamically loading of input libs.
+  20140726: * Added support for dynamically loading of input libs. This should
+              ease adding support for new input image formats in the future.
             * Moved input image functions to their corresponding dynamically
               loadable libs.
             * Prepended "glob_" to all global vars for better identification.
