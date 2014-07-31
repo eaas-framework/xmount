@@ -103,26 +103,52 @@ int EwfOpen(void **pp_handle,
 
   // Make sure all files are EWF files
   for(uint64_t i=0;i<filename_arr_len;i++) {
-    if(libewf_check_file_signature(pp_filename_arr[i],NULL)!=1) return 1;
+#ifdef HAVE_LIBEWF_V2_API
+    if(libewf_check_file_signature(pp_filename_arr[i],NULL)!=1)
+#else
+    if(libewf_check_file_signature(pp_filename_arr[i])!=1)
+#endif
+    {
+      return 1;
+    }
   }
 
   // Init handle
   *pp_handle=NULL;
+#ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_initialize((libewf_handle_t**)pp_handle,NULL)!=1) {
     // LOG_ERROR("Couldn't create EWF handle!\n")
     return 1;
   }
+#endif
 
   // Open EWF file
+#ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_open((libewf_handle_t*)*pp_handle,
                         (char* const*)pp_filename_arr,
                         filename_arr_len,
                         libewf_get_access_flags_read(),
                         NULL)!=1)
+#else
+  *pp_handle=(void*)libewf_open((char* const*)pp_filename_arr,
+                                filename_arr_len,
+                                libewf_get_flags_read());
+  if(*pp_handle==NULL)
+#endif
   {
     // LOG_ERROR("Couldn't open EWF file(s)!\n")
     return 1;
   }
+
+#ifndef HAVE_LIBEWF_V2_API
+  // Parse EWF header
+  if(libewf_parse_header_values((LIBEWF_HANDLE*)*pp_handle,
+                                LIBEWF_DATE_FORMAT_ISO8601)!=1)
+  {
+    //LOG_ERROR("Couldn't parse ewf header values!\n")
+    return 1;
+  }
+#endif
 
   return 0;
 }
@@ -131,7 +157,11 @@ int EwfOpen(void **pp_handle,
  * EwfSize
  */
 int EwfSize(void *p_handle, uint64_t *p_size) {
+#ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_get_media_size((libewf_handle_t*)p_handle,p_size,NULL)!=1) {
+#else
+  if(libewf_get_media_size((LIBEWF_HANDLE*)p_handle,p_size)!=1) {
+#endif
     return 1;
   }
   return 0;
@@ -145,15 +175,24 @@ int EwfRead(void *p_handle,
             char *p_buf,
             uint32_t count)
 {
+#ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_seek_offset((libewf_handle_t*)p_handle,
                                offset,
                                SEEK_SET,
                                NULL)!=-1)
+#else
+  if(libewf_seek_offset((LIBEWF_HANDLE*)p_handle,offset)!=-1)
+#endif
   {
+#ifdef HAVE_LIBEWF_V2_API
     if(libewf_handle_read_buffer((libewf_handle_t*)p_handle,
                                  p_buf,
                                  count,
                                  NULL)!=count)
+#else
+  
+    if(libewf_read_buffer((LIBEWF_HANDLE*)p_handle,p_buf,count)!=count)
+#endif
     {
       return 1;
     }
@@ -168,14 +207,21 @@ int EwfRead(void *p_handle,
  */
 int EwfClose(void **pp_handle) {
   // Close EWF handle
+#ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_close((libewf_handle_t*)*pp_handle,NULL)!=0) {
     return 1;
   }
+#else
+  // TODO: No return value??
+  libewf_close((LIBEWF_HANDLE*)*pp_handle);
+#endif
 
+#ifdef HAVE_LIBEWF_V2_API
   // Free EWF handle
   if(libewf_handle_free((libewf_handle_t**)pp_handle,NULL)!=1) {
     return 1;
   }
+#endif
 
   *pp_handle=NULL;
   return 0;
@@ -280,5 +326,6 @@ void EwfFreeBuffer(void *p_buf) {
   ----- Change history -----
   20140724: * Initial version implementing EwfOpen, EwfSize, EwfRead, EwfClose,
               EwfOptionsHelp, EwfOptionsParse and EwfFreeBuffer
+  20140731: * Added ifdef's for libewf1 functions
 */
 

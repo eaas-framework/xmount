@@ -647,7 +647,7 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
  *   Get size of the emulated image
  *
  * Params:
- *   size: Pointer to an uint64_t to which the size will be written to
+ *   p_size: Pointer to an uint64_t to which the size will be written to
  *
  * Returns:
  *   "TRUE" on success, "FALSE" on error
@@ -682,7 +682,7 @@ static int GetVirtImageSize(uint64_t *p_size) {
     case VirtImageType_VHD:
       // Virtual image is a VHD file. Get size of original image and add size
       // of VHD footer.
-      if(!GetOrigImageSize(size,FALSE)) {
+      if(!GetOrigImageSize(p_size,FALSE)) {
         LOG_ERROR("Couldn't get size of input image!\n")
         return FALSE;
       }
@@ -702,46 +702,47 @@ static int GetVirtImageSize(uint64_t *p_size) {
  *   Read data from original image
  *
  * Params:
- *   buf: Pointer to buffer to write read data to (Must be preallocated!)
+ *   p_buf: Pointer to buffer to write read data to (Must be preallocated!)
  *   offset: Offset at which data should be read
  *   size: Size of data which should be read (Size of buffer)
  *
  * Returns:
  *   Number of read bytes on success or "-1" on error
  */
-static int GetOrigImageData(char *buf, off_t offset, size_t size) {
-  size_t ToRead=0;
-  uint64_t ImageSize=0;
-
-  // Add offset if one was specified
-  offset+=glob_xmount_cfg.orig_img_offset;
+static int GetOrigImageData(char *p_buf, off_t offset, size_t size) {
+  size_t to_read=0;
+  uint64_t image_size=0;
 
   // Make sure we aren't reading past EOF of image file
-  if(!GetOrigImageSize(&ImageSize,FALSE)) {
+  if(!GetOrigImageSize(&image_size,FALSE)) {
     LOG_ERROR("Couldn't get image size!\n")
     return -1;
   }
-  if(offset>=ImageSize) {
+  if(offset>=image_size) {
     // Offset is beyond image size
     LOG_DEBUG("Offset is beyond image size.\n")
     return 0;
   }
-  if(offset+size>ImageSize) {
+  if(offset+size>image_size) {
     // Attempt to read data past EOF of image file
-    ToRead=ImageSize-offset;
+    to_read=image_size-offset;
     LOG_DEBUG("Attempt to read data past EOF. Corrected size from %zd"
-              " to %zd.\n",size,ToRead)
-  } else ToRead=size;
+              " to %zd.\n",size,to_read)
+  } else to_read=size;
 
-  // Read data from image file
-  if(glob_p_input_functions->Read(glob_p_input_image,offset,buf,ToRead)!=0) {
+  // Read data from image file (adding input image offset if one was specified)
+  if(glob_p_input_functions->Read(glob_p_input_image,
+                                  offset+glob_xmount_cfg.orig_img_offset,
+                                  p_buf,
+                                  to_read)!=0)
+  {
     LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64 "!\n",
-              ToRead,
+              to_read,
               offset);
     return -1;
   }
 
-  return ToRead;
+  return to_read;
 }
 
 /*
@@ -790,40 +791,37 @@ static int GetVirtualVmdkData(char *buf, off_t offset, size_t size) {
  *   Read data from virtual image
  *
  * Params:
- *   buf: Pointer to buffer to write read data to (Must be preallocated!)
+ *   p_buf: Pointer to buffer to write read data to (Must be preallocated!)
  *   offset: Offset at which data should be read
  *   size: Size of data which should be read (Size of buffer)
  *
  * Returns:
  *   Number of read bytes on success or "-1" on error
  */
-static int GetVirtImageData(char *buf, off_t offset, size_t size) {
-  uint32_t CurBlock=0;
-  uint64_t VirtImageSize;
-  uint64_t orig_image_size;
-  size_t ToRead=0;
-  size_t CurToRead=0;
-  off_t FileOff=offset;
-  off_t BlockOff=0;
+static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
+  uint32_t cur_block=0;
+  uint64_t orig_image_size, virt_image_size;
+  size_t to_read=0, cur_to_read=0;
+  off_t file_off=offset, block_off=0;
   size_t to_read_later=0;
 
   // Get virtual image size
-  if(!GetVirtImageSize(&VirtImageSize)) {
+  if(!GetVirtImageSize(&virt_image_size)) {
     LOG_ERROR("Couldn't get virtual image size!\n")
     return -1;
   }
 
-  if(offset>=VirtImageSize) {
+  if(offset>=virt_image_size) {
     LOG_ERROR("Attempt to read beyond virtual image EOF!\n")
     return -1;
   }
 
-  if(offset+size>VirtImageSize) {
+  if(offset+size>virt_image_size) {
     LOG_DEBUG("Attempt to read pas EOF of virtual image file\n")
-    size=VirtImageSize-offset;
+    size=virt_image_size-offset;
   }
 
-  ToRead=size;
+  to_read=size;
 
   if(!GetOrigImageSize(&orig_image_size,FALSE)) {
     LOG_ERROR("Couldn't get original image size!")
@@ -838,107 +836,110 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
     case VirtImageType_VMDKS:
       break;
     case VirtImageType_VDI:
-      if(FileOff<glob_vdi_header_size) {
-        if(FileOff+ToRead>glob_vdi_header_size) CurToRead=glob_vdi_header_size-FileOff;
-        else CurToRead=ToRead;
+      if(file_off<glob_vdi_header_size) {
+        if(file_off+to_read>glob_vdi_header_size) {
+          cur_to_read=glob_vdi_header_size-file_off;
+        } else {
+          cur_to_read=to_read;
+        }
         if(glob_xmount_cfg.Writable==TRUE &&
            glob_p_cache_header->VdiFileHeaderCached==TRUE)
         {
           // VDI header was already cached
           if(fseeko(glob_p_cache_file,
-                    glob_p_cache_header->pVdiFileHeader+FileOff,
+                    glob_p_cache_header->pVdiFileHeader+file_off,
                     SEEK_SET)!=0)
           {
             LOG_ERROR("Couldn't seek to cached VDI header at offset %"
-                      PRIu64 "\n",glob_p_cache_header->pVdiFileHeader+FileOff)
+                      PRIu64 "\n",glob_p_cache_header->pVdiFileHeader+file_off)
             return 0;
           }
-          if(fread(buf,CurToRead,1,glob_p_cache_file)!=1) {
+          if(fread(p_buf,cur_to_read,1,glob_p_cache_file)!=1) {
             LOG_ERROR("Couldn't read %zu bytes from cache file at offset %"
-                      PRIu64 "\n",CurToRead,
-                      glob_p_cache_header->pVdiFileHeader+FileOff)
+                      PRIu64 "\n",cur_to_read,
+                      glob_p_cache_header->pVdiFileHeader+file_off)
             return 0;
           }
           LOG_DEBUG("Read %zd bytes from cached VDI header at offset %"
                     PRIu64 " at cache file offset %" PRIu64 "\n",
-                    CurToRead,FileOff,
-                    glob_p_cache_header->pVdiFileHeader+FileOff)
+                    cur_to_read,file_off,
+                    glob_p_cache_header->pVdiFileHeader+file_off)
         } else {
           // VDI header isn't cached
-          memcpy(buf,((char*)glob_p_vdi_header)+FileOff,CurToRead);
+          memcpy(p_buf,((char*)glob_p_vdi_header)+file_off,cur_to_read);
           LOG_DEBUG("Read %zd bytes at offset %" PRIu64
-                    " from virtual VDI header\n",CurToRead,
-                    FileOff)
+                    " from virtual VDI header\n",cur_to_read,
+                    file_off)
         }
-        if(ToRead==CurToRead) return ToRead;
+        if(to_read==cur_to_read) return to_read;
         else {
           // Adjust values to read from original image
-          ToRead-=CurToRead;
-          buf+=CurToRead;
-          FileOff=0;
+          to_read-=cur_to_read;
+          p_buf+=cur_to_read;
+          file_off=0;
         }
-      } else FileOff-=glob_vdi_header_size;
+      } else file_off-=glob_vdi_header_size;
       break;
     case VirtImageType_VHD:
       // When emulating VHD, make sure the while loop below only reads data
       // available in the original image. Any VHD footer data must be read
       // afterwards.
-      if(FileOff>=orig_image_size) {
-        to_read_later=ToRead;
-        ToRead=0;
-      } else if((FileOff+ToRead)>orig_image_size) {
-        to_read_later=(FileOff+ToRead)-orig_image_size;
-        ToRead-=to_read_later;
+      if(file_off>=orig_image_size) {
+        to_read_later=to_read;
+        to_read=0;
+      } else if((file_off+to_read)>orig_image_size) {
+        to_read_later=(file_off+to_read)-orig_image_size;
+        to_read-=to_read_later;
       }
       break;
   }
 
   // Calculate block to read data from
-  CurBlock=FileOff/CACHE_BLOCK_SIZE;
-  BlockOff=FileOff%CACHE_BLOCK_SIZE;
+  cur_block=file_off/CACHE_BLOCK_SIZE;
+  block_off=file_off%CACHE_BLOCK_SIZE;
   
   // Read image data
-  while(ToRead!=0) {
+  while(to_read!=0) {
     // Calculate how many bytes we have to read from this block
-    if(BlockOff+ToRead>CACHE_BLOCK_SIZE) {
-      CurToRead=CACHE_BLOCK_SIZE-BlockOff;
-    } else CurToRead=ToRead;
+    if(block_off+to_read>CACHE_BLOCK_SIZE) {
+      cur_to_read=CACHE_BLOCK_SIZE-block_off;
+    } else cur_to_read=to_read;
     if(glob_xmount_cfg.Writable==TRUE &&
-       glob_p_cache_blkidx[CurBlock].Assigned==TRUE)
+       glob_p_cache_blkidx[cur_block].Assigned==TRUE)
     {
       // Write support enabled and need to read altered data from cachefile
       if(fseeko(glob_p_cache_file,
-                glob_p_cache_blkidx[CurBlock].off_data+BlockOff,
+                glob_p_cache_blkidx[cur_block].off_data+block_off,
                 SEEK_SET)!=0)
       {
         LOG_ERROR("Couldn't seek to offset %" PRIu64
                   " in cache file\n")
         return -1;
       }
-      if(fread(buf,CurToRead,1,glob_p_cache_file)!=1) {
+      if(fread(p_buf,cur_to_read,1,glob_p_cache_file)!=1) {
         LOG_ERROR("Couldn't read data from cache file!\n")
         return -1;
       }
       LOG_DEBUG("Read %zd bytes at offset %" PRIu64
-                " from cache file\n",CurToRead,FileOff)
+                " from cache file\n",cur_to_read,file_off)
     } else {
       // No write support or data not cached
-      if(GetOrigImageData(buf,
-                          FileOff,
-                          CurToRead)!=CurToRead)
+      if(GetOrigImageData(p_buf,
+                          file_off,
+                          cur_to_read)!=cur_to_read)
       {
         LOG_ERROR("Couldn't read data from input image!\n")
         return -1;
       }
       LOG_DEBUG("Read %zd bytes at offset %" PRIu64
-                " from original image file\n",CurToRead,
-                FileOff)
+                " from original image file\n",cur_to_read,
+                file_off)
     }
-    CurBlock++;
-    BlockOff=0;
-    buf+=CurToRead;
-    ToRead-=CurToRead;
-    FileOff+=CurToRead;
+    cur_block++;
+    block_off=0;
+    p_buf+=cur_to_read;
+    to_read-=cur_to_read;
+    file_off+=cur_to_read;
   }
 
   if(to_read_later!=0) {
@@ -957,35 +958,35 @@ static int GetVirtImageData(char *buf, off_t offset, size_t size) {
         {
           // VHD footer was already cached
           if(fseeko(glob_p_cache_file,
-                    glob_p_cache_header->pVhdFileHeader+(FileOff-orig_image_size),
+                    glob_p_cache_header->pVhdFileHeader+(file_off-orig_image_size),
                     SEEK_SET)!=0)
           {
             LOG_ERROR("Couldn't seek to cached VHD footer at offset %"
                       PRIu64 "\n",
                       glob_p_cache_header->pVhdFileHeader+
-                        (FileOff-orig_image_size))
+                        (file_off-orig_image_size))
             return 0;
           }
-          if(fread(buf,to_read_later,1,glob_p_cache_file)!=1) {
+          if(fread(p_buf,to_read_later,1,glob_p_cache_file)!=1) {
             LOG_ERROR("Couldn't read %zu bytes from cache file at offset %"
                       PRIu64 "\n",to_read_later,
                       glob_p_cache_header->pVhdFileHeader+
-                        (FileOff-orig_image_size))
+                        (file_off-orig_image_size))
             return 0;
           }
           LOG_DEBUG("Read %zd bytes from cached VHD footer at offset %"
                     PRIu64 " at cache file offset %" PRIu64 "\n",
-                    to_read_later,(FileOff-orig_image_size),
-                    glob_p_cache_header->pVhdFileHeader+(FileOff-orig_image_size))
+                    to_read_later,(file_off-orig_image_size),
+                    glob_p_cache_header->pVhdFileHeader+(file_off-orig_image_size))
         } else {
           // VHD header isn't cached
-          memcpy(buf,
-                 ((char*)glob_p_vhd_header)+(FileOff-orig_image_size),
+          memcpy(p_buf,
+                 ((char*)glob_p_vhd_header)+(file_off-orig_image_size),
                  to_read_later);
           LOG_DEBUG("Read %zd bytes at offset %" PRIu64
                     " from virtual VHD header\n",
                     to_read_later,
-                    (FileOff-orig_image_size))
+                    (file_off-orig_image_size))
         }
         break;
     }
@@ -1749,7 +1750,8 @@ static int OpenVirtFile(const char *path, struct fuse_file_info *fi) {
  *   FUSE read implementation
  *
  * Params:
- *   buf: Buffer where read data is written to
+ *   p_path: Path (relative to mount folder) of file to read data from
+ *   p_buf: Pre-allocated buffer where read data should be written to
  *   size: Number of bytes to read
  *   offset: Offset to start reading at
  *   fi: ?? but not used
@@ -1757,15 +1759,15 @@ static int OpenVirtFile(const char *path, struct fuse_file_info *fi) {
  * Returns:
  *   Read bytes on success, negated error code on error
  */
-static int ReadVirtFile(const char *path,
-                        char *buf,
+static int ReadVirtFile(const char *p_path,
+                        char *p_buf,
                         size_t size,
                         off_t offset,
                         struct fuse_file_info *fi)
 {
   uint64_t len;
 
-  if(strcmp(path,glob_xmount_cfg.pVirtualImagePath)==0) {
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
     // Wait for other threads to end reading/writing data
     pthread_mutex_lock(&glob_mutex_image_rw);
 
@@ -1777,7 +1779,7 @@ static int ReadVirtFile(const char *path,
     }
     if(offset<len) {
       if(offset+size>len) size=len-offset;
-      if(GetVirtImageData(buf,offset,size)!=size) {
+      if(GetVirtImageData(p_buf,offset,size)!=size) {
         LOG_ERROR("Couldn't read data from virtual image file!\n")
         pthread_mutex_unlock(&glob_mutex_image_rw);
         return 0;
@@ -1791,7 +1793,7 @@ static int ReadVirtFile(const char *path,
     // Allow other threads to read/write data again
     pthread_mutex_unlock(&glob_mutex_image_rw);
 
-  } else if(strcmp(path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
     // Read data from virtual image info file
     len=strlen(glob_p_info_file);
     if(offset<len) {
@@ -1800,7 +1802,7 @@ static int ReadVirtFile(const char *path,
         LOG_DEBUG("Attempt to read past EOF of virtual image info file\n")
       }
       pthread_mutex_lock(&glob_mutex_info_read);
-      memcpy(buf,glob_p_info_file+offset,size);
+      memcpy(p_buf,glob_p_info_file+offset,size);
       pthread_mutex_unlock(&glob_mutex_info_read);
       LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64
                 " from virtual image info file\n",size,offset)
@@ -1808,7 +1810,7 @@ static int ReadVirtFile(const char *path,
       LOG_DEBUG("Attempt to read past EOF of virtual info file\n");
       return 0;
     }
-  } else if(strcmp(path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
     // Read data from virtual vmdk file
     len=glob_vmdk_file_size;
     if(offset<len) {
@@ -1818,7 +1820,7 @@ static int ReadVirtFile(const char *path,
         size=len-offset;
       }
       pthread_mutex_lock(&glob_mutex_image_rw);
-      memcpy(buf,glob_p_vmdk_file+offset,size);
+      memcpy(p_buf,glob_p_vmdk_file+offset,size);
       pthread_mutex_unlock(&glob_mutex_image_rw);
       LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64
                 " from virtual vmdk file\n",size,offset)
@@ -1827,7 +1829,7 @@ static int ReadVirtFile(const char *path,
       return 0;
     }
   } else if(glob_p_vmdk_lockfile_name!=NULL &&
-            strcmp(path,glob_p_vmdk_lockfile_name)==0)
+            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
   {
     // Read data from virtual lock file
     len=glob_vmdk_lockfile_size;
@@ -1838,7 +1840,7 @@ static int ReadVirtFile(const char *path,
         size=len-offset;
       }
       pthread_mutex_lock(&glob_mutex_image_rw);
-      memcpy(buf,glob_p_vmdk_lockfile_data+offset,size);
+      memcpy(p_buf,glob_p_vmdk_lockfile_data+offset,size);
       pthread_mutex_unlock(&glob_mutex_image_rw);
       LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64
                 " from virtual vmdk lock file\n",size,offset)
@@ -1848,7 +1850,7 @@ static int ReadVirtFile(const char *path,
     }
   } else {
     // Attempt to read non existant file
-    LOG_DEBUG("Attempt to read from non existant file \"%s\"\n",path)
+    LOG_DEBUG("Attempt to read from non existant file \"%s\"\n",p_path)
     return -ENOENT;
   }
 
@@ -2964,7 +2966,7 @@ int main(int argc, char *argv[])
     }
     if(glob_xmount_cfg.orig_img_offset>size) {
       LOG_ERROR("The specified offset is larger then the size of the input "
-                  "image! (" PRIu64 " > " PRIu64 ")\n",
+                  "image! (%" PRIu64 " > %" PRIu64 ")\n",
                 glob_xmount_cfg.orig_img_offset,
                 size);
       return 1;
@@ -3259,7 +3261,7 @@ int main(int argc, char *argv[])
   20110210: * Adding subtype and fsname FUSE options in order to display mounted
               source in mount command output.
   20110211: v0.4.5 released
-  20111011: * Changes to deal with libewf v2 API (Thx to Joachim Metz)
+  20111011: * Changes to deal with libewf v2 API (thx to Joachim Metz)
   20111109: v0.4.6 released
             * Added support for DMG output type (actually a DD with .dmg file
               extension). This type is used as default output type when
@@ -3280,7 +3282,9 @@ int main(int argc, char *argv[])
               support split dd files (thx to Guy Voncken).
   20140311: * Added libaewf (thx to Guy Voncken).
   20140726: * Added support for dynamically loading of input libs.
-            * Moved input image functions to their corresponding lib.
+            * Moved input image functions to their corresponding dynamically
+              loadable libs.
             * Prepended "glob_" to all global vars for better identification.
+  20140731: * Added --offset option as requested by HPM.
             
 */
