@@ -40,6 +40,7 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
+int AaffInitHandle(void **pp_handle);
 int AaffOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len);
@@ -50,7 +51,7 @@ int AaffRead(void *p_handle,
              char *p_buf,
              uint32_t count);
 int AaffClose(void **pp_handle);
-int AaffOptionsHelp(const char **pp_help);
+const char* AaffOptionsHelp();
 int AaffOptionsParse(void *p_handle,
                      char *p_options,
                      char **pp_error);
@@ -79,6 +80,7 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->InitHandle=&AaffInitHandle;
   p_functions->Open=&AaffOpen;
   p_functions->Size=&AaffSize;
   p_functions->Read=&AaffRead;
@@ -367,13 +369,24 @@ static int AaffReadPage (t_pAaff pAaff, uint64_t Page, char **ppBuffer, uint32_t
 // ---------------
 
 /*
+ * AaffInitHandle
+ */
+int AaffInitHandle(void **pp_handle) {
+  *pp_handle=NULL;
+
+  CHK(AaffCreateHandle((t_pAaff*)pp_handle))
+
+  return AAFF_OK;
+}
+
+/*
  * AaffOpen
  */
 int AaffOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len)
 {
-  t_pAaff pAaff;
+  t_pAaff pAaff=(t_pAaff)*pp_handle;
   char Signature[strlen(AFF_HEADER)+1];
   uint64_t Seek;
 
@@ -382,9 +395,6 @@ int AaffOpen(void **pp_handle,
     // TODO: Set correct error
     return 1;
   }
-
-  *pp_handle=NULL;
-  CHK(AaffCreateHandle(&pAaff))
 
   pAaff->pFilename=strdup(pp_filename_arr[0]);
   pAaff->pFile=fopen(pp_filename_arr[0],"r");
@@ -603,9 +613,8 @@ int AaffRead(void *p_handle,
 /*
  * AaffOptionsHelp
  */
-int AaffOptionsHelp(const char **pp_help) {
-  *pp_help=NULL;
-  return AAFF_OK;
+const char* AaffOptionsHelp() {
+  return NULL;
 }
 
 /*

@@ -169,11 +169,13 @@ static void PrintUsage(char *p_prog_name) {
   printf("                  addition of FUSE's allow_other option!\n");
   printf("    INFO: For VMDK emulation, you have to uncomment \"user_allow_other\" in\n");
   printf("          /etc/fuse.conf or run xmount as root.\n");
+  printf("\n");
   printf("  mopts:\n");
   printf("    --cache <file> : Enable virtual write support and set cachefile to use.\n");
 //  printf("    --debug : Enable xmount's debug mode.\n");
   printf("    --in <itype> : Input image format. <itype> can be ");
 
+  // List supported input types
   for(uint32_t i=0;i<glob_input_libs_count;i++) {
     p_buf=glob_pp_input_libs[i]->p_supported_input_types;
     while(*p_buf!='\0') {
@@ -186,9 +188,9 @@ static void PrintUsage(char *p_prog_name) {
   }
   printf(".\n");
 
+  printf("    --inopts <iopts> : Specify input library specific options.\n");
   printf("    --info : Print out some infos about used compiler and libraries.\n");
   printf("    --offset <off> : Move the output image data start <off> bytes into the input image.\n");
-  printf("    --options <opts> : Specify special xmount options.\n");
   printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk(s)\".\n");
   printf("    --owcache <file> : Same as --cache <file> but overwrites existing cache.\n");
   printf("    --rw <file> : Same as --cache <file>.\n");
@@ -199,10 +201,29 @@ static void PrintUsage(char *p_prog_name) {
   printf("    INFO: Input image type defaults to \"dd\" and output image type defaults to \"dmg\" if not specified.\n");
 #endif
   printf("    WARNING: Output image type \"vmdk(s)\" should be considered experimental!\n");
+  printf("\n");
   printf("  ifile:\n");
   printf("    Input image file. If your input image is split into multiple files, you have to specify them all!\n");
+  printf("\n");
   printf("  mntp:\n");
   printf("    Mount point where virtual files should be located.\n");
+  printf("\n");
+  printf("  iopts:\n");
+  printf("    Some input libraries might support an own set of options to configure / tune their behaviour.\n");
+  printf("    Input libraries supporting this feature (if any) and and their options are listed below.\n");
+  printf("\n");
+
+  // List input lib options
+  first=1;
+  for(uint32_t i=0;i<glob_input_libs_count;i++) {
+    p_buf=(char*)glob_pp_input_libs[i]->lib_functions.OptionsHelp();
+    if(p_buf==NULL) continue;
+    first=0;
+    printf("    - %s\n",glob_pp_input_libs[i]->p_name);
+    printf("%s\n",p_buf);
+    printf("\n");
+  }
+
 }
 
 /*
@@ -365,7 +386,7 @@ static int ParseCmdLine(const int argc,
           PrintUsage(argv[0]);
           exit(1);
         }
-      } else if(strcmp(argv[i],"--options")==0) {
+      } else if(strcmp(argv[i],"--inopts")==0) {
         if((argc+1)>i) {
           i++;
           XMOUNT_STRSET(glob_xmount_cfg.p_lib_params,argv[i]);
@@ -2921,6 +2942,13 @@ int main(int argc, char *argv[])
     UnloadInputLibs();
     return 1;
   }
+
+/*
+  // Parse input lib specific options
+  if(lob_xmount_cfg.p_lib_params!=NULL) {
+    glob_p_input_functions->OptionsParse(
+  }
+*/
 
   if(glob_xmount_cfg.Debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")

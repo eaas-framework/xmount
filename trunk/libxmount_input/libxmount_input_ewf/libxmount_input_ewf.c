@@ -49,7 +49,7 @@ int EwfRead(void *p_handle,
             char *p_buf,
             uint32_t count);
 int EwfClose(void **pp_handle);
-int EwfOptionsHelp(const char **pp_help);
+const char* EwfOptionsHelp();
 int EwfOptionsParse(void *p_handle,
                     char *p_options,
                     char **pp_error);
@@ -230,9 +230,8 @@ int EwfClose(void **pp_handle) {
 /*
  * EwfOptionsHelp
  */
-int EwfOptionsHelp(const char **pp_help) {
-  *pp_help=NULL;
-  return 0;
+const char* EwfOptionsHelp() {
+  return NULL;
 }
 
 /*

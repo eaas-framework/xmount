@@ -44,7 +44,7 @@ int AffRead(void *p_handle,
             unsigned char *p_buf,
             uint32_t count);
 int AffClose(void **pp_handle);
-int AffOptionsHelp(const char **pp_help);
+const char* AffOptionsHelp();
 int AffOptionsParse(void *p_handle,
                     char *p_options,
                     char **pp_error);
@@ -169,9 +169,8 @@ int AffClose(void **pp_handle) {
 /*
  * AffOptionsHelp
  */
-int AffOptionsHelp(const char **pp_help) {
-  *pp_help=NULL;
-  return 0;
+const char* AffOptionsHelp() {
+  return NULL;
 }
 
 /*

@@ -29,6 +29,14 @@
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountInputFunctions {
   /*!
+   * Function to initialize handle
+   *
+   * \param oo_handle Pointer to store handle
+   * \return 0 on success or error code
+   */
+  int (*InitHandle)(void **pp_handle);
+
+  /*!
    * Function to open input image
    *
    * \param pp_handle Pointer to store handle of opened image to
@@ -39,6 +47,7 @@ typedef struct s_LibXmountInputFunctions {
   int (*Open)(void **pp_handle,
               const char **pp_filename_arr,
               uint64_t filename_arr_len);
+
   /*!
    * Function to get the input image's size
    *
@@ -48,6 +57,7 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*Size)(void *p_handle,
               uint64_t *p_size);
+
   /*!
    * Function to read data from input image
    *
@@ -61,6 +71,7 @@ typedef struct s_LibXmountInputFunctions {
               uint64_t offset,
               char *p_buf,
               uint32_t count);
+
   /*!
    * Function to close an opened input image
    *
@@ -68,14 +79,15 @@ typedef struct s_LibXmountInputFunctions {
    * \return 0 on success or error code
    */
   int (*Close)(void **pp_handle);
+
   /*!
    * Function to return a string containing help messages for any supported
    * lib-specific options
    *
    * \param pp_help Pointer to a string to store null-terminated help text
-   * \return 0 on success or error code
    */
-  int (*OptionsHelp)(const char **pp_help);
+  const char* (*OptionsHelp)();
+
   /*!
    * Function to parse any lib-specific options
    *
@@ -87,6 +99,7 @@ typedef struct s_LibXmountInputFunctions {
   int (*OptionsParse)(void *p_handle,
                       char *p_options,
                       char **pp_error);
+
   /*!
    * Function to get content to add to the info file
    *
@@ -96,6 +109,7 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*GetInfofileContent)(void *p_handle,
                             const char **pp_info_buf);
+
   /*!
    * Function to free buffers that were allocated by lib
    *

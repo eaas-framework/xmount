@@ -72,6 +72,7 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
+int AewfInitHandle(void **pp_handle);
 int AewfOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len);
@@ -82,7 +83,7 @@ int AewfRead(void *p_handle,
              char *p_buf,
              uint32_t count);
 int AewfClose(void **pp_handle);
-int AewfOptionsHelp(const char **pp_help);
+const char* AewfOptionsHelp();
 int AewfOptionsParse(void *p_handle,
                      char *p_options,
                      char **pp_error);
@@ -111,6 +112,7 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->InitHandle=&AewfInitHandle;
   p_functions->Open=&AewfOpen;
   p_functions->Size=&AewfSize;
   p_functions->Read=&AewfRead;
@@ -196,6 +198,13 @@ static int QsortCompareSegments (const void *pA, const void *pB)
 // ---------------
 //  API functions
 // ---------------
+
+/*
+ * AewfInitHandle
+ */
+int AewfInitHandle(void **pp_handle) {
+
+}
 
 static int CreateInfoData (t_pAewf pAewf, t_pAewfSectionVolume pVolume, char *pHeader , unsigned HeaderLen,
                                                                         char *pHeader2, unsigned Header2Len)
@@ -1044,18 +1053,14 @@ int AewfOptionsParse(void *p_handle, char *p_options, char **pp_error) {
    return AEWF_OK;
 }
 
-int AewfOptionsHelp(const char **pp_help) {
-  *pp_help = "   aewf_maxmem   The maximum amount of memory (in MiB) used for caching image offset\n"
-             "                 tables.\n"
-             "   aewf_maxfiles The maximum number of image segment files opened at the same time.\n"
-             "   aewf_stats    A filename that will be used for outputting statistical data at\n"
-             "                 regular intervals. The process id is automatically appended to the\n"
-             "                 given filename.\n"
-             "   aewf_refresh  The update interval, in seconds, for the statistical data output.\n"
-             "                 Ignored if aewf_stats is not set. The default value is 10.\n"
-             "   Example: aewf_maxmem=64,aewf_stats=mystats,aewf_refresh=2"
-             ;
-  return AEWF_OK;
+const char* AewfOptionsHelp() {
+  return "      aewf_maxmem : The maximum amount of memory (in MiB) used for caching image offset tables.\n"
+         "      aewf_maxfiles : The maximum number of image segment files opened at the same time.\n"
+         "      aewf_stats : A filename that will be used for outputting statistical data at regular\n"
+         "                   intervals. The process id is automatically appended to the given filename.\n"
+         "      aewf_refresh : The update interval, in seconds, for the statistical data output.\n"
+         "                     Ignored if aewf_stats is not set. The default value is 10.\n"
+         "      Example: aewf_maxmem=64,aewf_stats=mystats,aewf_refresh=2";
 }
 
 void AewfFreeBuffer(void *p_buf) {

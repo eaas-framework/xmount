@@ -45,7 +45,7 @@ int DdRead(void *p_handle,
            char *p_buf,
            uint32_t count);
 int DdClose(void **pp_handle);
-int DdOptionsHelp(const char **pp_help);
+const char* DdOptionsHelp();
 int DdOptionsParse(void *p_handle,
                    char *p_options,
                    char **pp_error);
@@ -338,9 +338,8 @@ int DdClose(void **pp_handle) {
 /*
  * DdOptionsHelp
  */
-int DdOptionsHelp(const char **pp_help) {
-  *pp_help=NULL;
-  return DD_OK;
+const char* DdOptionsHelp() {
+  return NULL;
 }
 
 /*
