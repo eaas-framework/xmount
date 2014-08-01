@@ -199,13 +199,6 @@ static int QsortCompareSegments (const void *pA, const void *pB)
 //  API functions
 // ---------------
 
-/*
- * AewfInitHandle
- */
-int AewfInitHandle(void **pp_handle) {
-
-}
-
 static int CreateInfoData (t_pAewf pAewf, t_pAewfSectionVolume pVolume, char *pHeader , unsigned HeaderLen,
                                                                         char *pHeader2, unsigned Header2Len)
 {
@@ -400,13 +393,44 @@ static int CreateInfoData (t_pAewf pAewf, t_pAewfSectionVolume pVolume, char *pH
 }
 
 /*
+ * AewfInitHandle
+ */
+int AewfInitHandle(void **pp_handle) {
+  t_pAewf p_aewf=(t_pAewf)*pp_handle;
+
+  // Create handle and clear it
+  // --------------------------
+  p_aewf=(t_pAewf)malloc(sizeof(t_Aewf));
+  if(p_aewf == NULL) return AEWF_MEMALLOC_FAILED;
+
+  memset(p_aewf,0,sizeof(t_Aewf));
+  p_aewf->ChunkInBuff=ULONG_LONG_MAX;
+  p_aewf->pErrorText=NULL;
+  p_aewf->pStatsFilename=NULL;
+  p_aewf->StatsRefresh=10;
+  p_aewf->SegmentCacheHits=0;
+  p_aewf->SegmentCacheMisses=0;
+  p_aewf->TableCacheHits=0;
+  p_aewf->TableCacheMisses=0;
+  p_aewf->ChunkCacheHits=0;
+  p_aewf->ChunkCacheMisses=0;
+  p_aewf->ReadOperations=0;
+  p_aewf->DataReadFromImage=0;
+  p_aewf->DataReadFromImageRaw=0;
+  p_aewf->DataRequestedByCaller=0;
+  p_aewf->TablesReadFromImage=0;
+
+  return AEWF_OK;
+}
+
+/*
  * AewfOpen
  */
 int AewfOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len)
 {
-   t_pAewf                 pAewf;
+   t_pAewf                 pAewf=(t_pAewf)*pp_handle;
    t_AewfFileHeader         FileHeader;
    t_AewfSection            Section;
    FILE                   *pFile;
@@ -421,30 +445,6 @@ int AewfOpen(void **pp_handle,
    unsigned int             SectionSectorsSize;
    unsigned                 HeaderLen  = 0;
    unsigned                 Header2Len = 0;
-
-   // Create handle and clear it
-   // --------------------------
-   *pp_handle = NULL;
-   pAewf = (t_pAewf) malloc (sizeof(t_Aewf));
-   if (pAewf == NULL)
-      return AEWF_MEMALLOC_FAILED;
-   memset (pAewf, 0, sizeof(t_Aewf));
-   pAewf->ChunkInBuff       = ULONG_LONG_MAX;
-   pAewf->pErrorText        = NULL;
-   pAewf->pStatsFilename    = NULL;
-   pAewf->StatsRefresh      = 10;
-
-   pAewf->SegmentCacheHits     = 0;
-   pAewf->SegmentCacheMisses   = 0;
-   pAewf->TableCacheHits       = 0;
-   pAewf->TableCacheMisses     = 0;
-   pAewf->ChunkCacheHits       = 0;
-   pAewf->ChunkCacheMisses     = 0;
-   pAewf->ReadOperations       = 0;
-   pAewf->DataReadFromImage    = 0;
-   pAewf->DataReadFromImageRaw = 0;
-   pAewf->DataRequestedByCaller= 0;
-   pAewf->TablesReadFromImage  = 0;
 
    // Create pSegmentArr and put the segment files in it
    // --------------------------------------------------
@@ -572,8 +572,6 @@ int AewfOpen(void **pp_handle,
    pAewf->MaxOpenSegments = 10;
    pAewf->TableCache      = 0;
    pAewf->OpenSegments    = 0;
-
-   *((t_pAewf**)pp_handle)=(void*)pAewf;
 
    CHK (CreateInfoData (pAewf, pVolume, pHeader, HeaderLen, pHeader2, Header2Len))
    free (pVolume);

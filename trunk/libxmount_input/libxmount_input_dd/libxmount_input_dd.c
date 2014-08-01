@@ -35,6 +35,7 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
+int DdInitHandle(void **pp_handle);
 int DdOpen(void **pp_handle,
            const char **pp_filename_arr,
            uint64_t filename_arr_len);
@@ -74,6 +75,7 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->InitHandle=&DdInitHandle;
   p_functions->Open=&DdOpen;
   p_functions->Size=&DdSize;
   p_functions->Read=&DdRead;
@@ -151,7 +153,7 @@ static inline unsigned long long DdGetCurrentSeekPos (t_pPiece pPiece)
    return ftello (pPiece->pFile);
 }
 
-static inline int DdSetCurrentSeekPos (t_pPiece pPiece, unsigned long long Val, int Whence)
+static inline int DdSetCurrentSeekPos (t_pPiece pPiece, uint64_t Val, int Whence)
 {
    if (fseeko (pPiece->pFile, Val, Whence) != 0)
       return DD_CANNOT_SEEK;
@@ -189,17 +191,10 @@ int DdDestroyHandle (t_pdd *ppdd)
     return DD_OK;
 }
 
-static int DdCreateHandle (t_pdd *ppdd, unsigned FilenameArrLen, const char **ppFilenameArr)
+static int DdCreateHandle (t_pdd pdd, unsigned FilenameArrLen, const char **ppFilenameArr)
 {
-   t_pdd    pdd;
    t_pPiece pPiece;
 
-   *ppdd = NULL;
-   pdd = (t_pdd) malloc (sizeof(t_dd));
-   if (pdd == NULL)
-      return DD_MEMALLOC_FAILED;
-
-   memset (pdd, 0, sizeof(t_dd));
    pdd->Pieces    = FilenameArrLen;
    pdd->pPieceArr = (t_pPiece) malloc (pdd->Pieces * sizeof(t_Piece));
    if (pdd->pPieceArr == NULL)
@@ -231,8 +226,6 @@ static int DdCreateHandle (t_pdd *ppdd, unsigned FilenameArrLen, const char **pp
 
    asprintf (&pdd->pInfo, "dd image made of %u pieces, %llu bytes in total (%0.3f GiB)", pdd->Pieces, pdd->TotalSize, pdd->TotalSize / (1024.0*1024.0*1024.0));
 
-   *ppdd = pdd;
-
    return DD_OK;
 }
 
@@ -242,13 +235,27 @@ static int DdCreateHandle (t_pdd *ppdd, unsigned FilenameArrLen, const char **pp
 // ---------------
 
 /*
+ * DdInitHandle
+ */
+int DdInitHandle(void **pp_handle) {
+  t_pdd p_dd=(t_pdd)*pp_handle;
+
+  p_dd=(t_pdd)malloc(sizeof(t_dd));
+  if(p_dd==NULL) return DD_MEMALLOC_FAILED;
+
+  memset(p_dd,0,sizeof(t_dd));
+
+  return DD_OK;
+}
+
+/*
  * DdOpen
  */
 int DdOpen(void **pp_handle,
            const char **pp_filename_arr,
            uint64_t filename_arr_len)
 {
-  CHK(DdCreateHandle((t_pdd*)pp_handle,filename_arr_len,pp_filename_arr))
+  CHK(DdCreateHandle((t_pdd)*pp_handle,filename_arr_len,pp_filename_arr))
   return DD_OK;
 }
 
@@ -260,9 +267,6 @@ int DdSize(void *p_handle, uint64_t *p_size) {
   return DD_OK;
 }
 
-/*
- * DdRead0
- */
 int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 {
     t_pPiece pPiece;

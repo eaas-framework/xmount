@@ -373,9 +373,7 @@ static int AaffReadPage (t_pAaff pAaff, uint64_t Page, char **ppBuffer, uint32_t
  */
 int AaffInitHandle(void **pp_handle) {
   *pp_handle=NULL;
-
   CHK(AaffCreateHandle((t_pAaff*)pp_handle))
-
   return AAFF_OK;
 }
 
@@ -512,8 +510,6 @@ int AaffOpen(void **pp_handle,
   // -------------
   pAaff->pPageBuff   = malloc (pAaff->PageSize);
   pAaff->CurrentPage = AAFF_CURRENTPAGE_NOTSET;
-
-  *pp_handle=(void*)pAaff;
 
   return AAFF_OK;
 }

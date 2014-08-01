@@ -2867,15 +2867,16 @@ static struct fuse_operations xmount_operations = {
 /*
  * Main
  */
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   char **ppInputFilenames=NULL;
   int InputFilenameCount=0;
   int nargc=0;
   char **ppNargv=NULL;
   char *pMountpoint=NULL;
   int ret=1;
+  char *p_err_msg;
 
+  // Disable std output / std input buffering
   setbuf(stdout,NULL);
   setbuf(stderr,NULL);
 
@@ -2929,6 +2930,8 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  // TODO: Check if mountpoint is a valid dir
+
   // If no input type was specified, default to "dd"
   if(glob_xmount_cfg.p_orig_image_type==NULL) {
     XMOUNT_STRSET(glob_xmount_cfg.p_orig_image_type,"dd");
@@ -2943,20 +2946,33 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-/*
+  // Init input image handle
+  if(glob_p_input_functions->InitHandle(&glob_p_input_image)!=0) {
+    LOG_ERROR("Unable to init input handle!\n");
+    return 1;
+  }
+
   // Parse input lib specific options
   if(lob_xmount_cfg.p_lib_params!=NULL) {
-    glob_p_input_functions->OptionsParse(
+    if(glob_p_input_functions->OptionsParse(glob_p_input_image,
+                                            glob_xmount_cfg.p_lib_params,
+                                            &p_err_msg)!=0)
+    {
+      if(p_err_msg!=NULL) {
+        LOG_ERROR("Unable to parse input library specific options: %s!\n",
+                  p_err_msg);
+        glob_p_input_functions->FreeBuffer(p_err_msg);
+      } else {
+        LOG_ERROR("Unable to parse input library specific options!\n");
+      }
+    }
   }
-*/
 
   if(glob_xmount_cfg.Debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")
     for(int i=0;i<nargc;i++) { printf("%s ",ppNargv[i]); }
     printf("\n");
   }
-
-  // TODO: Check if mountpoint is a valid dir
 
   // Init mutexes
   pthread_mutex_init(&glob_mutex_image_rw,NULL);

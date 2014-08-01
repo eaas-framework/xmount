@@ -28,16 +28,34 @@
 
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountInputFunctions {
+  //! Function to initialize handle
   /*!
-   * Function to initialize handle
+   * This function is called once to allow the lib to alloc any needed
+   * structures before other functions that rely upon a valid handle are called
+   * (for ex. OptionsParse or Open).
    *
-   * \param oo_handle Pointer to store handle
+   * \param pp_handle Pointer to store handle to
    * \return 0 on success or error code
    */
-  int (*InitHandle)(void **pp_handle);
+  int (*CreateHandle)(void **pp_handle);
 
+  //! Function to destroy handle
   /*!
-   * Function to open input image
+   * In this function, any structures allocated with CreateHandle should be
+   * freed. It is generally the last function called before unloading of lib
+   * happens.
+   *
+   * By convention, after this function has been called, *pp_handle must be
+   * NULL.
+   *
+   * \param pp_handle Pointer to store handle to
+   * \return 0 on success or error code
+   */
+  int (*DestroyHandle)(void **pp_handle);
+
+  //! Function to open input image
+  /*!
+   * Opens the specified image for reading.
    *
    * \param pp_handle Pointer to store handle of opened image to
    * \param pp_filename_arr Array containing all specified input images
@@ -48,8 +66,22 @@ typedef struct s_LibXmountInputFunctions {
               const char **pp_filename_arr,
               uint64_t filename_arr_len);
 
+  //! Function to close an opened input image
   /*!
-   * Function to get the input image's size
+   * Closes the input image and frees any memory allocaed during opening but
+   * does not invalidate the main handle. Further calls to for ex. Open must
+   * be possible without first calling CreateHandle again!
+   *
+   * \param pp_handle Pointer to the handle of the opened image
+   * \return 0 on success or error code
+   */
+  int (*Close)(void **pp_handle);
+
+  //! Function to get the input image's size
+  /*!
+   * Returns the real size of the input image. Real means the size of the
+   * uncompressed or otherwise made available data contained inside the input
+   * image.
    *
    * \param p_handle Handle to the opened image
    * \param p_size Pointer to store input image's size to
@@ -58,8 +90,11 @@ typedef struct s_LibXmountInputFunctions {
   int (*Size)(void *p_handle,
               uint64_t *p_size);
 
+  //! Function to read data from input image
   /*!
-   * Function to read data from input image
+   * Reads count bytes at offset from input image and copies them into memory
+   * starting at the address of p_buf. Memory is pre-allocated to as much bytes
+   * as should be read.
    *
    * \param p_handle Handle to the opened image
    * \param offset Position at which to start reading
@@ -73,18 +108,12 @@ typedef struct s_LibXmountInputFunctions {
               uint32_t count);
 
   /*!
-   * Function to close an opened input image
-   *
-   * \param pp_handle Pointer to the handle of the opened image
-   * \return 0 on success or error code
-   */
-  int (*Close)(void **pp_handle);
-
-  /*!
    * Function to return a string containing help messages for any supported
-   * lib-specific options
+   * lib-specific options.
    *
-   * \param pp_help Pointer to a string to store null-terminated help text
+   * Returned string must be constant. It won't be freed!
+   *
+   * \return Pointer to a null-terminated string containing the help text
    */
   const char* (*OptionsHelp)();
 

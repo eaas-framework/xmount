@@ -39,6 +39,7 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
+int EwfInitHandle(void **pp_handle);
 int EwfOpen(void **pp_handle,
             const char **pp_filename_arr,
             uint64_t filename_arr_len);
@@ -78,6 +79,7 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->InitHandle=&EwfInitHandle;
   p_functions->Open=&EwfOpen;
   p_functions->Size=&EwfSize;
   p_functions->Read=&EwfRead;
@@ -91,6 +93,22 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*******************************************************************************
  * Private
  ******************************************************************************/
+/*
+ * EwfInitHandle
+ */
+int EwfInitHandle(void **pp_handle) {
+  *pp_handle=NULL;
+
+#ifdef HAVE_LIBEWF_V2_API
+  if(libewf_handle_initialize((libewf_handle_t**)pp_handle,NULL)!=1) {
+    // LOG_ERROR("Couldn't create EWF handle!\n")
+    return 1;
+  }
+#endif
+
+  return 0;
+}
+
 /*
  * EwfOpen
  */
@@ -112,15 +130,6 @@ int EwfOpen(void **pp_handle,
       return 1;
     }
   }
-
-  // Init handle
-  *pp_handle=NULL;
-#ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_initialize((libewf_handle_t**)pp_handle,NULL)!=1) {
-    // LOG_ERROR("Couldn't create EWF handle!\n")
-    return 1;
-  }
-#endif
 
   // Open EWF file
 #ifdef HAVE_LIBEWF_V2_API

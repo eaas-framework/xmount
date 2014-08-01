@@ -34,6 +34,7 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
+int AffInitHandle(void **pp_handle);
 int AffOpen(void **pp_handle,
             const char **pp_filename_arr,
             uint64_t filename_arr_len);
@@ -58,52 +59,43 @@ void AffFreeBuffer(void *p_buf);
 /*
  * LibXmount_Input_GetApiVersion
  */
-void LibXmount_Input_GetApiVersion(uint8_t *p_ver) {
-  *p_ver=LIBXMOUNT_INPUT_API_VERSION;
+uint8_t LibXmount_Input_GetApiVersion() {
+  return LIBXMOUNT_INPUT_API_VERSION;
 }
 
 /*
  * LibXmount_Input_GetSupportedFormats
  */
-void LibXmount_Input_GetSupportedFormats(char ***ppp_arr, uint8_t *p_arr_len) {
-  // Alloc array containing 1 element with content "aff"
-  *ppp_arr=(char**)malloc(sizeof(char*));
-  if(*ppp_arr==NULL) {
-    *p_arr_len=0;
-    return;
-  }
-  **ppp_arr=(char*)malloc(sizeof(char)*4);
-  if(**ppp_arr==NULL) {
-    free(*ppp_arr);
-    *ppp_arr=NULL;
-    *p_arr_len=0;
-    return;
-  }
-  strcpy(**ppp_arr,"aff");
-  *p_arr_len=1;
+const char* LibXmount_Input_GetSupportedFormats() {
+  return "aff\0\0";
 }
 
 /*
  * LibXmount_Input_GetFunctions
  */
-void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions **pp_functions) {
-  *pp_functions=
-    (pts_LibXmountInputFunctions)malloc(sizeof(ts_LibXmountInputFunctions));
-  if(*pp_functions==NULL) return;
-
-  (*pp_functions)->Open=&AffOpen;
-  (*pp_functions)->Size=&AffSize;
-  (*pp_functions)->Read=&AffRead;
-  (*pp_functions)->Close=&AffClose;
-  (*pp_functions)->OptionsHelp=&AffOptionsHelp;
-  (*pp_functions)->OptionsParse=&AffOptionsParse;
-  (*pp_functions)->GetInfofileContent=&AffGetInfofileContent;
-  (*pp_functions)->FreeBuffer=&AffFreeBuffer;
+void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
+  p_functions->InitHandle=&AffInitHandle;
+  p_functions->Open=&AffOpen;
+  p_functions->Size=&AffSize;
+  p_functions->Read=&AffRead;
+  p_functions->Close=&AffClose;
+  p_functions->OptionsHelp=&AffOptionsHelp;
+  p_functions->OptionsParse=&AffOptionsParse;
+  p_functions->GetInfofileContent=&AffGetInfofileContent;
+  p_functions->FreeBuffer=&AffFreeBuffer;
 }
 
 /*******************************************************************************
  * Private
  ******************************************************************************/
+/*
+ * AffInitHandle
+ */
+int AffInitHandle(void **pp_handle) {
+  *pp_handle=NULL;
+  return 0;
+}
+
 /*
  * AffOpen
  */
