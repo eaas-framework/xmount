@@ -72,23 +72,24 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-int AewfInitHandle(void **pp_handle);
+int AewfCreateHandle(void **pp_handle);
+int AewfDestroyHandle(void **pp_handle);
 int AewfOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len);
+int AewfClose(void **pp_handle);
 int AewfSize(void *p_handle,
              uint64_t *p_size);
 int AewfRead(void *p_handle,
              uint64_t seek,
              char *p_buf,
              uint32_t count);
-int AewfClose(void **pp_handle);
 const char* AewfOptionsHelp();
 int AewfOptionsParse(void *p_handle,
                      char *p_options,
                      char **pp_error);
 int AewfGetInfofileContent(void *p_handle,
-                           const char **pp_info_buf);
+                           char **pp_info_buf);
 void AewfFreeBuffer(void *p_buf);
 
 /*******************************************************************************
@@ -112,11 +113,12 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
-  p_functions->InitHandle=&AewfInitHandle;
+  p_functions->CreateHandle=&AewfCreateHandle;
+  p_functions->DestroyHandle=&AewfDestroyHandle;
   p_functions->Open=&AewfOpen;
+  p_functions->Close=&AewfClose;
   p_functions->Size=&AewfSize;
   p_functions->Read=&AewfRead;
-  p_functions->Close=&AewfClose;
   p_functions->OptionsHelp=&AewfOptionsHelp;
   p_functions->OptionsParse=&AewfOptionsParse;
   p_functions->GetInfofileContent=&AewfGetInfofileContent;
@@ -194,10 +196,6 @@ static int QsortCompareSegments (const void *pA, const void *pB)
    const t_pSegment pSegmentB = ((const t_pSegment)pB); //lint !e1773 Attempt to cast way const
    return (int)pSegmentA->Number - (int)pSegmentB->Number;
 }
-
-// ---------------
-//  API functions
-// ---------------
 
 static int CreateInfoData (t_pAewf pAewf, t_pAewfSectionVolume pVolume, char *pHeader , unsigned HeaderLen,
                                                                         char *pHeader2, unsigned Header2Len)
@@ -390,211 +388,6 @@ static int CreateInfoData (t_pAewf pAewf, t_pAewfSectionVolume pVolume, char *pH
    if (pInfo3) free (pInfo3);
 
    return AEWF_OK;
-}
-
-/*
- * AewfInitHandle
- */
-int AewfInitHandle(void **pp_handle) {
-  t_pAewf p_aewf=(t_pAewf)*pp_handle;
-
-  // Create handle and clear it
-  // --------------------------
-  p_aewf=(t_pAewf)malloc(sizeof(t_Aewf));
-  if(p_aewf == NULL) return AEWF_MEMALLOC_FAILED;
-
-  memset(p_aewf,0,sizeof(t_Aewf));
-  p_aewf->ChunkInBuff=ULONG_LONG_MAX;
-  p_aewf->pErrorText=NULL;
-  p_aewf->pStatsFilename=NULL;
-  p_aewf->StatsRefresh=10;
-  p_aewf->SegmentCacheHits=0;
-  p_aewf->SegmentCacheMisses=0;
-  p_aewf->TableCacheHits=0;
-  p_aewf->TableCacheMisses=0;
-  p_aewf->ChunkCacheHits=0;
-  p_aewf->ChunkCacheMisses=0;
-  p_aewf->ReadOperations=0;
-  p_aewf->DataReadFromImage=0;
-  p_aewf->DataReadFromImageRaw=0;
-  p_aewf->DataRequestedByCaller=0;
-  p_aewf->TablesReadFromImage=0;
-
-  return AEWF_OK;
-}
-
-/*
- * AewfOpen
- */
-int AewfOpen(void **pp_handle,
-             const char **pp_filename_arr,
-             uint64_t filename_arr_len)
-{
-   t_pAewf                 pAewf=(t_pAewf)*pp_handle;
-   t_AewfFileHeader         FileHeader;
-   t_AewfSection            Section;
-   FILE                   *pFile;
-   t_pSegment              pSegment;
-   t_pTable                pTable;
-   uint64_t       Pos;
-   t_pAewfSectionTable     pEwfTable    = NULL;
-   t_pAewfSectionVolume    pVolume      = NULL;
-   char          *pHeader      = NULL;
-   char          *pHeader2     = NULL;
-   int                      LastSection;
-   unsigned int             SectionSectorsSize;
-   unsigned                 HeaderLen  = 0;
-   unsigned                 Header2Len = 0;
-
-   // Create pSegmentArr and put the segment files in it
-   // --------------------------------------------------
-   int SegmentArrLen  = filename_arr_len * sizeof(t_Segment);
-   pAewf->pSegmentArr = (t_pSegment) malloc (SegmentArrLen);
-   pAewf->Segments    = filename_arr_len;
-   if (pAewf->pSegmentArr == NULL)
-      return AEWF_MEMALLOC_FAILED;
-   memset (pAewf->pSegmentArr, 0, SegmentArrLen);
-
-   for (unsigned i=0; i<filename_arr_len; i++)
-   {
-      pSegment = &pAewf->pSegmentArr[i];
-      pSegment->pName = canonicalize_file_name (pp_filename_arr[i]); // canonicalize_file_name allocates a buffer
-
-      CHK (OpenFile (&pFile, pSegment->pName))
-      CHK (ReadFilePos (pFile, (void*)&FileHeader, sizeof(FileHeader), 0))
-//      DEBUG_PRINTF ("Segment %s - %d \n", pp_filename_arr[i], FileHeader.SegmentNumber);
-
-      pSegment->Number   = FileHeader.SegmentNumber;
-      pSegment->LastUsed = 0;
-      pSegment->pFile    = NULL;
-
-      CHK (CloseFile (&pFile))
-   }
-
-   // Put segment array into correct sequence and check if segment number are correct
-   // -------------------------------------------------------------------------------
-   qsort (pAewf->pSegmentArr, pAewf->Segments, sizeof (t_Segment), &QsortCompareSegments);
-   for (unsigned i=0; i<pAewf->Segments; i++)
-   {
-      if ((i+1) != pAewf->pSegmentArr[i].Number)
-         return AEWF_INVALID_SEGMENT_NUMBER;
-   }
-
-   // Find all tables in the segment files
-   // ------------------------------------
-   pAewf->pTableArr   = NULL;
-   pAewf->Tables      = 0;
-   pAewf->Chunks      = 0;
-   SectionSectorsSize = 0;
-
-   DEBUG_PRINTF ("Reading tables\n");
-   for (unsigned i=0; i<pAewf->Segments; i++)
-   {
-      pSegment = &pAewf->pSegmentArr[i];
-      CHK (OpenFile (&pFile, pSegment->pName))
-      CHK (ReadFilePos (pFile, &FileHeader, sizeof(FileHeader), 0))
-      Pos = sizeof (FileHeader);
-      DEBUG_PRINTF ("Segment %s ", pSegment->pName);
-      do
-      {
-         CHK (ReadFilePos (pFile, &Section, sizeof (t_AewfSection), Pos))
-
-         if (strcasecmp ((char *)Section.Type, "sectors") == 0)
-         {
-            SectionSectorsSize = Section.Size;
-         }
-         else if (strcasecmp ((char *)Section.Type, "table") == 0)
-         {
-            if (pVolume == NULL)
-               return AEWF_VOLUME_MUST_PRECEDE_TABLES;
-            if (SectionSectorsSize == 0)
-               return AEWF_SECTORS_MUST_PRECEDE_TABLES;
-            pAewf->Tables++;
-            pAewf->pTableArr = (t_pTable) realloc (pAewf->pTableArr, pAewf->Tables * sizeof (t_Table));
-            CHK (ReadFileAlloc (pFile, (void**) &pEwfTable, sizeof(t_AewfSectionTable))) // No need to read the actual offset table
-            pTable = &pAewf->pTableArr[pAewf->Tables-1];
-            pTable->Nr                 = pAewf->Tables-1;
-            pTable->pSegment           = pSegment;
-            pTable->Offset             = Pos + sizeof (t_AewfSection);
-            pTable->Size               = Section.Size;
-            pTable->ChunkCount         = pEwfTable->ChunkCount;
-            pTable->LastUsed           = 0;
-            pTable->pEwfTable          = NULL;
-            pTable->ChunkFrom          = pAewf->Chunks;
-            pTable->SectionSectorsSize = SectionSectorsSize;
-            pAewf->Chunks             += pTable->ChunkCount;
-            pTable->ChunkTo            = pAewf->Chunks-1;
-            DEBUG_PRINTF ("t%d", pTable->ChunkCount)
-            free (pEwfTable);
-            pEwfTable = NULL;
-            SectionSectorsSize = 0;
-         }
-         else if ((strcasecmp ((char *)Section.Type, "header") == 0) && (pHeader==NULL))
-         {
-            HeaderLen = Section.Size - sizeof(t_AewfSection);
-            CHK (ReadFileAlloc (pFile, (void**) &pHeader, HeaderLen))
-         }
-         else if ((strcasecmp ((char *)Section.Type, "header2") == 0) && (pHeader2==NULL))
-         {
-            Header2Len = Section.Size - sizeof(t_AewfSection);
-            CHK (ReadFileAlloc (pFile, (void**) &pHeader2, Header2Len))
-         }
-         else if ((strcasecmp ((char *)Section.Type, "volume") == 0) && (pVolume==NULL))
-         {
-            CHK (ReadFileAlloc (pFile, (void**) &pVolume, sizeof(t_AewfSectionVolume)))
-            pAewf->Sectors    = pVolume->SectorCount;
-            pAewf->SectorSize = pVolume->BytesPerSector;
-            pAewf->ChunkSize  = pVolume->SectorsPerChunk * pVolume->BytesPerSector;
-            pAewf->ImageSize  = pAewf->Sectors * pAewf->SectorSize;
-            DEBUG_PRINTF ("%lld sectors à %lld bytes", pAewf->Sectors, pAewf->SectorSize)
-         }
-
-         LastSection = (Pos == Section.OffsetNextSection);
-         Pos = Section.OffsetNextSection;
-      } while (!LastSection);
-      DEBUG_PRINTF ("\n");
-      CHK (CloseFile (&pFile))
-   }
-   if (pVolume == NULL)
-      return AEWF_VOLUME_MISSING;
-
-   if (pAewf->Chunks != pVolume->ChunkCount)
-      return AEWF_WRONG_CHUNK_COUNT;
-
-   pAewf->ChunkBuffSize = pAewf->ChunkSize + 4096; // reserve some extra space (for CRC and as compressed data might be slightly larger than uncompressed data with some imagers)
-   pAewf->pChunkBuffCompressed   = (char *) malloc (pAewf->ChunkBuffSize);
-   pAewf->pChunkBuffUncompressed = (char *) malloc (pAewf->ChunkBuffSize);
-   if ((pAewf->pChunkBuffCompressed   == NULL) ||
-       (pAewf->pChunkBuffUncompressed == NULL))
-      return AEWF_MEMALLOC_FAILED;
-
-   pAewf->MaxTableCache   = 10*1024*1024;
-   pAewf->MaxOpenSegments = 10;
-   pAewf->TableCache      = 0;
-   pAewf->OpenSegments    = 0;
-
-   CHK (CreateInfoData (pAewf, pVolume, pHeader, HeaderLen, pHeader2, Header2Len))
-   free (pVolume);
-   free (pHeader);
-   free (pHeader2);
-
-   return AEWF_OK;
-}
-
-/*
- * AewfInfo
- */
-int AewfGetInfofileContent(void *p_handle, const char **pp_info_buf) {
-  *pp_info_buf=((t_pAewf)p_handle)->pInfo;
-  return AEWF_OK;
-}
-
-/*
- * AewfSize
- */
-int AewfSize(void *p_handle, uint64_t *p_size) {
-  *p_size = ((t_pAewf)p_handle)->ImageSize;
-  return AEWF_OK;
 }
 
 static int AewfOpenSegment (t_pAewf pAewf, t_pTable pTable)
@@ -862,75 +655,6 @@ static int UpdateStats (t_pAewf pAewf, int Force)
    return AEWF_OK;
 }
 
-/*
- * AewfRead
- */
-int AewfRead(void *p_handle,
-             uint64_t seek,
-             char *p_buf,
-             uint32_t count)
-{
-  uint64_t chunk;
-  char *p_chunk_buffer;
-  unsigned int chunk_len, ofs, to_copy;
-
-  ((t_pAewf)p_handle)->ReadOperations++;
-  ((t_pAewf)p_handle)->DataRequestedByCaller+=count;
-
-  if((seek+count)>((t_pAewf)p_handle)->ImageSize) {
-    return AEWF_READ_BEYOND_IMAGE_LENGTH;
-  }
-
-  chunk=seek/((t_pAewf)p_handle)->ChunkSize;
-  ofs=seek%((t_pAewf)p_handle)->ChunkSize;
-
-  while(count) {
-    CHK(AewfReadChunk((t_pAewf)p_handle,chunk,&p_chunk_buffer,&chunk_len))
-    to_copy=GETMIN(chunk_len-ofs,count);
-    memcpy(p_buf,p_chunk_buffer+ofs,to_copy);
-    count-=to_copy;
-    p_buf+=to_copy;
-    ofs=0;
-    chunk++;
-  }
-  CHK(UpdateStats((t_pAewf)p_handle,FALSE))
-
-  return AEWF_OK;
-}
-
-/*
- * AewfClose
- */
-int AewfClose(void **pp_handle) {
-  t_pTable   p_table;
-  t_pSegment p_segment;
-  t_pAewf    p_aewf=*((t_pAewf*)pp_handle);
-
-  CHK(UpdateStats(p_aewf,TRUE))
-
-  for(unsigned i=0;i<p_aewf->Tables;i++) {
-    p_table=&p_aewf->pTableArr[i];
-    if(p_table->pEwfTable) free(p_table->pEwfTable);
-  }
-
-  for(unsigned i=0;i<p_aewf->Segments;i++) {
-    p_segment=&p_aewf->pSegmentArr[i];
-    if(p_segment->pFile) CloseFile(&p_segment->pFile);
-    free(p_segment->pName);
-  }
-
-  free(p_aewf->pTableArr);
-  free(p_aewf->pSegmentArr);
-  free(p_aewf->pChunkBuffCompressed);
-  free(p_aewf->pChunkBuffUncompressed);
-  if(p_aewf->pStatsFilename) free(p_aewf->pStatsFilename);
-  memset(p_aewf,0,sizeof(t_Aewf));
-  free(p_aewf);
-  *pp_handle=NULL;
-
-  return AEWF_OK;
-}
-
 // Option handling
 // ---------------
 
@@ -1003,6 +727,298 @@ static int ReadOption (t_pAewf pAewf, char *pOption, int OptionLen, char **ppErr
    return AEWF_OK;
 }
 
+// ---------------
+//  API functions
+// ---------------
+
+/*
+ * AewfInitHandle
+ */
+int AewfCreateHandle(void **pp_handle) {
+  t_pAewf p_aewf=(t_pAewf)*pp_handle;
+
+  // Create handle and clear it
+  // --------------------------
+  p_aewf=(t_pAewf)malloc(sizeof(t_Aewf));
+  if(p_aewf == NULL) return AEWF_MEMALLOC_FAILED;
+
+  memset(p_aewf,0,sizeof(t_Aewf));
+  p_aewf->ChunkInBuff=ULONG_LONG_MAX;
+  p_aewf->pErrorText=NULL;
+  p_aewf->pStatsFilename=NULL;
+  p_aewf->StatsRefresh=10;
+  p_aewf->SegmentCacheHits=0;
+  p_aewf->SegmentCacheMisses=0;
+  p_aewf->TableCacheHits=0;
+  p_aewf->TableCacheMisses=0;
+  p_aewf->ChunkCacheHits=0;
+  p_aewf->ChunkCacheMisses=0;
+  p_aewf->ReadOperations=0;
+  p_aewf->DataReadFromImage=0;
+  p_aewf->DataReadFromImageRaw=0;
+  p_aewf->DataRequestedByCaller=0;
+  p_aewf->TablesReadFromImage=0;
+
+  return AEWF_OK;
+}
+
+/*
+ * AewfDestroyHandle
+ */
+int AewfDestroyHandle(void **pp_handle) {
+  // TODO: Implement
+  return 0;
+}
+
+/*
+ * AewfOpen
+ */
+int AewfOpen(void **pp_handle,
+             const char **pp_filename_arr,
+             uint64_t filename_arr_len)
+{
+   t_pAewf                 pAewf=(t_pAewf)*pp_handle;
+   t_AewfFileHeader         FileHeader;
+   t_AewfSection            Section;
+   FILE                   *pFile;
+   t_pSegment              pSegment;
+   t_pTable                pTable;
+   uint64_t       Pos;
+   t_pAewfSectionTable     pEwfTable    = NULL;
+   t_pAewfSectionVolume    pVolume      = NULL;
+   char          *pHeader      = NULL;
+   char          *pHeader2     = NULL;
+   int                      LastSection;
+   unsigned int             SectionSectorsSize;
+   unsigned                 HeaderLen  = 0;
+   unsigned                 Header2Len = 0;
+
+   // Create pSegmentArr and put the segment files in it
+   // --------------------------------------------------
+   int SegmentArrLen  = filename_arr_len * sizeof(t_Segment);
+   pAewf->pSegmentArr = (t_pSegment) malloc (SegmentArrLen);
+   pAewf->Segments    = filename_arr_len;
+   if (pAewf->pSegmentArr == NULL)
+      return AEWF_MEMALLOC_FAILED;
+   memset (pAewf->pSegmentArr, 0, SegmentArrLen);
+
+   for (unsigned i=0; i<filename_arr_len; i++)
+   {
+      pSegment = &pAewf->pSegmentArr[i];
+      pSegment->pName = canonicalize_file_name (pp_filename_arr[i]); // canonicalize_file_name allocates a buffer
+
+      CHK (OpenFile (&pFile, pSegment->pName))
+      CHK (ReadFilePos (pFile, (void*)&FileHeader, sizeof(FileHeader), 0))
+//      DEBUG_PRINTF ("Segment %s - %d \n", pp_filename_arr[i], FileHeader.SegmentNumber);
+
+      pSegment->Number   = FileHeader.SegmentNumber;
+      pSegment->LastUsed = 0;
+      pSegment->pFile    = NULL;
+
+      CHK (CloseFile (&pFile))
+   }
+
+   // Put segment array into correct sequence and check if segment number are correct
+   // -------------------------------------------------------------------------------
+   qsort (pAewf->pSegmentArr, pAewf->Segments, sizeof (t_Segment), &QsortCompareSegments);
+   for (unsigned i=0; i<pAewf->Segments; i++)
+   {
+      if ((i+1) != pAewf->pSegmentArr[i].Number)
+         return AEWF_INVALID_SEGMENT_NUMBER;
+   }
+
+   // Find all tables in the segment files
+   // ------------------------------------
+   pAewf->pTableArr   = NULL;
+   pAewf->Tables      = 0;
+   pAewf->Chunks      = 0;
+   SectionSectorsSize = 0;
+
+   DEBUG_PRINTF ("Reading tables\n");
+   for (unsigned i=0; i<pAewf->Segments; i++)
+   {
+      pSegment = &pAewf->pSegmentArr[i];
+      CHK (OpenFile (&pFile, pSegment->pName))
+      CHK (ReadFilePos (pFile, &FileHeader, sizeof(FileHeader), 0))
+      Pos = sizeof (FileHeader);
+      DEBUG_PRINTF ("Segment %s ", pSegment->pName);
+      do
+      {
+         CHK (ReadFilePos (pFile, &Section, sizeof (t_AewfSection), Pos))
+
+         if (strcasecmp ((char *)Section.Type, "sectors") == 0)
+         {
+            SectionSectorsSize = Section.Size;
+         }
+         else if (strcasecmp ((char *)Section.Type, "table") == 0)
+         {
+            if (pVolume == NULL)
+               return AEWF_VOLUME_MUST_PRECEDE_TABLES;
+            if (SectionSectorsSize == 0)
+               return AEWF_SECTORS_MUST_PRECEDE_TABLES;
+            pAewf->Tables++;
+            pAewf->pTableArr = (t_pTable) realloc (pAewf->pTableArr, pAewf->Tables * sizeof (t_Table));
+            CHK (ReadFileAlloc (pFile, (void**) &pEwfTable, sizeof(t_AewfSectionTable))) // No need to read the actual offset table
+            pTable = &pAewf->pTableArr[pAewf->Tables-1];
+            pTable->Nr                 = pAewf->Tables-1;
+            pTable->pSegment           = pSegment;
+            pTable->Offset             = Pos + sizeof (t_AewfSection);
+            pTable->Size               = Section.Size;
+            pTable->ChunkCount         = pEwfTable->ChunkCount;
+            pTable->LastUsed           = 0;
+            pTable->pEwfTable          = NULL;
+            pTable->ChunkFrom          = pAewf->Chunks;
+            pTable->SectionSectorsSize = SectionSectorsSize;
+            pAewf->Chunks             += pTable->ChunkCount;
+            pTable->ChunkTo            = pAewf->Chunks-1;
+            DEBUG_PRINTF ("t%d", pTable->ChunkCount)
+            free (pEwfTable);
+            pEwfTable = NULL;
+            SectionSectorsSize = 0;
+         }
+         else if ((strcasecmp ((char *)Section.Type, "header") == 0) && (pHeader==NULL))
+         {
+            HeaderLen = Section.Size - sizeof(t_AewfSection);
+            CHK (ReadFileAlloc (pFile, (void**) &pHeader, HeaderLen))
+         }
+         else if ((strcasecmp ((char *)Section.Type, "header2") == 0) && (pHeader2==NULL))
+         {
+            Header2Len = Section.Size - sizeof(t_AewfSection);
+            CHK (ReadFileAlloc (pFile, (void**) &pHeader2, Header2Len))
+         }
+         else if ((strcasecmp ((char *)Section.Type, "volume") == 0) && (pVolume==NULL))
+         {
+            CHK (ReadFileAlloc (pFile, (void**) &pVolume, sizeof(t_AewfSectionVolume)))
+            pAewf->Sectors    = pVolume->SectorCount;
+            pAewf->SectorSize = pVolume->BytesPerSector;
+            pAewf->ChunkSize  = pVolume->SectorsPerChunk * pVolume->BytesPerSector;
+            pAewf->ImageSize  = pAewf->Sectors * pAewf->SectorSize;
+            DEBUG_PRINTF ("%lld sectors à %lld bytes", pAewf->Sectors, pAewf->SectorSize)
+         }
+
+         LastSection = (Pos == Section.OffsetNextSection);
+         Pos = Section.OffsetNextSection;
+      } while (!LastSection);
+      DEBUG_PRINTF ("\n");
+      CHK (CloseFile (&pFile))
+   }
+   if (pVolume == NULL)
+      return AEWF_VOLUME_MISSING;
+
+   if (pAewf->Chunks != pVolume->ChunkCount)
+      return AEWF_WRONG_CHUNK_COUNT;
+
+   pAewf->ChunkBuffSize = pAewf->ChunkSize + 4096; // reserve some extra space (for CRC and as compressed data might be slightly larger than uncompressed data with some imagers)
+   pAewf->pChunkBuffCompressed   = (char *) malloc (pAewf->ChunkBuffSize);
+   pAewf->pChunkBuffUncompressed = (char *) malloc (pAewf->ChunkBuffSize);
+   if ((pAewf->pChunkBuffCompressed   == NULL) ||
+       (pAewf->pChunkBuffUncompressed == NULL))
+      return AEWF_MEMALLOC_FAILED;
+
+   pAewf->MaxTableCache   = 10*1024*1024;
+   pAewf->MaxOpenSegments = 10;
+   pAewf->TableCache      = 0;
+   pAewf->OpenSegments    = 0;
+
+   CHK (CreateInfoData (pAewf, pVolume, pHeader, HeaderLen, pHeader2, Header2Len))
+   free (pVolume);
+   free (pHeader);
+   free (pHeader2);
+
+   return AEWF_OK;
+}
+
+/*
+ * AewfClose
+ */
+int AewfClose(void **pp_handle) {
+  t_pTable   p_table;
+  t_pSegment p_segment;
+  t_pAewf    p_aewf=*((t_pAewf*)pp_handle);
+
+  CHK(UpdateStats(p_aewf,TRUE))
+
+  for(unsigned i=0;i<p_aewf->Tables;i++) {
+    p_table=&p_aewf->pTableArr[i];
+    if(p_table->pEwfTable) free(p_table->pEwfTable);
+  }
+
+  for(unsigned i=0;i<p_aewf->Segments;i++) {
+    p_segment=&p_aewf->pSegmentArr[i];
+    if(p_segment->pFile) CloseFile(&p_segment->pFile);
+    free(p_segment->pName);
+  }
+
+  free(p_aewf->pTableArr);
+  free(p_aewf->pSegmentArr);
+  free(p_aewf->pChunkBuffCompressed);
+  free(p_aewf->pChunkBuffUncompressed);
+  if(p_aewf->pStatsFilename) free(p_aewf->pStatsFilename);
+  memset(p_aewf,0,sizeof(t_Aewf));
+  free(p_aewf);
+  *pp_handle=NULL;
+
+  return AEWF_OK;
+}
+
+
+/*
+ * AewfSize
+ */
+int AewfSize(void *p_handle, uint64_t *p_size) {
+  *p_size = ((t_pAewf)p_handle)->ImageSize;
+  return AEWF_OK;
+}
+
+/*
+ * AewfRead
+ */
+int AewfRead(void *p_handle,
+             uint64_t seek,
+             char *p_buf,
+             uint32_t count)
+{
+  uint64_t chunk;
+  char *p_chunk_buffer;
+  unsigned int chunk_len, ofs, to_copy;
+
+  ((t_pAewf)p_handle)->ReadOperations++;
+  ((t_pAewf)p_handle)->DataRequestedByCaller+=count;
+
+  if((seek+count)>((t_pAewf)p_handle)->ImageSize) {
+    return AEWF_READ_BEYOND_IMAGE_LENGTH;
+  }
+
+  chunk=seek/((t_pAewf)p_handle)->ChunkSize;
+  ofs=seek%((t_pAewf)p_handle)->ChunkSize;
+
+  while(count) {
+    CHK(AewfReadChunk((t_pAewf)p_handle,chunk,&p_chunk_buffer,&chunk_len))
+    to_copy=GETMIN(chunk_len-ofs,count);
+    memcpy(p_buf,p_chunk_buffer+ofs,to_copy);
+    count-=to_copy;
+    p_buf+=to_copy;
+    ofs=0;
+    chunk++;
+  }
+  CHK(UpdateStats((t_pAewf)p_handle,FALSE))
+
+  return AEWF_OK;
+}
+
+/*
+ * AewfOptionsHelp
+ */
+const char* AewfOptionsHelp() {
+  return "      aewf_maxmem : The maximum amount of memory (in MiB) used for caching image offset tables.\n"
+         "      aewf_maxfiles : The maximum number of image segment files opened at the same time.\n"
+         "      aewf_stats : A filename that will be used for outputting statistical data at regular\n"
+         "                   intervals. The process id is automatically appended to the given filename.\n"
+         "      aewf_refresh : The update interval, in seconds, for the statistical data output.\n"
+         "                     Ignored if aewf_stats is not set. The default value is 10.\n"
+         "      Example: aewf_maxmem=64,aewf_stats=mystats,aewf_refresh=2";
+}
+
 /*
  * AewfOptionsParse
  */
@@ -1051,16 +1067,24 @@ int AewfOptionsParse(void *p_handle, char *p_options, char **pp_error) {
    return AEWF_OK;
 }
 
-const char* AewfOptionsHelp() {
-  return "      aewf_maxmem : The maximum amount of memory (in MiB) used for caching image offset tables.\n"
-         "      aewf_maxfiles : The maximum number of image segment files opened at the same time.\n"
-         "      aewf_stats : A filename that will be used for outputting statistical data at regular\n"
-         "                   intervals. The process id is automatically appended to the given filename.\n"
-         "      aewf_refresh : The update interval, in seconds, for the statistical data output.\n"
-         "                     Ignored if aewf_stats is not set. The default value is 10.\n"
-         "      Example: aewf_maxmem=64,aewf_stats=mystats,aewf_refresh=2";
+/*
+ * AewfGetInfofileContent
+ */
+int AewfGetInfofileContent(void *p_handle, char **pp_info_buf) {
+  // TODO: Rather then copying, generate info text once here. It won't be used
+  // after this anymore.
+  *pp_info_buf=(char*)malloc(strlen(((t_pAewf)p_handle)->pInfo)+1);
+  if(*pp_info_buf==NULL) {
+    return AEWF_MEMALLOC_FAILED;
+  }
+
+  strcpy(*pp_info_buf,((t_pAewf)p_handle)->pInfo);
+  return AEWF_OK;
 }
 
+/*
+ * AewfFreeBuffer
+ */
 void AewfFreeBuffer(void *p_buf) {
   free(p_buf);
 }

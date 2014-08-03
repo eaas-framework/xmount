@@ -40,5 +40,59 @@ enum
     DD_READ_BEYOND_END_OF_IMAGE
 };
 
+// ----------------------
+//  Constant definitions
+// ----------------------
+
+#define GETMAX(a,b) ((a)>(b)?(a):(b))
+#define GETMIN(a,b) ((a)<(b)?(a):(b))
+
+
+// ---------------------
+//  Types and strutures
+// ---------------------
+
+typedef struct 
+{
+   char              *pFilename;
+   unsigned long long  FileSize;
+   FILE               *pFile;
+} t_Piece, *t_pPiece;
+
+typedef struct _t_dd
+{
+   t_pPiece           pPieceArr;
+   unsigned int        Pieces;
+   unsigned long long  TotalSize;
+   char              *pInfo;
+} t_dd;
+
+
+// ----------------
+//  Error handling
+// ----------------
+
+#ifdef DD_DEBUG
+   #define CHK(ChkVal)    \
+   {                                                                  \
+      int ChkValRc;                                                   \
+      if ((ChkValRc=(ChkVal)) != DD_OK)                               \
+      {                                                               \
+         printf ("Err %d in %s, %d\n", ChkValRc, __FILE__, __LINE__); \
+         return ChkValRc;                                             \
+      }                                                               \
+   }
+   #define DEBUG_PRINTF(pFormat, ...) \
+      printf (pFormat, ##__VA_ARGS__);
+#else
+   #define CHK(ChkVal)                      \
+   {                                        \
+      int ChkValRc;                         \
+      if ((ChkValRc=(ChkVal)) != DD_OK)     \
+         return ChkValRc;                   \
+   }
+   #define DEBUG_PRINTF(...)
+#endif
+
 #endif
 

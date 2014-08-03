@@ -35,23 +35,24 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-int DdInitHandle(void **pp_handle);
+int DdCreateHandle(void **pp_handle);
+int DdDestroyHandle(void **pp_handle);
 int DdOpen(void **pp_handle,
            const char **pp_filename_arr,
            uint64_t filename_arr_len);
+int DdClose(void **pp_handle);
 int DdSize(void *p_handle,
            uint64_t *p_size);
 int DdRead(void *p_handle,
            uint64_t seek,
            char *p_buf,
            uint32_t count);
-int DdClose(void **pp_handle);
 const char* DdOptionsHelp();
 int DdOptionsParse(void *p_handle,
                    char *p_options,
                    char **pp_error);
 int DdGetInfofileContent(void *p_handle,
-                         const char **pp_info_buf);
+                         char **pp_info_buf);
 void DdFreeBuffer(void *p_buf);
 
 /*******************************************************************************
@@ -75,11 +76,12 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
-  p_functions->InitHandle=&DdInitHandle;
+  p_functions->CreateHandle=&DdCreateHandle;
+  p_functions->DestroyHandle=&DdDestroyHandle;
   p_functions->Open=&DdOpen;
+  p_functions->Close=&DdClose;
   p_functions->Size=&DdSize;
   p_functions->Read=&DdRead;
-  p_functions->Close=&DdClose;
   p_functions->OptionsHelp=&DdOptionsHelp;
   p_functions->OptionsParse=&DdOptionsParse;
   p_functions->GetInfofileContent=&DdGetInfofileContent;
@@ -89,60 +91,6 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*******************************************************************************
  * Private
  ******************************************************************************/
-
-// ----------------------
-//  Constant definitions
-// ----------------------
-
-#define GETMAX(a,b) ((a)>(b)?(a):(b))
-#define GETMIN(a,b) ((a)<(b)?(a):(b))
-
-
-// ---------------------
-//  Types and strutures
-// ---------------------
-
-typedef struct 
-{
-   char              *pFilename;
-   unsigned long long  FileSize;
-   FILE               *pFile;
-} t_Piece, *t_pPiece;
-
-typedef struct _t_dd
-{
-   t_pPiece           pPieceArr;
-   unsigned int        Pieces;
-   unsigned long long  TotalSize;
-   char              *pInfo;
-} t_dd;
-
-
-// ----------------
-//  Error handling
-// ----------------
-
-#ifdef DD_DEBUG
-   #define CHK(ChkVal)    \
-   {                                                                  \
-      int ChkValRc;                                                   \
-      if ((ChkValRc=(ChkVal)) != DD_OK)                               \
-      {                                                               \
-         printf ("Err %d in %s, %d\n", ChkValRc, __FILE__, __LINE__); \
-         return ChkValRc;                                             \
-      }                                                               \
-   }
-   #define DEBUG_PRINTF(pFormat, ...) \
-      printf (pFormat, ##__VA_ARGS__);
-#else
-   #define CHK(ChkVal)                      \
-   {                                        \
-      int ChkValRc;                         \
-      if ((ChkValRc=(ChkVal)) != DD_OK)     \
-         return ChkValRc;                   \
-   }
-   #define DEBUG_PRINTF(...)
-#endif
 
 // ---------------------------
 //  Internal static functions
@@ -160,7 +108,7 @@ static inline int DdSetCurrentSeekPos (t_pPiece pPiece, uint64_t Val, int Whence
    return DD_OK;
 }
 
-int DdDestroyHandle (t_pdd *ppdd)
+int DdDestroyHandle0 (t_pdd *ppdd)
 {
     t_pdd    pdd = *ppdd;
     t_pPiece pPiece;
@@ -191,7 +139,7 @@ int DdDestroyHandle (t_pdd *ppdd)
     return DD_OK;
 }
 
-static int DdCreateHandle (t_pdd pdd, unsigned FilenameArrLen, const char **ppFilenameArr)
+static int DdCreateHandle0 (t_pdd pdd, unsigned FilenameArrLen, const char **ppFilenameArr)
 {
    t_pPiece pPiece;
 
@@ -199,7 +147,7 @@ static int DdCreateHandle (t_pdd pdd, unsigned FilenameArrLen, const char **ppFi
    pdd->pPieceArr = (t_pPiece) malloc (pdd->Pieces * sizeof(t_Piece));
    if (pdd->pPieceArr == NULL)
    {
-      (void) DdDestroyHandle (&pdd);
+      (void) DdDestroyHandle0 (&pdd);
       return DD_MEMALLOC_FAILED;
    }
 
@@ -210,13 +158,13 @@ static int DdCreateHandle (t_pdd pdd, unsigned FilenameArrLen, const char **ppFi
        pPiece->pFilename = strdup (ppFilenameArr[i]);
        if (pPiece->pFilename == NULL)
        {
-          (void) DdDestroyHandle (&pdd);
+          (void) DdDestroyHandle0 (&pdd);
           return DD_MEMALLOC_FAILED;
        }
        pPiece->pFile = fopen (pPiece->pFilename, "r");
        if (pPiece->pFile == NULL)
        {
-          (void) DdDestroyHandle (&pdd);
+          (void) DdDestroyHandle0 (&pdd);
           return DD_FILE_OPEN_FAILED;
        }
        CHK(DdSetCurrentSeekPos(pPiece, 0, SEEK_END))
@@ -227,44 +175,6 @@ static int DdCreateHandle (t_pdd pdd, unsigned FilenameArrLen, const char **ppFi
    asprintf (&pdd->pInfo, "dd image made of %u pieces, %llu bytes in total (%0.3f GiB)", pdd->Pieces, pdd->TotalSize, pdd->TotalSize / (1024.0*1024.0*1024.0));
 
    return DD_OK;
-}
-
-
-// ---------------
-//  API functions
-// ---------------
-
-/*
- * DdInitHandle
- */
-int DdInitHandle(void **pp_handle) {
-  t_pdd p_dd=(t_pdd)*pp_handle;
-
-  p_dd=(t_pdd)malloc(sizeof(t_dd));
-  if(p_dd==NULL) return DD_MEMALLOC_FAILED;
-
-  memset(p_dd,0,sizeof(t_dd));
-
-  return DD_OK;
-}
-
-/*
- * DdOpen
- */
-int DdOpen(void **pp_handle,
-           const char **pp_filename_arr,
-           uint64_t filename_arr_len)
-{
-  CHK(DdCreateHandle((t_pdd)*pp_handle,filename_arr_len,pp_filename_arr))
-  return DD_OK;
-}
-
-/*
- * DdSize
- */
-int DdSize(void *p_handle, uint64_t *p_size) {
-  *p_size=((t_pdd)p_handle)->TotalSize;
-  return DD_OK;
 }
 
 int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
@@ -297,6 +207,59 @@ int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
     return DD_OK;
 }
 
+// ---------------
+//  API functions
+// ---------------
+
+/*
+ * DdCreateHandle
+ */
+int DdCreateHandle(void **pp_handle) {
+  t_pdd p_dd=(t_pdd)*pp_handle;
+
+  p_dd=(t_pdd)malloc(sizeof(t_dd));
+  if(p_dd==NULL) return DD_MEMALLOC_FAILED;
+
+  memset(p_dd,0,sizeof(t_dd));
+
+  return DD_OK;
+}
+
+/*
+ * DdDestroyHandle
+ */
+int DdDestroyHandle(void **pp_handle) {
+  // TODO: Implement
+  return DD_OK;
+}
+
+/*
+ * DdOpen
+ */
+int DdOpen(void **pp_handle,
+           const char **pp_filename_arr,
+           uint64_t filename_arr_len)
+{
+  CHK(DdCreateHandle0((t_pdd)*pp_handle,filename_arr_len,pp_filename_arr))
+  return DD_OK;
+}
+
+/*
+ * DdClose
+ */
+int DdClose(void **pp_handle) {
+  CHK (DdDestroyHandle0((t_pdd*)pp_handle))
+  return DD_OK;
+}
+
+/*
+ * DdSize
+ */
+int DdSize(void *p_handle, uint64_t *p_size) {
+  *p_size=((t_pdd)p_handle)->TotalSize;
+  return DD_OK;
+}
+
 /*
  * DdRead
  */
@@ -324,22 +287,6 @@ int DdRead(void *p_handle,
 }
 
 /*
- * DdInfo
- */
-int DdGetInfofileContent(void *p_handle, const char **pp_info_buf) {
-  *pp_info_buf=((t_pdd)p_handle)->pInfo;
-  return DD_OK;
-}
-
-/*
- * DdClose
- */
-int DdClose(void **pp_handle) {
-  CHK (DdDestroyHandle((t_pdd*)pp_handle))
-  return DD_OK;
-}
-
-/*
  * DdOptionsHelp
  */
 const char* DdOptionsHelp() {
@@ -350,6 +297,21 @@ const char* DdOptionsHelp() {
  * DdOptionsParse
  */
 int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
+  return DD_OK;
+}
+
+/*
+ * DdGetInfofileContent
+ */
+int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
+  // TODO: Rather then copying, generate info text once here. It won't be used
+  // after this anymore.
+  *pp_info_buf=(char*)malloc(strlen(((t_pdd)p_handle)->pInfo)+1);
+  if(*pp_info_buf==NULL) {
+    return DD_MEMALLOC_FAILED;
+  }
+
+  strcpy(*pp_info_buf,((t_pdd)p_handle)->pInfo);
   return DD_OK;
 }
 

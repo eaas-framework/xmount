@@ -40,7 +40,8 @@
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-int AaffInitHandle(void **pp_handle);
+int AaffCreateHandle(void **pp_handle);
+int AaffDestroyHandle(void **pp_handle);
 int AaffOpen(void **pp_handle,
              const char **pp_filename_arr,
              uint64_t filename_arr_len);
@@ -56,7 +57,7 @@ int AaffOptionsParse(void *p_handle,
                      char *p_options,
                      char **pp_error);
 int AaffGetInfofileContent(void *p_handle,
-                           const char **pp_info_buf);
+                           char **pp_info_buf);
 void AaffFreeBuffer(void *p_buf);
 
 /*******************************************************************************
@@ -80,11 +81,12 @@ const char* LibXmount_Input_GetSupportedFormats() {
  * LibXmount_Input_GetFunctions
  */
 void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
-  p_functions->InitHandle=&AaffInitHandle;
+  p_functions->CreateHandle=&AaffCreateHandle;
+  p_functions->DestroyHandle=&AaffDestroyHandle;
   p_functions->Open=&AaffOpen;
+  p_functions->Close=&AaffClose;
   p_functions->Size=&AaffSize;
   p_functions->Read=&AaffRead;
-  p_functions->Close=&AaffClose;
   p_functions->OptionsHelp=&AaffOptionsHelp;
   p_functions->OptionsParse=&AaffOptionsParse;
   p_functions->GetInfofileContent=&AaffGetInfofileContent;
@@ -99,7 +101,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 //  Internal static functions
 // ---------------------------
 
-static int AaffCreateHandle (t_pAaff *ppAaff)
+static int AaffCreateHandle0 (t_pAaff *ppAaff)
 {
    t_pAaff pAaff;
 
@@ -113,7 +115,7 @@ static int AaffCreateHandle (t_pAaff *ppAaff)
    return AAFF_OK;
 }
 
-static int AaffDestroyHandle (t_pAaff *ppAaff)
+static int AaffDestroyHandle0 (t_pAaff *ppAaff)
 {
    t_pAaff pAaff = *ppAaff;
 
@@ -369,11 +371,23 @@ static int AaffReadPage (t_pAaff pAaff, uint64_t Page, char **ppBuffer, uint32_t
 // ---------------
 
 /*
- * AaffInitHandle
+ * AaffCreateHandle
  */
-int AaffInitHandle(void **pp_handle) {
+int AaffCreateHandle(void **pp_handle) {
   *pp_handle=NULL;
-  CHK(AaffCreateHandle((t_pAaff*)pp_handle))
+  CHK(AaffCreateHandle0((t_pAaff*)pp_handle))
+  return AAFF_OK;
+}
+
+/*
+ * AaffDestroyHandle
+ */
+int AaffDestroyHandle(void **pp_handle) {
+  // TODO: Implement
+/*
+  CHK(AaffDestroyHandle0((t_pAaff*)pp_handle))
+  *pp_handle=NULL;
+*/
   return AAFF_OK;
 }
 
@@ -397,7 +411,7 @@ int AaffOpen(void **pp_handle,
   pAaff->pFilename=strdup(pp_filename_arr[0]);
   pAaff->pFile=fopen(pp_filename_arr[0],"r");
   if(pAaff->pFile==NULL) {
-    AaffDestroyHandle(&pAaff);
+    AaffDestroyHandle0(&pAaff);
     return AAFF_FILE_OPEN_FAILED;
   }
 
@@ -521,7 +535,7 @@ int AaffClose(void **pp_handle) {
   int rc=AAFF_OK;
 
   if(fclose((*(t_pAaff*)pp_handle)->pFile)) rc=AAFF_CANNOT_CLOSE_FILE;
-  CHK(AaffDestroyHandle((t_pAaff*)pp_handle))
+  CHK(AaffDestroyHandle0((t_pAaff*)pp_handle))
 
   return rc;
 }
@@ -529,7 +543,7 @@ int AaffClose(void **pp_handle) {
 /*
  * AaffGetInfofileContent
  */
-int AaffGetInfofileContent(void *p_handle, const char **pp_info_buf) {
+int AaffGetInfofileContent(void *p_handle, char **pp_info_buf) {
    uint64_t i;
    uint64_t Entries = 0;
    int      Pos     = 0;
@@ -561,9 +575,15 @@ int AaffGetInfofileContent(void *p_handle, const char **pp_info_buf) {
    Pos += snprintf (&((t_pAaff)p_handle)->pInfoBuff[Pos], REM, "\n");
    #undef REM
 
-   *pp_info_buf = ((t_pAaff)p_handle)->pInfoBuff;
+  // TODO: Rather then copying, generate info text once here. It won't be used
+  // after this anymore.
+  *pp_info_buf=(char*)malloc(strlen(((t_pAaff)p_handle)->pInfoBuff)+1);
+  if(*pp_info_buf==NULL) {
+    return AAFF_MEMALLOC_FAILED;
+  }
 
-   return AAFF_OK;
+  strcpy(*pp_info_buf,((t_pAaff)p_handle)->pInfoBuff);
+  return AAFF_OK;
 }
 
 /*

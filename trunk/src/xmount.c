@@ -636,6 +636,8 @@ static int ExtractVirtFileNames(char *p_orig_name) {
  *   "TRUE" on success, "FALSE" on error
  */
 static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
+  int ret;
+
   // Make sure to return correct values when dealing with only 32bit file sizes
   *p_size=0;
 
@@ -647,8 +649,10 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
   }
 
   // Get size of original image
-  if(glob_p_input_functions->Size(glob_p_input_image,p_size)!=0) {
-    LOG_ERROR("Unable to determine input image size\n");
+  ret=glob_p_input_functions->Size(glob_p_input_image,p_size);
+  if(ret!=0) {
+    LOG_ERROR("Unable to determine input image size: %s!\n",
+              glob_p_input_functions->GetErrorMessage(ret));
     return FALSE;
   }
 
@@ -731,6 +735,7 @@ static int GetVirtImageSize(uint64_t *p_size) {
  *   Number of read bytes on success or "-1" on error
  */
 static int GetOrigImageData(char *p_buf, off_t offset, size_t size) {
+  int ret;
   size_t to_read=0;
   uint64_t image_size=0;
 
@@ -752,14 +757,15 @@ static int GetOrigImageData(char *p_buf, off_t offset, size_t size) {
   } else to_read=size;
 
   // Read data from image file (adding input image offset if one was specified)
-  if(glob_p_input_functions->Read(glob_p_input_image,
-                                  offset+glob_xmount_cfg.orig_img_offset,
-                                  p_buf,
-                                  to_read)!=0)
-  {
+  ret=glob_p_input_functions->Read(glob_p_input_image,
+                                   offset+glob_xmount_cfg.orig_img_offset,
+                                   p_buf,
+                                   to_read);
+  if(ret!=0) {
     LOG_ERROR("Couldn't read %zd bytes from offset %" PRIu64 "!\n",
               to_read,
-              offset);
+              offset,
+              glob_p_input_functions->GetErrorMessage(ret));
     return -1;
   }
 
@@ -2387,6 +2393,7 @@ static int InitVirtualVmdkFile() {
 #undef VMDK_DESC_FILE
 
   // Do not use XMOUNT_STRSET here to avoid adding '\0' to the buffer!
+  // TODO: Not adding \0 but using strlen afterwards??? Needs checking!!
   XMOUNT_MALLOC(glob_p_vmdk_file,char*,strlen(buf))
   strncpy(glob_p_vmdk_file,buf,strlen(buf));
   glob_vmdk_file_size=strlen(buf);
@@ -2405,113 +2412,25 @@ static int InitVirtualVmdkFile() {
  *   "TRUE" on success, "FALSE" on error
  */
 static int InitVirtImageInfoFile() {
-//  char buf[200];
-//  int ret;
+  int ret;
+  char *p_buf;
 
-  // Add static header to file
-  XMOUNT_MALLOC(glob_p_info_file,char*,(strlen(IMAGE_INFO_HEADER)+1))
+  // Add static header
+  XMOUNT_MALLOC(glob_p_info_file,char*,strlen(IMAGE_INFO_HEADER)+1)
   strncpy(glob_p_info_file,IMAGE_INFO_HEADER,strlen(IMAGE_INFO_HEADER)+1);
-
-  // TODO
-/*
-  switch(glob_xmount_cfg.OrigImageType) {
-    case TOrigImageType_DD:
-      // Original image is a DD file. There isn't much info to extract. Perhaps
-      // just add image size
-      // TODO: Add infos to virtual image info file
-      break;
-
-#ifdef WITH_LIBEWF
-#define M_SAVE_VALUE(DESC,SHORT_DESC) { \
-  if(ret==1) {             \
-    XMOUNT_REALLOC(glob_p_info_file,char*, \
-      (strlen(glob_p_info_file)+strlen(buf)+strlen(DESC)+2)) \
-    strncpy((glob_p_info_file+strlen(glob_p_info_file)),DESC,strlen(DESC)+1); \
-    strncpy((glob_p_info_file+strlen(glob_p_info_file)),buf,strlen(buf)+1); \
-    strncpy((glob_p_info_file+strlen(glob_p_info_file)),"\n",2); \
-  } else if(ret==-1) { \
-    LOG_WARNING("Couldn't query EWF image header value '%s'\n",SHORT_DESC) \
-  } \
-}
-    case TOrigImageType_EWF:
-      // Original image is an EWF file. Extract various infos from ewf file and
-      // add them to the virtual image info file content.
-#if defined( HAVE_LIBEWF_V2_API )
-      ret=libewf_handle_get_utf8_header_value_case_number(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Case number: ","Case number")
-      ret=libewf_handle_get_utf8_header_value_description(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Description: ","Description")
-      ret=libewf_handle_get_utf8_header_value_examiner_name(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Examiner: ","Examiner")
-      ret=libewf_handle_get_utf8_header_value_evidence_number(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Evidence number: ","Evidence number")
-      ret=libewf_handle_get_utf8_header_value_notes(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Notes: ","Notes")
-      ret=libewf_handle_get_utf8_header_value_acquiry_date(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Acquiry date: ","Acquiry date")
-      ret=libewf_handle_get_utf8_header_value_system_date(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("System date: ","System date")
-      ret=libewf_handle_get_utf8_header_value_acquiry_operating_system(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Acquiry os: ","Acquiry os")
-      ret=libewf_handle_get_utf8_header_value_acquiry_software_version(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("Acquiry sw version: ","Acquiry sw version")
-      ret=libewf_handle_get_utf8_hash_value_md5(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("MD5 hash: ","MD5 hash")
-      ret=libewf_handle_get_utf8_hash_value_sha1(hEwfFile,buf,sizeof(buf),NULL);
-      M_SAVE_VALUE("SHA1 hash: ","SHA1 hash")
-#else
-      ret=libewf_get_header_value_case_number(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Case number: ","Case number")
-      ret=libewf_get_header_value_description(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Description: ","Description")
-      ret=libewf_get_header_value_examiner_name(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Examiner: ","Examiner")
-      ret=libewf_get_header_value_evidence_number(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Evidence number: ","Evidence number")
-      ret=libewf_get_header_value_notes(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Notes: ","Notes")
-      ret=libewf_get_header_value_acquiry_date(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry date: ","Acquiry date")
-      ret=libewf_get_header_value_system_date(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("System date: ","System date")
-      ret=libewf_get_header_value_acquiry_operating_system(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry os: ","Acquiry os")
-      ret=libewf_get_header_value_acquiry_software_version(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("Acquiry sw version: ","Acquiry sw version")
-      ret=libewf_get_hash_value_md5(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("MD5 hash: ","MD5 hash")
-      ret=libewf_get_hash_value_sha1(hEwfFile,buf,sizeof(buf));
-      M_SAVE_VALUE("SHA1 hash: ","SHA1 hash")
-#endif
-      break;
-#undef M_SAVE_VALUE
-#endif
-#ifdef WITH_LIBAEWF
-    case TOrigImageType_AEWF:
-      if((ret=AewfInfo(hAewfFile,(const char**)&glob_p_info_file))!=AEWF_OK) {
-        LOG_ERROR("Unable to get EWF image infos using AewfInfo. Return code %d!\n",ret)
-        return FALSE;
-      }
-      break;
-#endif
-#ifdef WITH_LIBAFF
-    case TOrigImageType_AFF:
-      // TODO: Extract some infos from AFF file to add to our info file
-      break;
-#endif
-#ifdef WITH_LIBAAFF
-    case TOrigImageType_AAFF:
-      if((ret=AaffInfo(hAaffFile,&glob_p_info_file))!=AAFF_OK) {
-        LOG_ERROR("Unable to get AAF image infos using AaffInfo. Return code %d!\n",ret)
-        return FALSE;
-      }
-      break;
-#endif
-    default:
-      LOG_ERROR("Unsupported input image type!\n")
-      return FALSE;
+  
+  // Get infos from input lib
+  ret=glob_p_input_functions->GetInfofileContent(glob_p_input_image,&p_buf);
+  if(ret!=0) {
+    LOG_ERROR("Unable to get info file content: %s!\n",
+              glob_p_input_functions->GetErrorMessage(ret));
+    return FALSE;
   }
-*/
+
+  // Add infos to main buffer and free p_buf
+  XMOUNT_STRAPP(glob_p_info_file,p_buf);
+  glob_p_input_functions->FreeBuffer(p_buf);
+
   return TRUE;
 }
 
@@ -2619,10 +2538,16 @@ static int InitCacheFile() {
           return FALSE;
         }
         // Alloc memory for header and block index
-        XMOUNT_MALLOC(glob_p_cache_header,pts_CacheFileHeader,CacheFileHeaderSize)
+        XMOUNT_MALLOC(glob_p_cache_header,
+                      pts_CacheFileHeader,
+                      CacheFileHeaderSize);
         memset(glob_p_cache_header,0,CacheFileHeaderSize);
         // Read header and block index from file
-        if(fread(glob_p_cache_header,CacheFileHeaderSize,1,glob_p_cache_file)!=1) {
+        if(fread(glob_p_cache_header,
+                 CacheFileHeaderSize,
+                 1,
+                 glob_p_cache_file)!=1)
+        {
           // Cache file isn't big enough
           free(glob_p_cache_header);
           LOG_ERROR("Cache file corrupt!\n")
@@ -2868,12 +2793,13 @@ static struct fuse_operations xmount_operations = {
  * Main
  */
 int main(int argc, char *argv[]) {
-  char **ppInputFilenames=NULL;
-  int InputFilenameCount=0;
+  char **pp_input_filenames=NULL;
+  int input_filenames_count=0;
   int nargc=0;
-  char **ppNargv=NULL;
-  char *pMountpoint=NULL;
-  int ret=1;
+  char **pp_nargv=NULL;
+  char *p_mountpoint=NULL;
+  int ret;
+  int fuse_ret;
   char *p_err_msg;
 
   // Disable std output / std input buffering
@@ -2911,10 +2837,10 @@ int main(int argc, char *argv[]) {
   if(!ParseCmdLine(argc,
                    argv,
                    &nargc,
-                   &ppNargv,
-                   &InputFilenameCount,
-                   &ppInputFilenames,
-                   &pMountpoint))
+                   &pp_nargv,
+                   &input_filenames_count,
+                   &pp_input_filenames,
+                   &p_mountpoint))
   {
     LOG_ERROR("Error parsing command line options!\n")
     //PrintUsage(argv[0]);
@@ -2923,7 +2849,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Check command line options
-  if(nargc<2 /*|| InputFilenameCount==0 || pMountpoint==NULL*/) {
+  if(nargc<2 /*|| input_filenames_count==0 || p_mountpoint==NULL*/) {
     LOG_ERROR("Couldn't parse command line options!\n")
     PrintUsage(argv[0]);
     UnloadInputLibs();
@@ -2947,30 +2873,34 @@ int main(int argc, char *argv[]) {
   }
 
   // Init input image handle
-  if(glob_p_input_functions->InitHandle(&glob_p_input_image)!=0) {
-    LOG_ERROR("Unable to init input handle!\n");
+  ret=glob_p_input_functions->CreateHandle(&glob_p_input_image);
+  if(ret!=0) {
+    LOG_ERROR("Unable to init input handle: %s!\n",
+              glob_p_input_functions->GetErrorMessage(ret));
     return 1;
   }
 
   // Parse input lib specific options
-  if(lob_xmount_cfg.p_lib_params!=NULL) {
-    if(glob_p_input_functions->OptionsParse(glob_p_input_image,
-                                            glob_xmount_cfg.p_lib_params,
-                                            &p_err_msg)!=0)
-    {
+  if(glob_xmount_cfg.p_lib_params!=NULL) {
+    ret=glob_p_input_functions->OptionsParse(glob_p_input_image,
+                                             glob_xmount_cfg.p_lib_params,
+                                             &p_err_msg);
+    if(ret!=0) {
       if(p_err_msg!=NULL) {
-        LOG_ERROR("Unable to parse input library specific options: %s!\n",
+        LOG_ERROR("Unable to parse input library specific options: %s: %s!\n",
+                  glob_p_input_functions->GetErrorMessage(ret),
                   p_err_msg);
         glob_p_input_functions->FreeBuffer(p_err_msg);
       } else {
-        LOG_ERROR("Unable to parse input library specific options!\n");
+        LOG_ERROR("Unable to parse input library specific options: %s!\n",
+                  glob_p_input_functions->GetErrorMessage(ret));
       }
     }
   }
 
   if(glob_xmount_cfg.Debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")
-    for(int i=0;i<nargc;i++) { printf("%s ",ppNargv[i]); }
+    for(int i=0;i<nargc;i++) { printf("%s ",pp_nargv[i]); }
     printf("\n");
   }
 
@@ -2978,24 +2908,25 @@ int main(int argc, char *argv[]) {
   pthread_mutex_init(&glob_mutex_image_rw,NULL);
   pthread_mutex_init(&glob_mutex_info_read,NULL);
 
-  if(InputFilenameCount==1) {
+  if(input_filenames_count==1) {
     LOG_DEBUG("Loading image file \"%s\"...\n",
-              ppInputFilenames[0])
+              pp_input_filenames[0])
   } else {
     LOG_DEBUG("Loading image files \"%s .. %s\"...\n",
-              ppInputFilenames[0],
-              ppInputFilenames[InputFilenameCount-1])
+              pp_input_filenames[0],
+              pp_input_filenames[input_filenames_count-1])
   }
 
   // Init random generator
   srand(time(NULL));
 
   // Open input image
-  if(glob_p_input_functions->Open(&glob_p_input_image,
-                             (const char**)ppInputFilenames,
-                             InputFilenameCount)!=0)
-  {
-    LOG_ERROR("Unable to open input image file!");
+  ret=glob_p_input_functions->Open(&glob_p_input_image,
+                                   (const char**)pp_input_filenames,
+                                   input_filenames_count);
+  if(ret!=0) {
+    LOG_ERROR("Unable to open input image file: %s!\n",
+              glob_p_input_functions->GetErrorMessage(ret));
     UnloadInputLibs();
     return 1;
   }
@@ -3034,7 +2965,7 @@ int main(int argc, char *argv[]) {
     printf("\n");
   }
 
-  if(!ExtractVirtFileNames(ppInputFilenames[0])) {
+  if(!ExtractVirtFileNames(pp_input_filenames[0])) {
     LOG_ERROR("Couldn't extract virtual file names!\n");
     UnloadInputLibs();
     return 1;
@@ -3094,58 +3025,81 @@ int main(int argc, char *argv[]) {
   }
 
   // Call fuse_main to do the fuse magic
-  ret=fuse_main(nargc,ppNargv,&xmount_operations,NULL);
+  fuse_ret=fuse_main(nargc,pp_nargv,&xmount_operations,NULL);
 
   // Destroy mutexes
   pthread_mutex_destroy(&glob_mutex_image_rw);
   pthread_mutex_destroy(&glob_mutex_info_read);
 
-  // Close input image
-  if(glob_p_input_functions->Close(&glob_p_input_image)!=0) {
-    LOG_ERROR("Unable to close input image file!");
+  // Close input image and destroy handle
+  ret=glob_p_input_functions->Close(&glob_p_input_image);
+  if(ret!=0) {
+    LOG_ERROR("Unable to close input image file: %s!",
+              glob_p_input_functions->GetErrorMessage(ret));
+  }
+  ret=glob_p_input_functions->DestroyHandle(&glob_p_input_image);
+  if(ret!=0) {
+    LOG_ERROR("Unable to destroy input image handle: %s!",
+              glob_p_input_functions->GetErrorMessage(ret));
   }
 
+  // Close cache file if write support was enabled
   if(glob_xmount_cfg.Writable) {
-    // Write support was enabled, close cache file
     fclose(glob_p_cache_file);
     free(glob_p_cache_header);
   }
 
   // Free allocated memory
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VDI) {
-    // Free constructed VDI header
-    free(glob_p_vdi_header);
+  // Free info file content
+  if(glob_p_info_file!=NULL) free(glob_p_info_file);
+  // Free output image specific data
+  switch(glob_xmount_cfg.VirtImageType) {
+    case VirtImageType_DD:
+    case VirtImageType_DMG:
+      break;
+    case VirtImageType_VDI:
+      free(glob_p_vdi_header);
+      break;
+    case VirtImageType_VHD:
+      free(glob_p_vhd_header);
+      break;
+    case VirtImageType_VMDK:
+    case VirtImageType_VMDKS: {
+      free(glob_p_vmdk_file);
+      free(glob_xmount_cfg.pVirtualVmdkPath);
+      if(glob_p_vmdk_lockfile_name!=NULL) free(glob_p_vmdk_lockfile_name);
+      if(glob_p_vmdk_lockfile_data!=NULL) free(glob_p_vmdk_lockfile_data);
+      if(glob_p_vmdk_lockdir1!=NULL) free(glob_p_vmdk_lockdir1);
+      if(glob_p_vmdk_lockdir2!=NULL) free(glob_p_vmdk_lockdir2);
+      break;
+    }
   }
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VHD) {
-    // Free constructed VHD header
-    free(glob_p_vhd_header);
+  // Free input filenames
+  if(pp_input_filenames!=NULL) {
+    for(int i=0;i<input_filenames_count;i++) free(pp_input_filenames[i]);
+    free(pp_input_filenames);
   }
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    // Free constructed VMDK file
-    free(glob_p_vmdk_file);
-    free(glob_xmount_cfg.pVirtualVmdkPath);
-    if(glob_p_vmdk_lockfile_name!=NULL) free(glob_p_vmdk_lockfile_name);
-    if(glob_p_vmdk_lockfile_data!=NULL) free(glob_p_vmdk_lockfile_data);
-    if(glob_p_vmdk_lockdir1!=NULL) free(glob_p_vmdk_lockdir1);
-    if(glob_p_vmdk_lockdir2!=NULL) free(glob_p_vmdk_lockdir2);
+  // Free constructed argv
+  if(pp_nargv!=NULL) {
+    for(int i=0;i<nargc;i++) free(pp_nargv[i]);
+    free(pp_nargv);
   }
-  for(int i=0;i<InputFilenameCount;i++) free(ppInputFilenames[i]);
-  free(ppInputFilenames);
-  for(int i=0;i<nargc;i++) free(ppNargv[i]);
-  free(ppNargv);
+  // Free mountpoint
+  if(p_mountpoint!=NULL) free(p_mountpoint);
+  // Free virtual paths
   free(glob_xmount_cfg.pVirtualImagePath);
   free(glob_xmount_cfg.pVirtualImageInfoPath);
+  // Free cachefile path
   free(glob_xmount_cfg.pCacheFile);
 
+  // Unload input libs
   UnloadInputLibs();
 
-  return ret;
+  return fuse_ret;
 }
 
 /*
-  ----- Change history -----
+  ----- Change log -----
   20090131: v0.1.0 released
             * Some minor things have still to be done.
             * Mounting ewf as dd: Seems to work. Diff didn't complain about
@@ -3331,6 +3285,12 @@ int main(int argc, char *argv[]) {
               loadable libs.
             * Prepended "glob_" to all global vars for better identification.
   20140731: * Added --offset option as requested by HPM.
-            * Began massive code cleanup
-            
+            * Began massive code cleanup.
+  20140803: * Added correct return code handling when calling input lib
+              functions including getting error messages using GetErrorMessage.
+            * Added input lib specific option parsing.
+            * Re-implemented InitVirtImageInfoFile using input lib's
+              GetInfofileContent function.
+            * Further code cleanups.
 */
+
