@@ -13,7 +13,8 @@ set(LIBOSXFUSE_LIBRARIES ${LIBOSXFUSE_LIBRARY})
 set(LIBOSXFUSE_INCLUDE_DIRS ${LIBOSXFUSE_INCLUDE_DIR})
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(LibOSXFUSE DEFAULT_MSG
+find_package_handle_standard_args(LibOSXFUSE
+                                  DEFAULT_MSG
                                   LIBOSXFUSE_LIBRARY
                                   LIBOSXFUSE_INCLUDE_DIR)
 

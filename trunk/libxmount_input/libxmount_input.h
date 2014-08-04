@@ -20,6 +20,8 @@
 
 #define LIBXMOUNT_INPUT_API_VERSION 1
 
+#include <config.h>
+
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
 

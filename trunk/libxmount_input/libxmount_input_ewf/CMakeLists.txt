@@ -2,7 +2,7 @@ if(POLICY CMP0042)
   cmake_policy(SET CMP0042 NEW) # CMake 3.0
 endif(POLICY CMP0042)
 
-project(libxmount_input_ewf)
+project(libxmount_input_ewf C)
 
 add_library(xmount_input_ewf SHARED libxmount_input_ewf.c)
 include_directories(${LIBEWF_INCLUDE_DIRS})

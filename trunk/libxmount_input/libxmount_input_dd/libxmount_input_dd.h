@@ -21,12 +21,12 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#ifndef DD_H
-#define DD_H
+#ifndef LIBXMOUNT_INPUT_DD_H
+#define LIBXMOUNT_INPUT_DD_H
 
-typedef struct _t_dd *t_pdd;
-
-// Possible error codes
+/*******************************************************************************
+ * Error codes
+ ******************************************************************************/
 enum
 {
     DD_OK = 0,
@@ -52,20 +52,18 @@ enum
 //  Types and strutures
 // ---------------------
 
-typedef struct 
-{
+typedef struct  {
    char              *pFilename;
    unsigned long long  FileSize;
    FILE               *pFile;
 } t_Piece, *t_pPiece;
 
-typedef struct _t_dd
-{
+typedef struct _t_dd {
    t_pPiece           pPieceArr;
    unsigned int        Pieces;
    unsigned long long  TotalSize;
    char              *pInfo;
-} t_dd;
+} t_dd, *t_pdd;
 
 
 // ----------------
@@ -94,5 +92,29 @@ typedef struct _t_dd
    #define DEBUG_PRINTF(...)
 #endif
 
-#endif
+/*******************************************************************************
+ * Forward declarations
+ ******************************************************************************/
+static int DdCreateHandle(void **pp_handle);
+static int DdDestroyHandle(void **pp_handle);
+static int DdOpen(void **pp_handle,
+                  const char **pp_filename_arr,
+                  uint64_t filename_arr_len);
+static int DdClose(void **pp_handle);
+static int DdSize(void *p_handle,
+                  uint64_t *p_size);
+static int DdRead(void *p_handle,
+                  uint64_t seek,
+                  char *p_buf,
+                  uint32_t count);
+static const char* DdOptionsHelp();
+static int DdOptionsParse(void *p_handle,
+                          char *p_options,
+                          char **pp_error);
+static int DdGetInfofileContent(void *p_handle,
+                                char **pp_info_buf);
+static const char* DdGetErrorMessage(int err_num);
+static void DdFreeBuffer(void *p_buf);
+
+#endif // LIBXMOUNT_INPUT_DD_H
 

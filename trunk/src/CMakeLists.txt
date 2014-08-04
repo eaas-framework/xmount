@@ -1,5 +1,3 @@
-project(xmount)
-
 add_definitions(-DXMOUNT_VERSION="0.7.0")
 
 if(NOT APPLE)
@@ -11,8 +9,6 @@ else(NOT APPLE)
 endif(NOT APPLE)
 
 set(LIBS ${LIBS} "dl")
-
-#set(CMAKE_C_FLAGS ${CMAKE_C_FLAGS} "-fno-strict-aliasing")
 
 add_definitions(-DXMOUNT_LIBRARY_PATH="${CMAKE_INSTALL_PREFIX}/lib/xmount")
 

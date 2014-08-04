@@ -4,9 +4,6 @@
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing dd images. Split dd is supported as well.                          *
 *                                                                              *
-* xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
-* vdi, vhd or vmdk files and enable virtual write access to them.              *
-*                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *
 * Software Foundation, either version 3 of the License, or (at your option)    *
@@ -29,31 +26,7 @@
 #include <limits.h>
 
 #include "../libxmount_input.h"
-
 #include "libxmount_input_dd.h"
-
-/*******************************************************************************
- * Forward declarations
- ******************************************************************************/
-int DdCreateHandle(void **pp_handle);
-int DdDestroyHandle(void **pp_handle);
-int DdOpen(void **pp_handle,
-           const char **pp_filename_arr,
-           uint64_t filename_arr_len);
-int DdClose(void **pp_handle);
-int DdSize(void *p_handle,
-           uint64_t *p_size);
-int DdRead(void *p_handle,
-           uint64_t seek,
-           char *p_buf,
-           uint32_t count);
-const char* DdOptionsHelp();
-int DdOptionsParse(void *p_handle,
-                   char *p_options,
-                   char **pp_error);
-int DdGetInfofileContent(void *p_handle,
-                         char **pp_info_buf);
-void DdFreeBuffer(void *p_buf);
 
 /*******************************************************************************
  * LibXmount_Input API implementation
@@ -85,6 +58,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
   p_functions->OptionsHelp=&DdOptionsHelp;
   p_functions->OptionsParse=&DdOptionsParse;
   p_functions->GetInfofileContent=&DdGetInfofileContent;
+  p_functions->GetErrorMessage=&DdGetErrorMessage;
   p_functions->FreeBuffer=&DdFreeBuffer;
 }
 
@@ -96,7 +70,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 //  Internal static functions
 // ---------------------------
 
-static inline unsigned long long DdGetCurrentSeekPos (t_pPiece pPiece)
+static inline uint64_t DdGetCurrentSeekPos (t_pPiece pPiece)
 {
    return ftello (pPiece->pFile);
 }
@@ -108,7 +82,7 @@ static inline int DdSetCurrentSeekPos (t_pPiece pPiece, uint64_t Val, int Whence
    return DD_OK;
 }
 
-int DdDestroyHandle0 (t_pdd *ppdd)
+static int DdDestroyHandle0 (t_pdd *ppdd)
 {
     t_pdd    pdd = *ppdd;
     t_pPiece pPiece;
@@ -177,7 +151,7 @@ static int DdCreateHandle0 (t_pdd pdd, unsigned FilenameArrLen, const char **ppF
    return DD_OK;
 }
 
-int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
+static int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 {
     t_pPiece pPiece;
     int       i;
@@ -214,7 +188,7 @@ int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 /*
  * DdCreateHandle
  */
-int DdCreateHandle(void **pp_handle) {
+static int DdCreateHandle(void **pp_handle) {
   t_pdd p_dd=(t_pdd)*pp_handle;
 
   p_dd=(t_pdd)malloc(sizeof(t_dd));
@@ -228,7 +202,7 @@ int DdCreateHandle(void **pp_handle) {
 /*
  * DdDestroyHandle
  */
-int DdDestroyHandle(void **pp_handle) {
+static int DdDestroyHandle(void **pp_handle) {
   // TODO: Implement
   return DD_OK;
 }
@@ -236,9 +210,9 @@ int DdDestroyHandle(void **pp_handle) {
 /*
  * DdOpen
  */
-int DdOpen(void **pp_handle,
-           const char **pp_filename_arr,
-           uint64_t filename_arr_len)
+static int DdOpen(void **pp_handle,
+                  const char **pp_filename_arr,
+                  uint64_t filename_arr_len)
 {
   CHK(DdCreateHandle0((t_pdd)*pp_handle,filename_arr_len,pp_filename_arr))
   return DD_OK;
@@ -247,7 +221,7 @@ int DdOpen(void **pp_handle,
 /*
  * DdClose
  */
-int DdClose(void **pp_handle) {
+static int DdClose(void **pp_handle) {
   CHK (DdDestroyHandle0((t_pdd*)pp_handle))
   return DD_OK;
 }
@@ -255,7 +229,7 @@ int DdClose(void **pp_handle) {
 /*
  * DdSize
  */
-int DdSize(void *p_handle, uint64_t *p_size) {
+static int DdSize(void *p_handle, uint64_t *p_size) {
   *p_size=((t_pdd)p_handle)->TotalSize;
   return DD_OK;
 }
@@ -263,10 +237,10 @@ int DdSize(void *p_handle, uint64_t *p_size) {
 /*
  * DdRead
  */
-int DdRead(void *p_handle,
-           uint64_t seek,
-           char *p_buf,
-           uint32_t count)
+static int DdRead(void *p_handle,
+                  uint64_t seek,
+                  char *p_buf,
+                  uint32_t count)
 {
   uint32_t remaining=count;
   uint32_t read;
@@ -289,21 +263,21 @@ int DdRead(void *p_handle,
 /*
  * DdOptionsHelp
  */
-const char* DdOptionsHelp() {
+static const char* DdOptionsHelp() {
   return NULL;
 }
 
 /*
  * DdOptionsParse
  */
-int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
+static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
   return DD_OK;
 }
 
 /*
  * DdGetInfofileContent
  */
-int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
   // TODO: Rather then copying, generate info text once here. It won't be used
   // after this anymore.
   *pp_info_buf=(char*)malloc(strlen(((t_pdd)p_handle)->pInfo)+1);
@@ -316,9 +290,17 @@ int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
 }
 
 /*
+ * DdGetErrorMessage
+ */
+static const char* DdGetErrorMessage(int err_num) {
+  // TODO
+  return "";
+}
+
+/*
  * DdFreeBuffer
  */
-void DdFreeBuffer(void *p_buf) {
+static void DdFreeBuffer(void *p_buf) {
   free(p_buf);
 }
 
@@ -405,5 +387,5 @@ int main(int argc, const char *argv[])
    return 0;
 }
 
-#endif
+#endif // DD_MAIN_FOR_TESTING
 

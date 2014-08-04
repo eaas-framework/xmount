@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+project(xmount C)
 
 include(CheckIncludeFiles)
 #include(CheckCSourceCompiles)
@@ -7,9 +8,11 @@ include(CheckIncludeFiles)
 if(CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE "Release")
 else(CMAKE_BUILD_TYPE STREQUAL "")
-  if(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "Debug"))
+  if(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR
+          CMAKE_BUILD_TYPE STREQUAL "Debug"))
     message(FATAL_ERROR "Only build types 'Release' and 'Debug' are supported!")
-  endif(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "Debug"))
+  endif(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR
+             CMAKE_BUILD_TYPE STREQUAL "Debug"))
 endif(CMAKE_BUILD_TYPE STREQUAL "")
 
 # Add cmake_modules dir to CMAKE_MODULE_PATH
@@ -22,6 +25,7 @@ check_include_files(stdint.h HAVE_STDINT_H)
 check_include_files(stdarg.h HAVE_STDARG_H)
 check_include_files(string.h HAVE_STRING_H)
 check_include_files(errno.h HAVE_ERRNO_H)
+check_include_files(fcntl.h HAVE_FCNTL_H)
 check_include_files(dlfcn.h HAVE_DLFCN_H)
 check_include_files(dirent.h HAVE_DIRENT_H)
 check_include_files(unistd.h HAVE_UNISTD_H)
