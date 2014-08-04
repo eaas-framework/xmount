@@ -18,7 +18,7 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-//#include "config.h"
+#include <config.h>
 
 //#ifndef HAVE_LIBZ
 //  #undef WITH_LIBAEWF
@@ -2671,11 +2671,6 @@ static int LoadInputLibs() {
 }
 
     LIBXMOUNT_LOAD_SYMBOL("LibXmount_Input_GetApiVersion",pfun_GetApiVersion);
-    LIBXMOUNT_LOAD_SYMBOL("LibXmount_Input_GetSupportedFormats",
-                          pfun_GetSupportedFormats);
-    LIBXMOUNT_LOAD_SYMBOL("LibXmount_Input_GetFunctions",pfun_GetFunctions);
-
-#undef LIBXMOUNT_LOAD_SYMBOL
 
     // Check library's API version
     if(pfun_GetApiVersion()!=LIBXMOUNT_INPUT_API_VERSION) {
@@ -2685,6 +2680,12 @@ static int LoadInputLibs() {
       dlclose(p_libxmount_in);
       continue;
     }
+
+    LIBXMOUNT_LOAD_SYMBOL("LibXmount_Input_GetSupportedFormats",
+                          pfun_GetSupportedFormats);
+    LIBXMOUNT_LOAD_SYMBOL("LibXmount_Input_GetFunctions",pfun_GetFunctions);
+
+#undef LIBXMOUNT_LOAD_SYMBOL
 
     // Construct new entry for our library list
     XMOUNT_MALLOC(p_input_lib,pts_InputLib,sizeof(ts_InputLib));

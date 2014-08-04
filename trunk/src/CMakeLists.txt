@@ -1,8 +1,14 @@
 project(xmount)
 
-find_package(LibFUSE REQUIRED)
-include_directories(${LIBFUSE_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${LIBFUSE_LIBRARIES})
+add_definitions(-DXMOUNT_VERSION="0.7.0")
+
+if(NOT APPLE)
+  include_directories(${LIBFUSE_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${LIBFUSE_LIBRARIES})
+else(NOT APPLE)
+  include_directories(${LIBOSXFUSE_INCLUDE_DIRS})
+  set(LIBS ${LIBS} ${LIBOSXFUSE_LIBRARIES})
+endif(NOT APPLE)
 
 set(LIBS ${LIBS} "dl")
 

@@ -265,50 +265,61 @@ static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
 
 #ifdef HAVE_LIBEWF_V2_API
   ret=libewf_handle_get_utf8_header_value_case_number(p_ewf,
-                                                      buf,
+                                                      (uint8_t*)buf,
                                                       sizeof(buf),
                                                       NULL);
   M_SAVE_VALUE("Case number: ");
   ret=libewf_handle_get_utf8_header_value_description(p_ewf,
-                                                      buf,
+                                                      (uint8_t*)buf,
                                                       sizeof(buf),
                                                       NULL);
   M_SAVE_VALUE("Description: ");
   ret=libewf_handle_get_utf8_header_value_examiner_name(p_ewf,
-                                                        buf,
+                                                        (uint8_t*)buf,
                                                         sizeof(buf),
                                                         NULL);
   M_SAVE_VALUE("Examiner: ");
   ret=libewf_handle_get_utf8_header_value_evidence_number(p_ewf,
-                                                          buf,
+                                                          (uint8_t*)buf,
                                                           sizeof(buf),
                                                           NULL);
   M_SAVE_VALUE("Evidence number: ");
-  ret=libewf_handle_get_utf8_header_value_notes(p_ewf,buf,sizeof(buf),NULL);
+  ret=libewf_handle_get_utf8_header_value_notes(p_ewf,
+                                                (uint8_t*)buf,
+                                                sizeof(buf),
+                                                NULL);
   M_SAVE_VALUE("Notes: ");
   ret=libewf_handle_get_utf8_header_value_acquiry_date(p_ewf,
-                                                       buf,
+                                                       (uint8_t*)buf,
                                                        sizeof(buf),
                                                        NULL);
   M_SAVE_VALUE("Acquiry date: ");
   ret=libewf_handle_get_utf8_header_value_system_date(p_ewf,
-                                                      buf,
+                                                      (uint8_t*)buf,
                                                       sizeof(buf),
                                                       NULL);
   M_SAVE_VALUE("System date: ");
-  ret=libewf_handle_get_utf8_header_value_acquiry_operating_system(p_ewf,
-                                                                   buf,
-                                                                   sizeof(buf),
-                                                                   NULL);
+  ret=
+    libewf_handle_get_utf8_header_value_acquiry_operating_system(p_ewf,
+                                                                 (uint8_t*)buf,
+                                                                 sizeof(buf),
+                                                                 NULL);
   M_SAVE_VALUE("Acquiry os: ");
-  ret=libewf_handle_get_utf8_header_value_acquiry_software_version(p_ewf,
-                                                                   buf,
-                                                                   sizeof(buf),
-                                                                   NULL);
+  ret=
+    libewf_handle_get_utf8_header_value_acquiry_software_version(p_ewf,
+                                                                 (uint8_t*)buf,
+                                                                 sizeof(buf),
+                                                                 NULL);
   M_SAVE_VALUE("Acquiry sw version: ");
-  ret=libewf_handle_get_utf8_hash_value_md5(p_ewf,buf,sizeof(buf),NULL);
+  ret=libewf_handle_get_utf8_hash_value_md5(p_ewf,
+                                            (uint8_t*)buf,
+                                            sizeof(buf),
+                                            NULL);
   M_SAVE_VALUE("MD5 hash: ");
-  ret=libewf_handle_get_utf8_hash_value_sha1(p_ewf,buf,sizeof(buf),NULL);
+  ret=libewf_handle_get_utf8_hash_value_sha1(p_ewf,
+                                             (uint8_t*)buf,
+                                             sizeof(buf),
+                                             NULL);
   M_SAVE_VALUE("SHA1 hash: ");
 #else
   ret=libewf_get_header_value_case_number(p_ewf,buf,sizeof(buf));
