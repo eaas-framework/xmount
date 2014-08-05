@@ -93,19 +93,23 @@ static int AffOpen(void **pp_handle,
                    const char **pp_filename_arr,
                    uint64_t filename_arr_len)
 {
+  AFFILE* p_aff=NULL;
+
   // We need exactly one file
   if(filename_arr_len==0) return AFF_NO_INPUT_FILES;
   if(filename_arr_len>1) return AFF_TOO_MANY_INPUT_FILES;
 
   // Open AFF file
-  *pp_handle=(void*)af_open(pp_filename_arr[0],O_RDONLY,0);
-  if(*pp_handle==NULL) {
+  p_aff=af_open(pp_filename_arr[0],O_RDONLY,0);
+  if(p_aff==NULL) {
     // LOG_ERROR("Couldn't open AFF file!\n")
     return AFF_OPEN_FAILED;
   }
 
+  *pp_handle=p_aff;
+
   // Encrypted images aren't supported for now
-  if(af_cannot_decrypt((AFFILE*)*pp_handle)) {
+  if(af_cannot_decrypt(p_aff)) {
     AffClose(pp_handle);
     return AFF_ENCRYPTION_UNSUPPORTED;
   }

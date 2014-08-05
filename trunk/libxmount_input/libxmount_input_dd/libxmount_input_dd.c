@@ -80,7 +80,7 @@ static inline int DdSetCurrentSeekPos (t_pPiece pPiece,
   return DD_OK;
 }
 
-static int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
+static int DdRead0 (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 {
   t_pPiece pPiece;
   uint64_t  i;
@@ -118,13 +118,14 @@ static int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
  * DdCreateHandle
  */
 static int DdCreateHandle(void **pp_handle) {
-  t_pdd p_dd=(t_pdd)*pp_handle;
+  t_pdd p_dd=NULL;
 
   p_dd=(t_pdd)malloc(sizeof(t_dd));
   if(p_dd==NULL) return DD_MEMALLOC_FAILED;
 
   memset(p_dd,0,sizeof(t_dd));
 
+  *pp_handle=p_dd;
   return DD_OK;
 }
 
@@ -258,7 +259,7 @@ static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
 static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
   asprintf(pp_info_buf,
            "DD image assembled of %" PRIu64 " pieces\n"
-             "%" PRIu64 " bytes in total (%0.3f GiB)",
+             "%" PRIu64 " bytes in total (%0.3f GiB)\n",
            ((t_pdd)p_handle)->Pieces,
            ((t_pdd)p_handle)->TotalSize,
            ((t_pdd)p_handle)->TotalSize/(1024.0*1024.0*1024.0));
