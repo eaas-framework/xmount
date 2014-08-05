@@ -18,12 +18,9 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#include <string.h>
-#include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <locale.h>
-#include <limits.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "../libxmount_input.h"
 #include "libxmount_input_dd.h"
@@ -72,113 +69,45 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 
 static inline uint64_t DdGetCurrentSeekPos (t_pPiece pPiece)
 {
-   return ftello (pPiece->pFile);
+  return ftello (pPiece->pFile);
 }
 
-static inline int DdSetCurrentSeekPos (t_pPiece pPiece, uint64_t Val, int Whence)
+static inline int DdSetCurrentSeekPos (t_pPiece pPiece,
+                                       uint64_t Val,
+                                       int Whence)
 {
-   if (fseeko (pPiece->pFile, Val, Whence) != 0)
-      return DD_CANNOT_SEEK;
-   return DD_OK;
-}
-
-static int DdDestroyHandle0 (t_pdd *ppdd)
-{
-    t_pdd    pdd = *ppdd;
-    t_pPiece pPiece;
-    int       CloseErrors = 0;
-
-    if (pdd->pPieceArr)
-    {
-        for (int i=0; i < pdd->Pieces; i++)
-        {
-            pPiece = &pdd->pPieceArr[i];
-            if (pPiece->pFile)
-               if (fclose (pPiece->pFile))
-                  CloseErrors++;
-            if (pPiece->pFilename)
-               free (pPiece->pFilename);
-        }
-        free (pdd->pPieceArr);
-    }
-    if (pdd->pInfo)
-        free (pdd->pInfo);
-
-    free (pdd);
-    *ppdd = NULL;
-
-    if (CloseErrors)
-        return DD_CANNOT_CLOSE_FILE;
-
-    return DD_OK;
-}
-
-static int DdCreateHandle0 (t_pdd pdd, unsigned FilenameArrLen, const char **ppFilenameArr)
-{
-   t_pPiece pPiece;
-
-   pdd->Pieces    = FilenameArrLen;
-   pdd->pPieceArr = (t_pPiece) malloc (pdd->Pieces * sizeof(t_Piece));
-   if (pdd->pPieceArr == NULL)
-   {
-      (void) DdDestroyHandle0 (&pdd);
-      return DD_MEMALLOC_FAILED;
-   }
-
-   pdd->TotalSize = 0;
-   for (int i=0; i < pdd->Pieces; i++)
-   {
-       pPiece = &pdd->pPieceArr[i];
-       pPiece->pFilename = strdup (ppFilenameArr[i]);
-       if (pPiece->pFilename == NULL)
-       {
-          (void) DdDestroyHandle0 (&pdd);
-          return DD_MEMALLOC_FAILED;
-       }
-       pPiece->pFile = fopen (pPiece->pFilename, "r");
-       if (pPiece->pFile == NULL)
-       {
-          (void) DdDestroyHandle0 (&pdd);
-          return DD_FILE_OPEN_FAILED;
-       }
-       CHK(DdSetCurrentSeekPos(pPiece, 0, SEEK_END))
-       pPiece->FileSize = DdGetCurrentSeekPos (pPiece);
-       pdd->TotalSize  += pPiece->FileSize;
-   }
-
-   asprintf (&pdd->pInfo, "dd image made of %u pieces, %llu bytes in total (%0.3f GiB)", pdd->Pieces, pdd->TotalSize, pdd->TotalSize / (1024.0*1024.0*1024.0));
-
-   return DD_OK;
+  if (fseeko (pPiece->pFile, Val, Whence) != 0) return DD_CANNOT_SEEK;
+  return DD_OK;
 }
 
 static int DdRead0  (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 {
-    t_pPiece pPiece;
-    int       i;
+  t_pPiece pPiece;
+  uint64_t  i;
 
-    // Find correct piece to read from
-    // -------------------------------
+  // Find correct piece to read from
+  // -------------------------------
 
-    for (i=0; i<pdd->Pieces; i++)
-    {
-        pPiece = &pdd->pPieceArr[i];
-        if (Seek < pPiece->FileSize)
-            break;
-        Seek -= pPiece->FileSize;
-    }
-    if (i >= pdd->Pieces)
-        return DD_READ_BEYOND_END_OF_IMAGE;
+  for (i=0; i<pdd->Pieces; i++)
+  {
+    pPiece = &pdd->pPieceArr[i];
+    if (Seek < pPiece->FileSize) break;
+    Seek -= pPiece->FileSize;
+  }
+  if (i >= pdd->Pieces) return DD_READ_BEYOND_END_OF_IMAGE;
 
-    // Read from this piece
-    // --------------------
-    CHK (DdSetCurrentSeekPos (pPiece, Seek, SEEK_SET))
+  // Read from this piece
+  // --------------------
+  CHK (DdSetCurrentSeekPos (pPiece, Seek, SEEK_SET))
 
-    *pCount = GETMIN (*pCount, pPiece->FileSize - Seek);
+  *pCount = GETMIN (*pCount, pPiece->FileSize - Seek);
 
-    if (fread (pBuffer, *pCount, 1, pPiece->pFile) != 1)
-       return DD_CANNOT_READ_DATA;
+  if (fread (pBuffer, *pCount, 1, pPiece->pFile) != 1)
+  {
+    return DD_CANNOT_READ_DATA;
+  }
 
-    return DD_OK;
+  return DD_OK;
 }
 
 // ---------------
@@ -203,7 +132,8 @@ static int DdCreateHandle(void **pp_handle) {
  * DdDestroyHandle
  */
 static int DdDestroyHandle(void **pp_handle) {
-  // TODO: Implement
+  free(*pp_handle);
+  *pp_handle=NULL;
   return DD_OK;
 }
 
@@ -214,7 +144,37 @@ static int DdOpen(void **pp_handle,
                   const char **pp_filename_arr,
                   uint64_t filename_arr_len)
 {
-  CHK(DdCreateHandle0((t_pdd)*pp_handle,filename_arr_len,pp_filename_arr))
+  t_pdd pdd=(t_pdd)*pp_handle;
+  t_pPiece pPiece;
+
+  pdd->Pieces    = filename_arr_len;
+  pdd->pPieceArr = (t_pPiece) malloc (pdd->Pieces * sizeof(t_Piece));
+  if (pdd->pPieceArr == NULL) return DD_MEMALLOC_FAILED;
+  // Need to set everything to 0 in case an error occurs later and DdClose is
+  // called
+  memset(pdd->pPieceArr,0,pdd->Pieces * sizeof(t_Piece));
+
+  pdd->TotalSize = 0;
+  for (uint64_t i=0; i < pdd->Pieces; i++) 
+  {
+    pPiece = &pdd->pPieceArr[i];
+    pPiece->pFilename = strdup (pp_filename_arr[i]);
+    if (pPiece->pFilename == NULL)
+    {
+      (void)DdClose(pp_handle);
+      return DD_MEMALLOC_FAILED;
+    }
+    pPiece->pFile = fopen (pPiece->pFilename, "r");
+    if (pPiece->pFile == NULL)
+    {
+      (void)DdClose(pp_handle);
+      return DD_FILE_OPEN_FAILED;
+    }
+    CHK(DdSetCurrentSeekPos(pPiece, 0, SEEK_END))
+    pPiece->FileSize = DdGetCurrentSeekPos (pPiece);
+    pdd->TotalSize  += pPiece->FileSize;
+  }
+
   return DD_OK;
 }
 
@@ -222,7 +182,25 @@ static int DdOpen(void **pp_handle,
  * DdClose
  */
 static int DdClose(void **pp_handle) {
-  CHK (DdDestroyHandle0((t_pdd*)pp_handle))
+  t_pdd    pdd = (t_pdd)*pp_handle;
+  t_pPiece pPiece;
+  int       CloseErrors = 0;
+
+  if (pdd->pPieceArr)
+  {
+    for (uint64_t i=0; i < pdd->Pieces; i++)
+    {
+      pPiece = &pdd->pPieceArr[i];
+      if (pPiece->pFile) {
+        if (fclose (pPiece->pFile)) CloseErrors=1;
+      }
+      if (pPiece->pFilename) free (pPiece->pFilename);
+    }
+    free (pdd->pPieceArr);
+  }
+
+  if (CloseErrors) return DD_CANNOT_CLOSE_FILE;
+
   return DD_OK;
 }
 
@@ -278,14 +256,13 @@ static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
  * DdGetInfofileContent
  */
 static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
-  // TODO: Rather then copying, generate info text once here. It won't be used
-  // after this anymore.
-  *pp_info_buf=(char*)malloc(strlen(((t_pdd)p_handle)->pInfo)+1);
-  if(*pp_info_buf==NULL) {
-    return DD_MEMALLOC_FAILED;
-  }
-
-  strcpy(*pp_info_buf,((t_pdd)p_handle)->pInfo);
+  asprintf(pp_info_buf,
+           "DD image assembled of %" PRIu64 " pieces\n"
+             "%" PRIu64 " bytes in total (%0.3f GiB)",
+           ((t_pdd)p_handle)->Pieces,
+           ((t_pdd)p_handle)->TotalSize,
+           ((t_pdd)p_handle)->TotalSize/(1024.0*1024.0*1024.0));
+  if(*pp_info_buf==NULL) return DD_MEMALLOC_FAILED;
   return DD_OK;
 }
 
@@ -293,8 +270,28 @@ static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
  * DdGetErrorMessage
  */
 static const char* DdGetErrorMessage(int err_num) {
-  // TODO
-  return "";
+  switch(err_num) {
+    case DD_MEMALLOC_FAILED:
+      return "Unable to allocate memory";
+      break;
+    case DD_FILE_OPEN_FAILED:
+      return "Unable to open DD file(s)";
+      break;
+    case DD_CANNOT_READ_DATA:
+      return "Unable to read DD data";
+      break;
+    case DD_CANNOT_CLOSE_FILE:
+      return "Unable to close DD file(s)";
+      break;
+    case DD_CANNOT_SEEK:
+      return "Unable to seek into DD data";
+      break;
+    case DD_READ_BEYOND_END_OF_IMAGE:
+      return "Unable to read DD data: Attempt to read past EOF";
+      break;
+    default:
+      return "Unknown error";
+  }
 }
 
 /*

@@ -25,19 +25,16 @@
 #define LIBXMOUNT_INPUT_DD_H
 
 /*******************************************************************************
- * Error codes
+ * Error codes etc...
  ******************************************************************************/
-enum
-{
-    DD_OK = 0,
-    DD_FOUND,
-
-    DD_MEMALLOC_FAILED=100,
-    DD_FILE_OPEN_FAILED,
-    DD_CANNOT_READ_DATA,
-    DD_CANNOT_CLOSE_FILE,
-    DD_CANNOT_SEEK,
-    DD_READ_BEYOND_END_OF_IMAGE
+enum {
+  DD_OK=0,
+  DD_MEMALLOC_FAILED,
+  DD_FILE_OPEN_FAILED,
+  DD_CANNOT_READ_DATA,
+  DD_CANNOT_CLOSE_FILE,
+  DD_CANNOT_SEEK,
+  DD_READ_BEYOND_END_OF_IMAGE
 };
 
 // ----------------------
@@ -47,24 +44,21 @@ enum
 #define GETMAX(a,b) ((a)>(b)?(a):(b))
 #define GETMIN(a,b) ((a)<(b)?(a):(b))
 
-
 // ---------------------
 //  Types and strutures
 // ---------------------
 
-typedef struct  {
-   char              *pFilename;
-   unsigned long long  FileSize;
-   FILE               *pFile;
+typedef struct {
+  char     *pFilename;
+  uint64_t   FileSize;
+  FILE     *pFile;
 } t_Piece, *t_pPiece;
 
-typedef struct _t_dd {
-   t_pPiece           pPieceArr;
-   unsigned int        Pieces;
-   unsigned long long  TotalSize;
-   char              *pInfo;
+typedef struct {
+  t_pPiece  pPieceArr;
+  uint64_t   Pieces;
+  uint64_t   TotalSize;
 } t_dd, *t_pdd;
-
 
 // ----------------
 //  Error handling
