@@ -29,6 +29,7 @@
 #include <dirent.h> // For opendir, readdir, closedir
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h> // For fstat
 #ifndef __APPLE__
   #include <linux/fs.h>
 #endif
@@ -41,30 +42,30 @@
 /*******************************************************************************
  * Global vars
  ******************************************************************************/
-// Struct that contains various runtime configuration options
+//! Struct that contains various runtime configuration options
 static ts_XmountConfData glob_xmount_cfg;
 
-// Struct containing pointers to the libxmount_input functions
+//! Struct containing pointers to the libxmount_input functions
 static pts_InputLib *glob_pp_input_libs=NULL;
 static uint32_t glob_input_libs_count=0;
 static pts_LibXmountInputFunctions glob_p_input_functions=NULL;
 
-// Handle for input image
+//! Handle for input image
 static void *glob_p_input_image=NULL;
 
-// Pointer to virtual info file
+//! Pointer to virtual info file
 static char *glob_p_info_file=NULL;
 
-// Vars needed for VDI emulation
+//! Vars needed for VDI emulation
 static pts_VdiFileHeader glob_p_vdi_header=NULL;
 static uint32_t glob_vdi_header_size=0;
 static char *glob_p_vdi_block_map=NULL;
 static uint32_t glob_p_vdi_block_map_size=0;
 
-// Vars needed for VHD emulation
+//! Vars needed for VHD emulation
 static ts_VhdFileHeader *glob_p_vhd_header=NULL;
 
-// Vars needed for VMDK emulation
+//! Vars needed for VMDK emulation
 static char *glob_p_vmdk_file=NULL;
 static int glob_vmdk_file_size=0;
 static char *glob_p_vmdk_lockdir1=NULL;
@@ -73,28 +74,25 @@ static char *glob_p_vmdk_lockfile_data=NULL;
 static int glob_vmdk_lockfile_size=0;
 static char *glob_p_vmdk_lockfile_name=NULL;
 
-// Vars needed for virtual write access
+//! Vars needed for virtual write access
 static FILE *glob_p_cache_file=NULL;
 static pts_CacheFileHeader glob_p_cache_header=NULL;
 static pts_CacheFileBlockIndex glob_p_cache_blkidx=NULL;
 
-// Mutexes to control concurrent read & write access
+//! Mutexes to control concurrent read & write access
 static pthread_mutex_t glob_mutex_image_rw;
 static pthread_mutex_t glob_mutex_info_read;
 
-/*
- * LogMessage:
- *   Print error and debug messages to stdout
- *
- * Params:
- *  p_msg_type: "ERROR" or "DEBUG"
- *  p_calling_fun: Name of calling function
- *  line: Line number of call
- *  p_msg: Message string
- *  ...: Variable params with values to include in message string
- *
- * Returns:
- *   n/a
+/*******************************************************************************
+ * Helper functions
+ ******************************************************************************/
+//! Print error and debug messages to stdout
+/*!
+ * \param p_msg_type "ERROR" or "DEBUG"
+ * \param p_calling_fun Name of calling function
+ * \param line Line number of call
+ * \param p_msg Message string
+ * \param ... Variable params with values to include in message string
  */
 static void LogMessage(char *p_msg_type,
                        char *p_calling_fun,
@@ -112,16 +110,10 @@ static void LogMessage(char *p_msg_type,
   va_end(var_list);
 }
 
-/*
- * LogWarnMessage:
- *   Print warning messages to stdout
- *
- * Params:
- *  p_msg: Message string
- *  ...: Variable params with values to include in message string
- *
- * Returns:
- *   n/a
+//! Print warning messages to stdout
+/*!
+ * \param p_msg Message string
+ * \param ... Variable params with values to include in message string
  */
 static void LogWarnMessage(char *p_msg,...) {
   va_list var_list;
@@ -134,15 +126,9 @@ static void LogWarnMessage(char *p_msg,...) {
   va_end(var_list);
 }
 
-/*
- * PrintUsage:
- *   Print usage instructions (cmdline options etc..)
- *
- * Params:
- *   p_prog_name: Program name (argv[0])
- *
- * Returns:
- *   n/a
+//! Print usage instructions (cmdline options etc..)
+/*!
+ * \param p_prog_name Program name (argv[0])
  */
 static void PrintUsage(char *p_prog_name) {
   char *p_buf;
@@ -165,7 +151,6 @@ static void PrintUsage(char *p_prog_name) {
   printf("\n");
   printf("  mopts:\n");
   printf("    --cache <file> : Enable virtual write support and set cachefile to use.\n");
-//  printf("    --debug : Enable xmount's debug mode.\n");
   printf("    --in <itype> : Input image format. <itype> can be ");
 
   // List supported input types
@@ -216,17 +201,13 @@ static void PrintUsage(char *p_prog_name) {
   }
 }
 
-/*
- * CheckFuseAllowOther:
- *   Check if FUSE allows us to pass the -o allow_other parameter.
- *   This only works if we are root or user_allow_other is set in
- *   /etc/fuse.conf.
+//! Check fuse settings
+/*!
+ * Check if FUSE allows us to pass the -o allow_other parameter.
+ * This only works if we are root or user_allow_other is set in
+ * /etc/fuse.conf.
  *
- * Params:
- *   n/a
- *
- * Returns:
- *   TRUE on success, FALSE on error
+ * \return TRUE on success, FALSE on error
  */
 static int CheckFuseAllowOther() {
   if(geteuid()!=0) {
@@ -262,52 +243,48 @@ static int CheckFuseAllowOther() {
   return TRUE;
 }
 
-/*
- * ParseCmdLine:
- *   Parse command line options
- *
- * Params:
- *   argc: Number of cmdline params
- *   argv: Array containing cmdline params
- *   pNargv: Number of FUSE options is written to this var
- *   pppNargv: FUSE options are written to this array
- *   pFilenameCount: Number of input image files is written to this var
- *   pppFilenames: Input image filenames are written to this array
- *   ppMountpoint: Mountpoint is written to this var
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Parse command line options
+/*!
+ * \param argc Number of cmdline params
+ * \param pp_argv Array containing cmdline params
+ * \param p_nargv Number of FUSE options is written to this var
+ * \param ppp_nargv FUSE options are written to this array
+ * \param p_filename_count Number of input image files is written to this var
+ * \param ppp_filenames Input image filenames are written to this array
+ * \param pp_mountpoint Mountpoint is written to this var
+ * \return TRUE on success, FALSE on error
  */
 static int ParseCmdLine(const int argc,
-                        char **argv,
-                        int *pNargc,
-                        char ***pppNargv,
-                        int *pFilenameCount,
-                        char ***pppFilenames,
-                        char **ppMountpoint) {
+                        char **pp_argv,
+                        int *p_nargv,
+                        char ***ppp_nargv,
+                        int *p_filename_count,
+                        char ***ppp_filenames,
+                        char **pp_mountpoint)
+{
   int i=1,files=0,opts=0,FuseMinusOControl=TRUE,FuseAllowOther=TRUE,first;
   char *p_buf;
 
-  // add argv[0] to pppNargv
+  // add pp_argv[0] to ppp_nargv
   opts++;
-  XMOUNT_MALLOC(*pppNargv,char**,opts*sizeof(char*))
-  XMOUNT_STRSET((*pppNargv)[opts-1],argv[0])
+  XMOUNT_MALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+  XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[0])
 
   // Parse options
-  while(i<argc && *argv[i]=='-') {
-    if(strlen(argv[i])>1 && *(argv[i]+1)!='-') {
+  while(i<argc && *pp_argv[i]=='-') {
+    if(strlen(pp_argv[i])>1 && *(pp_argv[i]+1)!='-') {
       // Options beginning with - are mostly FUSE specific
-      if(strcmp(argv[i],"-d")==0) {
+      if(strcmp(pp_argv[i],"-d")==0) {
         // Enable FUSE's and xmount's debug mode
         opts++;
-        XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*pppNargv)[opts-1],argv[i])
+        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
         glob_xmount_cfg.Debug=TRUE;
-      } else if(strcmp(argv[i],"-h")==0) {
+      } else if(strcmp(pp_argv[i],"-h")==0) {
         // Print help message
-        PrintUsage(argv[0]);
+        PrintUsage(pp_argv[0]);
         exit(1);
-      } else if(strcmp(argv[i],"-o")==0) {
+      } else if(strcmp(pp_argv[i],"-o")==0) {
         // Next parameter specifies fuse / lib mount options
         if((argc+1)>i) {
           i++;
@@ -315,131 +292,133 @@ static int ParseCmdLine(const int argc,
           // doing. We won't append allow_other automatically. And we allow him
           // to disable allow_other by passing a single "-o no_allow_other"
           // which won't be passed to FUSE as it is xmount specific.
-          if(strcmp(argv[i],"no_allow_other")!=0) {
+          if(strcmp(pp_argv[i],"no_allow_other")!=0) {
             opts+=2;
-            XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-            XMOUNT_STRSET((*pppNargv)[opts-2],argv[i-1])
-            XMOUNT_STRSET((*pppNargv)[opts-1],argv[i])
+            XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+            XMOUNT_STRSET((*ppp_nargv)[opts-2],pp_argv[i-1])
+            XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
             FuseMinusOControl=FALSE;
           } else FuseAllowOther=FALSE;
         } else {
           LOG_ERROR("Couldn't parse mount options!\n")
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
-      } else if(strcmp(argv[i],"-s")==0) {
+      } else if(strcmp(pp_argv[i],"-s")==0) {
         // Enable FUSE's single threaded mode
         opts++;
-        XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*pppNargv)[opts-1],argv[i])
-      } else if(strcmp(argv[i],"-V")==0) {
+        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
+      } else if(strcmp(pp_argv[i],"-V")==0) {
         // Display FUSE version info
         opts++;
-        XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*pppNargv)[opts-1],argv[i])
+        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
       } else {
-        LOG_ERROR("Unknown command line option \"%s\"\n",argv[i]);
-        PrintUsage(argv[0]);
+        LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
+        PrintUsage(pp_argv[0]);
         exit(1);
       }
     } else {
       // Options beginning with -- are xmount specific
-      if(strcmp(argv[i],"--cache")==0 || strcmp(argv[i],"--rw")==0) {
+      if(strcmp(pp_argv[i],"--cache")==0 || strcmp(pp_argv[i],"--rw")==0) {
         // Emulate writable access to mounted image
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,argv[i])
+          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,pp_argv[i])
           glob_xmount_cfg.Writable=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file to read/write data from/to!\n")
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
         LOG_DEBUG("Enabling virtual write support using cache file \"%s\"\n",
                   glob_xmount_cfg.pCacheFile)
-      } else if(strcmp(argv[i],"--in")==0) {
+      } else if(strcmp(pp_argv[i],"--in")==0) {
         // Specify input image type
         // Next parameter must be image type
         if((argc+1)>i) {
           i++;
           if(glob_xmount_cfg.p_orig_image_type==NULL) {
-            XMOUNT_STRSET(glob_xmount_cfg.p_orig_image_type,argv[i]);
-            LOG_DEBUG("Setting input image type to '%s'\n",argv[i]);
+            XMOUNT_STRSET(glob_xmount_cfg.p_orig_image_type,pp_argv[i]);
+            LOG_DEBUG("Setting input image type to '%s'\n",pp_argv[i]);
           } else {
             LOG_ERROR("You can only specify --in once!")
-            PrintUsage(argv[0]);
+            PrintUsage(pp_argv[0]);
             exit(1);
           }
         } else {
           LOG_ERROR("You must specify an input image type!\n");
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
-      } else if(strcmp(argv[i],"--inopts")==0) {
+      } else if(strcmp(pp_argv[i],"--inopts")==0) {
         if((argc+1)>i) {
           i++;
           if(glob_xmount_cfg.p_lib_params==NULL) {
-            XMOUNT_STRSET(glob_xmount_cfg.p_lib_params,argv[i]);
+            XMOUNT_STRSET(glob_xmount_cfg.p_lib_params,pp_argv[i]);
           } else {
             LOG_ERROR("You can only specify --inopts once!")
-            PrintUsage(argv[0]);
+            PrintUsage(pp_argv[0]);
             exit(1);
           }
         } else {
           LOG_ERROR("You must specify special options!\n");
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
-      } else if(strcmp(argv[i],"--out")==0) {
+      } else if(strcmp(pp_argv[i],"--out")==0) {
         // Specify output image type
         // Next parameter must be image type
         if((argc+1)>i) {
           i++;
-          if(strcmp(argv[i],"dd")==0) {
+          if(strcmp(pp_argv[i],"dd")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_DD;
             LOG_DEBUG("Setting virtual image type to DD\n")
-          } else if(strcmp(argv[i],"dmg")==0) {
+          } else if(strcmp(pp_argv[i],"dmg")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_DMG;
             LOG_DEBUG("Setting virtual image type to DMG\n")
-          } else if(strcmp(argv[i],"vdi")==0) {
+          } else if(strcmp(pp_argv[i],"vdi")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_VDI;
             LOG_DEBUG("Setting virtual image type to VDI\n")
-          } else if(strcmp(argv[i],"vhd")==0) {
+          } else if(strcmp(pp_argv[i],"vhd")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_VHD;
             LOG_DEBUG("Setting virtual image type to VHD\n")
-          } else if(strcmp(argv[i],"vmdk")==0) {
+          } else if(strcmp(pp_argv[i],"vmdk")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_VMDK;
             LOG_DEBUG("Setting virtual image type to VMDK\n")
-          } else if(strcmp(argv[i],"vmdks")==0) {
+          } else if(strcmp(pp_argv[i],"vmdks")==0) {
             glob_xmount_cfg.VirtImageType=VirtImageType_VMDKS;
             LOG_DEBUG("Setting virtual image type to VMDKS\n")
           } else {
-            LOG_ERROR("Unknown output image type \"%s\"!\n",argv[i])
-            PrintUsage(argv[0]);
+            LOG_ERROR("Unknown output image type \"%s\"!\n",pp_argv[i])
+            PrintUsage(pp_argv[0]);
             exit(1);
           }
         } else {
           LOG_ERROR("You must specify an output image type!\n");
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
-      } else if(strcmp(argv[i],"--owcache")==0) {
+      } else if(strcmp(pp_argv[i],"--owcache")==0) {
         // Enable writable access to mounted image and overwrite existing cache
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,argv[i])
+          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,pp_argv[i])
           glob_xmount_cfg.Writable=TRUE;
           glob_xmount_cfg.OverwriteCache=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file to read/write data from/to!\n")
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
         LOG_DEBUG("Enabling virtual write support overwriting cache file \"%s\"\n",
                   glob_xmount_cfg.pCacheFile)
-      } else if(strcmp(argv[i],"--version")==0 || strcmp(argv[i],"--info")==0) {
+      } else if(strcmp(pp_argv[i],"--version")==0 ||
+                strcmp(pp_argv[i],"--info")==0)
+      {
         printf("xmount v%s copyright (c) 2008-2014 by Gillen Daniel "
                "<gillen.dan@pinguin.lu>\n\n",XMOUNT_VERSION);
 #ifdef __GNUC__
@@ -462,20 +441,20 @@ static int ParseCmdLine(const int argc,
         }
         printf("\n");
         exit(0);
-      } else if(strcmp(argv[i],"--offset")==0) {
+      } else if(strcmp(pp_argv[i],"--offset")==0) {
         if((argc+1)>i) {
           i++;
-          glob_xmount_cfg.orig_img_offset=strtoull(argv[i],NULL,10);
+          glob_xmount_cfg.orig_img_offset=strtoull(pp_argv[i],NULL,10);
         } else {
           LOG_ERROR("You must specify an offset!\n")
-          PrintUsage(argv[0]);
+          PrintUsage(pp_argv[0]);
           exit(1);
         }
         LOG_DEBUG("Setting input image offset to \"%" PRIu64 "\"\n",
                   glob_xmount_cfg.orig_img_offset)
       } else {
-        LOG_ERROR("Unknown command line option \"%s\"\n",argv[i]);
-        PrintUsage(argv[0]);
+        LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
+        PrintUsage(pp_argv[0]);
         exit(1);
       }
     }
@@ -485,58 +464,53 @@ static int ParseCmdLine(const int argc,
   // Parse input image filename(s)
   while(i<(argc-1)) {
     files++;
-    XMOUNT_REALLOC(*pppFilenames,char**,files*sizeof(char*))
-    XMOUNT_STRSET((*pppFilenames)[files-1],argv[i])
+    XMOUNT_REALLOC(*ppp_filenames,char**,files*sizeof(char*))
+    XMOUNT_STRSET((*ppp_filenames)[files-1],pp_argv[i])
     i++;
   }
   if(files==0) {
     LOG_ERROR("No input files specified!\n")
-    PrintUsage(argv[0]);
+    PrintUsage(pp_argv[0]);
     exit(1);
   }
-  *pFilenameCount=files;
+  *p_filename_count=files;
 
   // Extract mountpoint
   if(i==(argc-1)) {
-    XMOUNT_STRSET(*ppMountpoint,argv[argc-1])
+    XMOUNT_STRSET(*pp_mountpoint,pp_argv[argc-1])
     opts++;
-    XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-    XMOUNT_STRSET((*pppNargv)[opts-1],*ppMountpoint)
+    XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+    XMOUNT_STRSET((*ppp_nargv)[opts-1],*pp_mountpoint)
   } else {
     LOG_ERROR("No mountpoint specified!\n")
-    PrintUsage(argv[0]);
+    PrintUsage(pp_argv[0]);
     exit(1);
   }
 
   if(FuseMinusOControl==TRUE) {
     // We control the -o flag, set subtype, fsname and allow_other options
     opts+=2;
-    XMOUNT_REALLOC(*pppNargv,char**,opts*sizeof(char*))
-    XMOUNT_STRSET((*pppNargv)[opts-2],"-o")
-    XMOUNT_STRSET((*pppNargv)[opts-1],"subtype=xmount,fsname=")
-    XMOUNT_STRAPP((*pppNargv)[opts-1],(*pppFilenames)[0])
+    XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
+    XMOUNT_STRSET((*ppp_nargv)[opts-2],"-o")
+    XMOUNT_STRSET((*ppp_nargv)[opts-1],"subtype=xmount,fsname=")
+    XMOUNT_STRAPP((*ppp_nargv)[opts-1],(*ppp_filenames)[0])
     if(FuseAllowOther==TRUE) {
       // Try to add "allow_other" to FUSE's cmd-line params
       if(CheckFuseAllowOther()==TRUE) {
-        XMOUNT_STRAPP((*pppNargv)[opts-1],",allow_other")
+        XMOUNT_STRAPP((*ppp_nargv)[opts-1],",allow_other")
       }
     }
   }
 
-  *pNargc=opts;
+  *p_nargv=opts;
 
   return TRUE;
 }
 
-/*
- * ExtractVirtFileNames:
- *   Extract virtual file name from input image name
- *
- * Params:
- *   p_orig_name: Name of input image (Can include a path)
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Extract virtual file name from input image name
+/*!
+ * \param p_orig_name Name of input image (may include a path)
+ * \return TRUE on success, FALSE on error
  */
 static int ExtractVirtFileNames(char *p_orig_name) {
   char *tmp;
@@ -619,17 +593,12 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   return TRUE;
 }
 
-/*
- * GetOrigImageSize:
- *   Get size of original image
- *
- * Params:
- *   p_size: Pointer to an uint64_t to which the size will be written to
- *   without_offset: If set to TRUE, returns the real size without substracting
- *                   a given offset.
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Get size of original image
+/*!
+ * \param p_size Pointer to an uint64_t to which the size will be written to
+ * \param without_offset If set to TRUE, returns the real size without
+ *                       substracting a given offset.
+ * \return TRUE on success, FALSE on error
  */
 static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
   int ret;
@@ -663,15 +632,10 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
   return TRUE;
 }
 
-/*
- * GetVirtImageSize:
- *   Get size of the emulated image
- *
- * Params:
- *   p_size: Pointer to an uint64_t to which the size will be written to
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Get size of the emulated image
+/*!
+ * \param p_size Pointer to an uint64_t to which the size will be written to
+ * \return TRUE on success, FALSE on error
  */
 static int GetVirtImageSize(uint64_t *p_size) {
   if(glob_xmount_cfg.VirtImageSize!=0) {
@@ -718,17 +682,12 @@ static int GetVirtImageSize(uint64_t *p_size) {
   return TRUE;
 }
 
-/*
- * GetOrigImageData:
- *   Read data from original image
- *
- * Params:
- *   p_buf: Pointer to buffer to write read data to (Must be preallocated!)
- *   offset: Offset at which data should be read
- *   size: Size of data which should be read (Size of buffer)
- *
- * Returns:
- *   Number of read bytes on success or "-1" on error
+//! Read data from original image
+/*!
+ * \param p_buf Pointer to buffer to write read data to (must be preallocated!)
+ * \param offset Offset at which data should be read
+ * \param size Size of data which should be read (size of buffer)
+ * \return Number of read bytes on success or "-1" on error
  */
 static int GetOrigImageData(char *p_buf, off_t offset, size_t size) {
   int ret;
@@ -768,58 +727,12 @@ static int GetOrigImageData(char *p_buf, off_t offset, size_t size) {
   return to_read;
 }
 
-/*
- * GetVirtVmdkData:
- *   Read data from virtual VMDK file
- *
- * Params:
- *   buf: Pointer to buffer to write read data to (Must be preallocated!)
- *   offset: Offset at which data should be read
- *   size: Size of data which should be read (Size of buffer)
- *
- * Returns:
- *   Number of read bytes on success or "-1" on error
- */
- /*
-static int GetVirtualVmdkData(char *buf, off_t offset, size_t size) {
-  uint32_t len;
-
-  len=strlen(glob_p_vmdk_file);
-  if(offset<len) {
-    if(offset+size>len) {
-      size=len-offset;
-      LOG_DEBUG("Attempt to read past EOF of virtual vmdk file\n")
-    }
-    if(glob_xmount_cfg.Writable==TRUE &&
-       glob_p_cache_header->VmdkFileCached==TRUE)
-    {
-      // VMDK file is cached. Read data from cache file
-      // TODO: Read data from cache file
-    } else {
-      // No write support or VMDK file not cached.
-      memcpy(buf,glob_p_vmdk_file+offset,size);
-      LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64
-                " from virtual vmdk file\n",size,offset)
-    }
-  } else {
-    LOG_DEBUG("Attempt to read past EOF of virtual vmdk file\n");
-    return -1;
-  }
-  return size;
-}
-*/
-
-/*
- * GetVirtImageData:
- *   Read data from virtual image
- *
- * Params:
- *   p_buf: Pointer to buffer to write read data to (Must be preallocated!)
- *   offset: Offset at which data should be read
- *   size: Size of data which should be read (Size of buffer)
- *
- * Returns:
- *   Number of read bytes on success or negated error code on error
+//! Read data from virtual image
+/*!
+ * \param p_buf Pointer to buffer to write read data to
+ * \param offset Offset at which data should be read
+ * \param size Size of data which should be read
+ * \return Number of read bytes on success or negated error code on error
  */
 static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
   uint32_t cur_block=0;
@@ -836,7 +749,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
 
   if(offset>=virt_image_size) {
     LOG_ERROR("Attempt to read behind EOF of virtual image!\n")
-    return -EIO;
+    return 0;
   }
 
   if(offset+size>virt_image_size) {
@@ -1021,17 +934,12 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
   return size;
 }
 
-/*
- * SetVdiFileHeaderData:
- *   Write data to virtual VDI file header
- *
- * Params:
- *   p_buf: Buffer containing data to write
- *   offset: Offset of changes
- *   size: Amount of bytes to write
- *
- * Returns:
- *   Number of written bytes on success or "-1" on error
+//! Write data to virtual VDI file header
+/*!
+ * \param p_buf Buffer containing data to write
+ * \param offset Offset of changes
+ * \param size Amount of bytes to write
+ * \return Number of written bytes on success or "-1" on error
  */
 static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
   if(offset+size>glob_vdi_header_size) size=glob_vdi_header_size-offset;
@@ -1131,17 +1039,12 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
   return size;
 }
 
-/*
- * SetVhdFileHeaderData:
- *   Write data to virtual VHD file footer
- *
- * Params:
- *   p_buf: Buffer containing data to write
- *   offset: Offset of changes
- *   size: Amount of bytes to write
- *
- * Returns:
- *   Number of written bytes on success or "-1" on error
+//! Write data to virtual VHD file footer
+/*!
+ * \param p_buf Buffer containing data to write
+ * \param offset Offset of changes
+ * \param size Amount of bytes to write
+ * \return Number of written bytes on success or "-1" on error
  */
 static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
@@ -1240,17 +1143,12 @@ static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   return size;
 }
 
-/*
- * SetVirtImageData:
- *   Write data to virtual image
- *
- * Params:
- *   p_buf: Buffer containing data to write
- *   offset: Offset to start writing at
- *   size: Size of data to be written
- *
- * Returns:
- *   Number of written bytes on success or "-1" on error
+//! Write data to virtual image
+/*!
+ * \param p_buf Buffer containing data to write
+ * \param offset Offset to start writing at
+ * \param size Size of data to be written
+ * \return Number of written bytes on success or "-1" on error
  */
 static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   uint64_t cur_block=0;
@@ -1491,612 +1389,11 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   return size;
 }
 
-/*
- * GetVirtFileAccess:
- *   FUSE access implementation
- *
- * Params:
- *   path: Path of file to get attributes from
- *   perm: Requested permissisons
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-/*
-static int GetVirtFileAccess(const char *path, int perm) {
-  // TODO: Implement propper file permission handling
-  // http://www.cs.cf.ac.uk/Dave/C/node20.html
-  // Values for the second argument to access.
-  // These may be OR'd together.
-  //#define	R_OK	4		// Test for read permission.
-  //#define	W_OK	2		// Test for write permission.
-  //#define	X_OK	1		// Test for execute permission.
-  //#define	F_OK	0		// Test for existence.
-  return 0;
-}
-*/
-
-/*
- * GetVirtFileAttr:
- *   FUSE getattr implementation
- *
- * Params:
- *   p_path: Path of file to get attributes from
- *   p_stat: Pointer to stat structure to save attributes to
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int GetVirtFileAttr(const char *p_path, struct stat *p_stat) {
-  memset(p_stat,0,sizeof(struct stat));
-  if(strcmp(p_path,"/")==0) {
-    // Attributes of mountpoint
-    p_stat->st_mode=S_IFDIR | 0777;
-    p_stat->st_nlink=2;
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
-    // Attributes of virtual image
-    if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
-    else p_stat->st_mode=S_IFREG | 0666;
-    p_stat->st_nlink=1;
-    // Get virtual image file size
-    if(!GetVirtImageSize((uint64_t*)&(p_stat->st_size))) {
-      LOG_ERROR("Couldn't get image size!\n");
-      return -ENOENT;
-    }
-    if(glob_xmount_cfg.VirtImageType==VirtImageType_VHD) {
-      // Make sure virtual image seems to be fully allocated (not sparse file).
-      // Without this, Windows won't attach the vhd file!
-      p_stat->st_blocks=p_stat->st_size/512;
-      if(p_stat->st_size%512!=0) p_stat->st_blocks++;
-    }
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
-    // Attributes of virtual image info file
-    p_stat->st_mode=S_IFREG | 0444;
-    p_stat->st_nlink=1;
-    // Get virtual image info file size
-    if(glob_p_info_file!=NULL) {
-      p_stat->st_size=strlen(glob_p_info_file);
-    } else p_stat->st_size=0;
-  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    // Some special files only present when emulating VMDK files
-    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
-      // Attributes of virtual vmdk file
-      if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
-      else p_stat->st_mode=S_IFREG | 0666;
-      p_stat->st_nlink=1;
-      // Get virtual image info file size
-      if(glob_p_vmdk_file!=NULL) {
-        p_stat->st_size=glob_vmdk_file_size;
-      } else p_stat->st_size=0;
-    } else if(glob_p_vmdk_lockdir1!=NULL &&
-              strcmp(p_path,glob_p_vmdk_lockdir1)==0)
-    {
-      p_stat->st_mode=S_IFDIR | 0777;
-      p_stat->st_nlink=2;
-    } else if(glob_p_vmdk_lockdir2!=NULL &&
-              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
-    {
-      p_stat->st_mode=S_IFDIR | 0777;
-      p_stat->st_nlink=2;
-    } else if(glob_p_vmdk_lockfile_name!=NULL &&
-              strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
-    {
-      p_stat->st_mode=S_IFREG | 0666;
-      if(glob_p_vmdk_lockfile_name!=NULL) {
-        p_stat->st_size=strlen(glob_p_vmdk_lockfile_name);
-      } else p_stat->st_size=0;
-    } else return -ENOENT;
-  } else return -ENOENT;
-  // Set uid and gid of all files to uid and gid of current process
-  p_stat->st_uid=getuid();
-  p_stat->st_gid=getgid();
-  return 0;
-}
-
-/*
- * CreateVirtDir:
- *   FUSE mkdir implementation
- *
- * Params:
- *   p_path: Directory path
- *   mode: Directory permissions
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int CreateVirtDir(const char *p_path, mode_t mode) {
-  // Only allow creation of VMWare's lock directories
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    if(glob_p_vmdk_lockdir1==NULL)  {
-      char aVmdkLockDir[strlen(glob_xmount_cfg.pVirtualVmdkPath)+5];
-      sprintf(aVmdkLockDir,"%s.lck",glob_xmount_cfg.pVirtualVmdkPath);
-      if(strcmp(p_path,aVmdkLockDir)==0) {
-        LOG_DEBUG("Creating virtual directory \"%s\"\n",aVmdkLockDir)
-        XMOUNT_STRSET(glob_p_vmdk_lockdir1,aVmdkLockDir)
-        return 0;
-      } else {
-        LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
-        LOG_DEBUG("Supposed: %s\n",aVmdkLockDir)
-        return -1;
-      }
-    } else if(glob_p_vmdk_lockdir2==NULL &&
-              strncmp(p_path,
-                      glob_p_vmdk_lockdir1,
-                      strlen(glob_p_vmdk_lockdir1))==0)
-    {
-      LOG_DEBUG("Creating virtual directory \"%s\"\n",p_path)
-      XMOUNT_STRSET(glob_p_vmdk_lockdir2,p_path)
-      return 0;
-    } else {
-      LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
-      LOG_DEBUG("Compared to first %u chars of \"%s\"\n",
-                strlen(glob_p_vmdk_lockdir1),
-                glob_p_vmdk_lockdir1)
-      return -1;
-    }
-  }
-  LOG_ERROR("Attempt to create directory \"%s\" "
-            "on read-only filesystem!\n",p_path)
-  return -1;
-}
-
-/*
- * CreateVirtFile:
- *   FUSE create implementation.
- *   Only allows to create VMWare's lock file!
- *
- * Params:
- *   p_path: File to create
- *   mode: File mode
- *   dev: ??? but not used
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int CreateVirtFile(const char *p_path,
-                          mode_t mode,
-                          dev_t dev)
-{
-  if((glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS) &&
-     glob_p_vmdk_lockdir1!=NULL && glob_p_vmdk_lockfile_name==NULL)
-  {
-    LOG_DEBUG("Creating virtual file \"%s\"\n",p_path)
-    XMOUNT_STRSET(glob_p_vmdk_lockfile_name,p_path);
-    return 0;
-  } else {
-    LOG_ERROR("Attempt to create illegal file \"%s\"\n",p_path)
-    return -1;
-  }
-}
-
-/*
- * GetVirtFiles:
- *   FUSE readdir implementation
- *
- * Params:
- *   p_path: Path from where files should be listed
- *   buf: Buffer to write file entrys to
- *   filler: Function to write file entrys to buffer
- *   offset: ??? but not used
- *   fi: ??? but not used
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int GetVirtFiles(const char *p_path,
-                        void *buf,
-                        fuse_fill_dir_t filler,
-                        off_t offset,
-                        struct fuse_file_info *fi)
-{
-  // Ignore some params
-  (void)offset;
-  (void)fi;
-
-  if(strcmp(p_path,"/")==0) {
-    // Add std . and .. entrys
-    filler(buf,".",NULL,0);
-    filler(buf,"..",NULL,0);
-    // Add our virtual files (p+1 to ignore starting "/")
-    filler(buf,glob_xmount_cfg.pVirtualImagePath+1,NULL,0);
-    filler(buf,glob_xmount_cfg.pVirtualImageInfoPath+1,NULL,0);
-    if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-       glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-    {
-      // For VMDK's, we use an additional descriptor file
-      filler(buf,glob_xmount_cfg.pVirtualVmdkPath+1,NULL,0);
-      // And there could also be a lock directory
-      if(glob_p_vmdk_lockdir1!=NULL) {
-        filler(buf,glob_p_vmdk_lockdir1+1,NULL,0);
-      }
-    }
-  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    // For VMDK emulation, there could be a lock directory
-    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
-      filler(buf,".",NULL,0);
-      filler(buf,"..",NULL,0);
-      if(glob_p_vmdk_lockfile_name!=NULL) {
-        filler(buf,
-               glob_p_vmdk_lockfile_name+strlen(glob_p_vmdk_lockdir1)+1,
-               NULL,
-               0);
-      }
-    } else if(glob_p_vmdk_lockdir2!=NULL &&
-              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
-    {
-      filler(buf,".",NULL,0);
-      filler(buf,"..",NULL,0);
-    } else return -ENOENT;
-  } else return -ENOENT;
-
-  return 0;
-}
-
-/*
- * OpenVirtFile:
- *   FUSE open implementation
- *
- * Params:
- *   p_path: Path to file to open
- *   p_fi: File info struct
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int OpenVirtFile(const char *p_path, struct fuse_file_info *p_fi) {
-
-#define CHECK_OPEN_PERMS() {                                              \
-  if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {          \
-    LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n", \
-              p_path)                                                     \
-    return -EACCES;                                                       \
-  }                                                                       \
-  return 0;                                                               \
-}
-
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0 ||
-     strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0)
-  {
-    CHECK_OPEN_PERMS();
-  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0 ||
-         (glob_p_vmdk_lockfile_name!=NULL &&
-            strcmp(p_path,glob_p_vmdk_lockfile_name)==0))
-    {
-      CHECK_OPEN_PERMS();
-    }
-  }
-
-#undef CHECK_PERMS
-
-  LOG_DEBUG("Attempt to open inexistant file \"%s\".\n",p_path);
-  return -ENOENT;
-}
-
-/*
- * ReadVirtFile:
- *   FUSE read implementation
- *
- * Params:
- *   p_path: Path (relative to mount folder) of file to read data from
- *   p_buf: Pre-allocated buffer where read data should be written to
- *   size: Number of bytes to read
- *   offset: Offset to start reading at
- *   fi: ?? but not used
- *
- * Returns:
- *   Read bytes on success, negated error code on error
- */
-static int ReadVirtFile(const char *p_path,
-                        char *p_buf,
-                        size_t size,
-                        off_t offset,
-                        struct fuse_file_info *fi)
-{
-  int ret;
-  uint64_t len;
-
-#define READ_MEM_FILE(filebuf,filesize,filetypestr,mutex) {                    \
-  len=filesize;                                                                \
-  if(offset<len) {                                                             \
-    if(offset+size>len) {                                                      \
-      LOG_DEBUG("Attempt to read past EOF of virtual " filetypestr " file\n"); \
-      LOG_DEBUG("Adjusting read size from %u to %u\n",size,len-offset);        \
-      size=len-offset;                                                         \
-    }                                                                          \
-    pthread_mutex_lock(&mutex);                                                \
-    memcpy(p_buf,filebuf+offset,size);                                         \
-    pthread_mutex_unlock(&mutex);                                              \
-    LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64                      \
-              " from virtual " filetypestr " file\n",size,offset);             \
-    ret=size;                                                                  \
-  } else {                                                                     \
-    LOG_DEBUG("Attempt to read behind EOF of virtual " filetypestr " file\n"); \
-    ret=-EIO;                                                                  \
-  }                                                                            \
-}
-
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
-    // Read data from virtual output file
-    // Wait for other threads to end reading/writing data
-    pthread_mutex_lock(&glob_mutex_image_rw);
-    // Get requested data
-    if((ret=GetVirtImageData(p_buf,offset,size))<0) {
-      LOG_ERROR("Couldn't read data from virtual image file!\n")
-    }
-    // Allow other threads to read/write data again
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
-    // Read data from virtual info file
-    READ_MEM_FILE(glob_p_info_file,
-                  strlen(glob_p_info_file),
-                  "info",
-                  glob_mutex_info_read);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
-    // Read data from virtual vmdk file
-    READ_MEM_FILE(glob_p_vmdk_file,
-                  glob_vmdk_file_size,
-                  "vmdk",
-                  glob_mutex_image_rw);
-  } else if(glob_p_vmdk_lockfile_name!=NULL &&
-            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
-  {
-    // Read data from virtual lock file
-    READ_MEM_FILE(glob_p_vmdk_lockfile_data,
-                  glob_vmdk_lockfile_size,
-                  "vmdk lock",
-                  glob_mutex_image_rw);
-  } else {
-    // Attempt to read non existant file
-    LOG_DEBUG("Attempt to read from non existant file \"%s\"\n",p_path)
-    ret=-ENOENT;
-  }
-
-#undef READ_MEM_FILE
-
-  return size;
-}
-
-/*
- * RenameVirtFile:
- *   FUSE rename implementation
- *
- * Params:
- *   p_path: File to rename
- *   p_npath: New filename
- *
- * Returns:
- *   "0" on error, negated error code on error
- */
-static int RenameVirtFile(const char *p_path, const char *p_npath) {
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    if(glob_p_vmdk_lockfile_name!=NULL &&
-       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
-    {
-      LOG_DEBUG("Renaming virtual lock file from \"%s\" to \"%s\"\n",
-                glob_p_vmdk_lockfile_name,
-                p_npath)
-      XMOUNT_REALLOC(glob_p_vmdk_lockfile_name,char*,
-                     (strlen(p_npath)+1)*sizeof(char));
-      strcpy(glob_p_vmdk_lockfile_name,p_npath);
-      return 0;
-    }
-  }
-  return -ENOENT;
-}
-
-/*
- * DeleteVirtDir:
- *   FUSE rmdir implementation
- *
- * Params:
- *   p_path: Directory to delete
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int DeleteVirtDir(const char *p_path) {
-  // Only VMWare's lock directories can be deleted
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
-      LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
-      free(glob_p_vmdk_lockdir1);
-      glob_p_vmdk_lockdir1=NULL;
-      return 0;
-    } else if(glob_p_vmdk_lockdir2!=NULL &&
-              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
-    {
-      LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
-      free(glob_p_vmdk_lockdir2);
-      glob_p_vmdk_lockdir2=NULL;
-      return 0;
-    }
-  }
-  return -1;
-}
-
-/*
- * DeleteVirtFile:
- *   FUSE unlink implementation
- *
- * Params:
- *   p_path: File to delete
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-static int DeleteVirtFile(const char *p_path) {
-  // Only VMWare's lock file can be deleted
-  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
-     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
-  {
-    if(glob_p_vmdk_lockfile_name!=NULL &&
-       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
-    {
-      LOG_DEBUG("Deleting virtual file \"%s\"\n",glob_p_vmdk_lockfile_name)
-      free(glob_p_vmdk_lockfile_name);
-      free(glob_p_vmdk_lockfile_data);
-      glob_p_vmdk_lockfile_name=NULL;
-      glob_p_vmdk_lockfile_data=NULL;
-      glob_vmdk_lockfile_size=0;
-      return 0;
-    }
-  }
-  return -1;
-}
-
-/*
- * GetVirtFsStats:
- *   FUSE statfs implementation
- *
- * Params:
- *   p_path: Get stats for fs that the specified file resides in
- *   stats: Stats
- *
- * Returns:
- *   "0" on success, negated error code on error
- */
-/*
-static int GetVirtFsStats(const char *p_path, struct statvfs *stats) {
-  struct statvfs CacheFileFsStats;
-  int ret;
-
-  if(glob_xmount_cfg.Writable==TRUE) {
-    // If write support is enabled, return stats of fs upon which cache file
-    // resides in
-    if((ret=statvfs(glob_xmount_cfg.pCacheFile,&CacheFileFsStats))==0) {
-      memcpy(stats,&CacheFileFsStats,sizeof(struct statvfs));
-      return 0;
-    } else {
-      LOG_ERROR("Couldn't get stats for fs upon which resides \"%s\"\n",
-                glob_xmount_cfg.pCacheFile)
-      return ret;
-    }
-  } else {
-    // TODO: Return read only
-    return 0;
-  }
-}
-*/
-
-/*
- * WriteVirtFile:
- *   FUSE write implementation
- *
- * Params:
- *   p_buf: Buffer containing data to write
- *   size: Number of bytes to write
- *   offset: Offset to start writing at
- *   fi: ?? but not used
- *
- * Returns:
- *   Written bytes on success, negated error code on error
- */
-static int WriteVirtFile(const char *p_path,
-                         const char *p_buf,
-                         size_t size,
-                         off_t offset,
-                         struct fuse_file_info *fi)
-{
-  uint64_t len;
-
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
-    // Wait for other threads to end reading/writing data
-    pthread_mutex_lock(&glob_mutex_image_rw);
-
-    // Get virtual image file size
-    if(!GetVirtImageSize(&len)) {
-      LOG_ERROR("Couldn't get virtual image size!\n")
-      pthread_mutex_unlock(&glob_mutex_image_rw);
-      return 0;
-    }
-    if(offset<len) {
-      if(offset+size>len) size=len-offset;
-      if(SetVirtImageData(p_buf,offset,size)!=size) {
-        LOG_ERROR("Couldn't write data to virtual image file!\n")
-        pthread_mutex_unlock(&glob_mutex_image_rw);
-        return 0;
-      }
-    } else {
-      LOG_DEBUG("Attempt to write past EOF of virtual image file\n")
-      pthread_mutex_unlock(&glob_mutex_image_rw);
-      return 0;
-    }
-
-    // Allow other threads to read/write data again
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
-    pthread_mutex_lock(&glob_mutex_image_rw);
-    len=glob_vmdk_file_size;
-    if((offset+size)>len) {
-      // Enlarge or create buffer if needed
-      if(len==0) {
-        len=offset+size;
-        XMOUNT_MALLOC(glob_p_vmdk_file,char*,len*sizeof(char))
-      } else {
-        len=offset+size;
-        XMOUNT_REALLOC(glob_p_vmdk_file,char*,len*sizeof(char))
-      }
-      glob_vmdk_file_size=offset+size;
-    }
-    // Copy data to buffer
-    memcpy(glob_p_vmdk_file+offset,p_buf,size);
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(glob_p_vmdk_lockfile_name!=NULL &&
-            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
-  {
-    pthread_mutex_lock(&glob_mutex_image_rw);
-    if((offset+size)>glob_vmdk_lockfile_size) {
-      // Enlarge or create buffer if needed
-      if(glob_vmdk_lockfile_size==0) {
-        glob_vmdk_lockfile_size=offset+size;
-        XMOUNT_MALLOC(glob_p_vmdk_lockfile_data,char*,
-                      glob_vmdk_lockfile_size*sizeof(char))
-      } else {
-        glob_vmdk_lockfile_size=offset+size;
-        XMOUNT_REALLOC(glob_p_vmdk_lockfile_data,char*,
-                       glob_vmdk_lockfile_size*sizeof(char))
-      }
-    }
-    // Copy data to buffer
-    memcpy(glob_p_vmdk_lockfile_data+offset,p_buf,size);
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
-    // Attempt to write data to read only image info file
-    LOG_DEBUG("Attempt to write data to virtual info file\n");
-    return -ENOENT;
-  } else {
-    // Attempt to write to non existant file
-    LOG_DEBUG("Attempt to write to the non existant file \"%s\"\n",p_path)
-    return -ENOENT;
-  }
-
-  return size;
-}
-
-/*
- * CalculateInputImageHash:
- *   Calculates an MD5 hash of the first HASH_AMOUNT bytes of the input image.
- *
- * Params:
- *   p_hash_low : Pointer to the lower 64 bit of the hash
- *   p_hash_high : Pointer to the higher 64 bit of the hash
- *
- * Returns:
- *   TRUE on success, FALSE on error
+//! Calculates an MD5 hash of the first HASH_AMOUNT bytes of the input image
+/*!
+ * \param p_hash_low Pointer to the lower 64 bit of the hash
+ * \param p_hash_high Pointer to the higher 64 bit of the hash
+ * \return TRUE on success, FALSE on error
  */
 static int CalculateInputImageHash(uint64_t *p_hash_low,
                                    uint64_t *p_hash_high)
@@ -2109,7 +1406,7 @@ static int CalculateInputImageHash(uint64_t *p_hash_low,
   if(read_data>0) {
     // Calculate MD5 hash
     md5_init(&md5_state);
-    md5_append(&md5_state,(const md5_byte_t*)p_buf,HASH_AMOUNT);
+    md5_append(&md5_state,(const md5_byte_t*)p_buf,read_data);
     md5_finish(&md5_state,(md5_byte_t*)hash);
     // Convert MD5 hash into two 64bit integers
     *p_hash_low=*((uint64_t*)hash);
@@ -2123,15 +1420,9 @@ static int CalculateInputImageHash(uint64_t *p_hash_low,
   }
 }
 
-/*
- * InitVirtVdiHeader:
- *   Build and init virtual VDI file header
- *
- * Params:
- *   n/a
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Build and init virtual VDI file header
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int InitVirtVdiHeader() {
   // See http://forums.virtualbox.org/viewtopic.php?t=8046 for a
@@ -2218,15 +1509,9 @@ static int InitVirtVdiHeader() {
   return TRUE;
 }
 
-/*
- * InitVirtVhdHeader:
- *   Build and init virtual VHD file header
- *
- * Params:
- *   n/a
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Build and init virtual VHD file header
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int InitVirtVhdHeader() {
   uint64_t orig_image_size=0;
@@ -2316,15 +1601,9 @@ static int InitVirtVhdHeader() {
   return TRUE;
 }
 
-/*
- * InitVirtualVmdkFile:
- *   Init the virtual VMDK file
- *
- * Params:
- *   n/a
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Init the virtual VMDK file
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int InitVirtualVmdkFile() {
   uint64_t image_size=0;
@@ -2377,7 +1656,6 @@ static int InitVirtualVmdkFile() {
 #undef VMDK_DESC_FILE
 
   // Do not use XMOUNT_STRSET here to avoid adding '\0' to the buffer!
-  // TODO: Not adding \0 but using strlen afterwards??? Needs checking!!
   XMOUNT_MALLOC(glob_p_vmdk_file,char*,strlen(buf))
   strncpy(glob_p_vmdk_file,buf,strlen(buf));
   glob_vmdk_file_size=strlen(buf);
@@ -2385,15 +1663,9 @@ static int InitVirtualVmdkFile() {
   return TRUE;
 }
 
-/*
- * InitVirtImageInfoFile:
- *   Create virtual image info file
- *
- * Params:
- *   n/a
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Create virtual image info file
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int InitVirtImageInfoFile() {
   int ret;
@@ -2418,15 +1690,9 @@ static int InitVirtImageInfoFile() {
   return TRUE;
 }
 
-/*
- * InitCacheFile:
- *   Create / load cache file to enable virtual write support
- *
- * Params:
- *   n/a
- *
- * Returns:
- *   "TRUE" on success, "FALSE" on error
+//! Create / load cache file to enable virtual write support
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int InitCacheFile() {
   uint64_t image_size=0;
@@ -2586,8 +1852,9 @@ static int InitCacheFile() {
   return TRUE;
 }
 
-/*
- * LoadInputLibs
+//! Load input libs
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int LoadInputLibs() {
   DIR *p_dir=NULL;
@@ -2739,8 +2006,9 @@ static int LoadInputLibs() {
   return (glob_input_libs_count>0 ? TRUE : FALSE);
 }
 
-/*
- * UnloadInputLibs
+//! Unload input libs
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static void UnloadInputLibs() {
   LOG_DEBUG("Unloading all input libs.\n");
@@ -2755,8 +2023,9 @@ static void UnloadInputLibs() {
   glob_input_libs_count=0;
 }
 
-/*
- * FindInputLib
+//! Search an appropriate input lib for specified input type
+/*!
+ * \return TRUE on success, FALSE on error
  */
 static int FindInputLib() {
   char *p_buf;
@@ -2786,37 +2055,578 @@ static int FindInputLib() {
   return FALSE;
 }
 
-/*
- * Struct containing implemented FUSE functions
+/*******************************************************************************
+ * FUSE function implementation
+ ******************************************************************************/
+//! FUSE access implementation
+/*!
+ * \param p_path Path of file to get attributes from
+ * \param perm Requested permissisons
+ * \return 0 on success, negated error code on error
  */
-static struct fuse_operations xmount_operations = {
-//  .access=GetVirtFileAccess,
-  .getattr=GetVirtFileAttr,
-  .mkdir=CreateVirtDir,
-  .mknod=CreateVirtFile,
-  .open=OpenVirtFile,
-  .readdir=GetVirtFiles,
-  .read=ReadVirtFile,
-  .rename=RenameVirtFile,
-  .rmdir=DeleteVirtDir,
-//  .statfs=GetVirtFsStats,
-  .unlink=DeleteVirtFile,
-  .write=WriteVirtFile
-//  .release=mountewf_release,
-};
+/*
+static int FuseAccess(const char *path, int perm) {
+  // TODO: Implement propper file permission handling
+  // http://www.cs.cf.ac.uk/Dave/C/node20.html
+  // Values for the second argument to access.
+  // These may be OR'd together.
+  //#define	R_OK	4		// Test for read permission.
+  //#define	W_OK	2		// Test for write permission.
+  //#define	X_OK	1		// Test for execute permission.
+  //#define	F_OK	0		// Test for existence.
+  return 0;
+}
+*/
 
-/*
- * Main
+//! FUSE getattr implementation
+/*!
+ * \param p_path Path of file to get attributes from
+ * \param p_stat Pointer to stat structure to save attributes to
+ * \return 0 on success, negated error code on error
  */
+static int FuseGetAttr(const char *p_path, struct stat *p_stat) {
+  memset(p_stat,0,sizeof(struct stat));
+  if(strcmp(p_path,"/")==0) {
+    // Attributes of mountpoint
+    p_stat->st_mode=S_IFDIR | 0777;
+    p_stat->st_nlink=2;
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+    // Attributes of virtual image
+    if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+    else p_stat->st_mode=S_IFREG | 0666;
+    p_stat->st_nlink=1;
+    // Get virtual image file size
+    if(!GetVirtImageSize((uint64_t*)&(p_stat->st_size))) {
+      LOG_ERROR("Couldn't get image size!\n");
+      return -ENOENT;
+    }
+    if(glob_xmount_cfg.VirtImageType==VirtImageType_VHD) {
+      // Make sure virtual image seems to be fully allocated (not sparse file).
+      // Without this, Windows won't attach the vhd file!
+      p_stat->st_blocks=p_stat->st_size/512;
+      if(p_stat->st_size%512!=0) p_stat->st_blocks++;
+    }
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+    // Attributes of virtual image info file
+    p_stat->st_mode=S_IFREG | 0444;
+    p_stat->st_nlink=1;
+    // Get virtual image info file size
+    if(glob_p_info_file!=NULL) {
+      p_stat->st_size=strlen(glob_p_info_file);
+    } else p_stat->st_size=0;
+  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    // Some special files only present when emulating VMDK files
+    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+      // Attributes of virtual vmdk file
+      if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+      else p_stat->st_mode=S_IFREG | 0666;
+      p_stat->st_nlink=1;
+      // Get virtual image info file size
+      if(glob_p_vmdk_file!=NULL) {
+        p_stat->st_size=glob_vmdk_file_size;
+      } else p_stat->st_size=0;
+    } else if(glob_p_vmdk_lockdir1!=NULL &&
+              strcmp(p_path,glob_p_vmdk_lockdir1)==0)
+    {
+      p_stat->st_mode=S_IFDIR | 0777;
+      p_stat->st_nlink=2;
+    } else if(glob_p_vmdk_lockdir2!=NULL &&
+              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
+    {
+      p_stat->st_mode=S_IFDIR | 0777;
+      p_stat->st_nlink=2;
+    } else if(glob_p_vmdk_lockfile_name!=NULL &&
+              strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
+    {
+      p_stat->st_mode=S_IFREG | 0666;
+      if(glob_p_vmdk_lockfile_name!=NULL) {
+        p_stat->st_size=strlen(glob_p_vmdk_lockfile_name);
+      } else p_stat->st_size=0;
+    } else return -ENOENT;
+  } else return -ENOENT;
+  // Set uid and gid of all files to uid and gid of current process
+  p_stat->st_uid=getuid();
+  p_stat->st_gid=getgid();
+  return 0;
+}
+
+//! FUSE mkdir implementation
+/*!
+ * \param p_path Directory path
+ * \param mode Directory permissions
+ * \return 0 on success, negated error code on error
+ */
+static int FuseMkDir(const char *p_path, mode_t mode) {
+  // Only allow creation of VMWare's lock directories
+  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    if(glob_p_vmdk_lockdir1==NULL)  {
+      char aVmdkLockDir[strlen(glob_xmount_cfg.pVirtualVmdkPath)+5];
+      sprintf(aVmdkLockDir,"%s.lck",glob_xmount_cfg.pVirtualVmdkPath);
+      if(strcmp(p_path,aVmdkLockDir)==0) {
+        LOG_DEBUG("Creating virtual directory \"%s\"\n",aVmdkLockDir)
+        XMOUNT_STRSET(glob_p_vmdk_lockdir1,aVmdkLockDir)
+        return 0;
+      } else {
+        LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
+        LOG_DEBUG("Supposed: %s\n",aVmdkLockDir)
+        return -1;
+      }
+    } else if(glob_p_vmdk_lockdir2==NULL &&
+              strncmp(p_path,
+                      glob_p_vmdk_lockdir1,
+                      strlen(glob_p_vmdk_lockdir1))==0)
+    {
+      LOG_DEBUG("Creating virtual directory \"%s\"\n",p_path)
+      XMOUNT_STRSET(glob_p_vmdk_lockdir2,p_path)
+      return 0;
+    } else {
+      LOG_ERROR("Attempt to create illegal directory \"%s\"!\n",p_path)
+      LOG_DEBUG("Compared to first %u chars of \"%s\"\n",
+                strlen(glob_p_vmdk_lockdir1),
+                glob_p_vmdk_lockdir1)
+      return -1;
+    }
+  }
+  LOG_ERROR("Attempt to create directory \"%s\" "
+            "on read-only filesystem!\n",p_path)
+  return -1;
+}
+
+//! FUSE create implementation.
+/*!
+ * Currently only allows to create VMWare's lock file
+ *
+ * \param p_path File to create
+ * \param mode File mode
+ * \param dev ??? but not used
+ * \return 0 on success, negated error code on error
+ */
+static int FuseMkNod(const char *p_path, mode_t mode, dev_t dev) {
+  if((glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS) &&
+     glob_p_vmdk_lockdir1!=NULL && glob_p_vmdk_lockfile_name==NULL)
+  {
+    LOG_DEBUG("Creating virtual file \"%s\"\n",p_path)
+    XMOUNT_STRSET(glob_p_vmdk_lockfile_name,p_path);
+    return 0;
+  } else {
+    LOG_ERROR("Attempt to create illegal file \"%s\"\n",p_path)
+    return -1;
+  }
+}
+
+//! FUSE readdir implementation
+/*!
+ * \param p_path Path from where files should be listed
+ * \param p_buf Buffer to write file entrys to
+ * \param filler Function to write dir entrys to buffer
+ * \param offset ??? but not used
+ * \param p_fi File info struct
+ * \return 0 on success, negated error code on error
+ */
+static int FuseReadDir(const char *p_path,
+                       void *p_buf,
+                       fuse_fill_dir_t filler,
+                       off_t offset,
+                       struct fuse_file_info *p_fi)
+{
+  // Ignore some params
+  (void)offset;
+  (void)p_fi;
+
+  if(strcmp(p_path,"/")==0) {
+    // Add std . and .. entrys
+    filler(p_buf,".",NULL,0);
+    filler(p_buf,"..",NULL,0);
+    // Add our virtual files (p+1 to ignore starting "/")
+    filler(p_buf,glob_xmount_cfg.pVirtualImagePath+1,NULL,0);
+    filler(p_buf,glob_xmount_cfg.pVirtualImageInfoPath+1,NULL,0);
+    if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+       glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+    {
+      // For VMDK's, we use an additional descriptor file
+      filler(p_buf,glob_xmount_cfg.pVirtualVmdkPath+1,NULL,0);
+      // And there could also be a lock directory
+      if(glob_p_vmdk_lockdir1!=NULL) {
+        filler(p_buf,glob_p_vmdk_lockdir1+1,NULL,0);
+      }
+    }
+  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    // For VMDK emulation, there could be a lock directory
+    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
+      filler(p_buf,".",NULL,0);
+      filler(p_buf,"..",NULL,0);
+      if(glob_p_vmdk_lockfile_name!=NULL) {
+        filler(p_buf,
+               glob_p_vmdk_lockfile_name+strlen(glob_p_vmdk_lockdir1)+1,
+               NULL,
+               0);
+      }
+    } else if(glob_p_vmdk_lockdir2!=NULL &&
+              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
+    {
+      filler(p_buf,".",NULL,0);
+      filler(p_buf,"..",NULL,0);
+    } else return -ENOENT;
+  } else return -ENOENT;
+
+  return 0;
+}
+
+//! FUSE open implementation
+/*!
+ * \param p_path Path to file to open
+ * \param p_fi File info struct
+ * \return 0 on success, negated error code on error
+ */
+static int FuseOpen(const char *p_path, struct fuse_file_info *p_fi) {
+
+#define CHECK_OPEN_PERMS() {                                              \
+  if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {          \
+    LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n", \
+              p_path)                                                     \
+    return -EACCES;                                                       \
+  }                                                                       \
+  return 0;                                                               \
+}
+
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0 ||
+     strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0)
+  {
+    CHECK_OPEN_PERMS();
+  } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+            glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0 ||
+         (glob_p_vmdk_lockfile_name!=NULL &&
+            strcmp(p_path,glob_p_vmdk_lockfile_name)==0))
+    {
+      CHECK_OPEN_PERMS();
+    }
+  }
+
+#undef CHECK_PERMS
+
+  LOG_DEBUG("Attempt to open inexistant file \"%s\".\n",p_path);
+  return -ENOENT;
+}
+
+//! FUSE read implementation
+/*!
+ * \param p_path Path (relative to mount folder) of file to read data from
+ * \param p_buf Pre-allocated buffer where read data should be written to
+ * \param size Number of bytes to read
+ * \param offset Offset to start reading at
+ * \param p_fi: File info struct
+ * \return Read bytes on success, negated error code on error
+ */
+static int FuseRead(const char *p_path,
+                    char *p_buf,
+                    size_t size,
+                    off_t offset,
+                    struct fuse_file_info *p_fi)
+{
+  (void)p_fi;
+
+  int ret;
+  uint64_t len;
+
+#define READ_MEM_FILE(filebuf,filesize,filetypestr,mutex) {                    \
+  len=filesize;                                                                \
+  if(offset<len) {                                                             \
+    if(offset+size>len) {                                                      \
+      LOG_DEBUG("Attempt to read past EOF of virtual " filetypestr " file\n"); \
+      LOG_DEBUG("Adjusting read size from %u to %u\n",size,len-offset);        \
+      size=len-offset;                                                         \
+    }                                                                          \
+    pthread_mutex_lock(&mutex);                                                \
+    memcpy(p_buf,filebuf+offset,size);                                         \
+    pthread_mutex_unlock(&mutex);                                              \
+    LOG_DEBUG("Read %" PRIu64 " bytes at offset %" PRIu64                      \
+              " from virtual " filetypestr " file\n",size,offset);             \
+    ret=size;                                                                  \
+  } else {                                                                     \
+    LOG_DEBUG("Attempt to read behind EOF of virtual " filetypestr " file\n"); \
+    ret=0;                                                                     \
+  }                                                                            \
+}
+
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+    // Read data from virtual output file
+    // Wait for other threads to end reading/writing data
+    pthread_mutex_lock(&glob_mutex_image_rw);
+    // Get requested data
+    if((ret=GetVirtImageData(p_buf,offset,size))<0) {
+      LOG_ERROR("Couldn't read data from virtual image file!\n")
+    }
+    // Allow other threads to read/write data again
+    pthread_mutex_unlock(&glob_mutex_image_rw);
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+    // Read data from virtual info file
+    READ_MEM_FILE(glob_p_info_file,
+                  strlen(glob_p_info_file),
+                  "info",
+                  glob_mutex_info_read);
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+    // Read data from virtual vmdk file
+    READ_MEM_FILE(glob_p_vmdk_file,
+                  glob_vmdk_file_size,
+                  "vmdk",
+                  glob_mutex_image_rw);
+  } else if(glob_p_vmdk_lockfile_name!=NULL &&
+            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
+  {
+    // Read data from virtual lock file
+    READ_MEM_FILE(glob_p_vmdk_lockfile_data,
+                  glob_vmdk_lockfile_size,
+                  "vmdk lock",
+                  glob_mutex_image_rw);
+  } else {
+    // Attempt to read non existant file
+    LOG_DEBUG("Attempt to read from non existant file \"%s\"\n",p_path)
+    ret=-ENOENT;
+  }
+
+#undef READ_MEM_FILE
+
+  return ret;
+}
+
+//! FUSE rename implementation
+/*!
+ * \param p_path File to rename
+ * \param p_npath New filename
+ * \return 0 on error, negated error code on error
+ */
+static int FuseRename(const char *p_path, const char *p_npath) {
+  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    if(glob_p_vmdk_lockfile_name!=NULL &&
+       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
+    {
+      LOG_DEBUG("Renaming virtual lock file from \"%s\" to \"%s\"\n",
+                glob_p_vmdk_lockfile_name,
+                p_npath)
+      XMOUNT_REALLOC(glob_p_vmdk_lockfile_name,char*,
+                     (strlen(p_npath)+1)*sizeof(char));
+      strcpy(glob_p_vmdk_lockfile_name,p_npath);
+      return 0;
+    }
+  }
+  return -ENOENT;
+}
+
+//! FUSE rmdir implementation
+/*!
+ * \param p_path Directory to delete
+ * \return 0 on success, negated error code on error
+ */
+static int FuseRmDir(const char *p_path) {
+  // Only VMWare's lock directories can be deleted
+  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    if(glob_p_vmdk_lockdir1!=NULL && strcmp(p_path,glob_p_vmdk_lockdir1)==0) {
+      LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
+      free(glob_p_vmdk_lockdir1);
+      glob_p_vmdk_lockdir1=NULL;
+      return 0;
+    } else if(glob_p_vmdk_lockdir2!=NULL &&
+              strcmp(p_path,glob_p_vmdk_lockdir2)==0)
+    {
+      LOG_DEBUG("Deleting virtual lock dir \"%s\"\n",glob_p_vmdk_lockdir1)
+      free(glob_p_vmdk_lockdir2);
+      glob_p_vmdk_lockdir2=NULL;
+      return 0;
+    }
+  }
+  return -1;
+}
+
+//! FUSE unlink implementation
+/*!
+ * \param p_path File to delete
+ * \return 0 on success, negated error code on error
+ */
+static int FuseUnlink(const char *p_path) {
+  // Only VMWare's lock file can be deleted
+  if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
+     glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
+  {
+    if(glob_p_vmdk_lockfile_name!=NULL &&
+       strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
+    {
+      LOG_DEBUG("Deleting virtual file \"%s\"\n",glob_p_vmdk_lockfile_name)
+      free(glob_p_vmdk_lockfile_name);
+      free(glob_p_vmdk_lockfile_data);
+      glob_p_vmdk_lockfile_name=NULL;
+      glob_p_vmdk_lockfile_data=NULL;
+      glob_vmdk_lockfile_size=0;
+      return 0;
+    }
+  }
+  return -1;
+}
+
+//! FUSE statfs implementation
+/*!
+ * \param p_path Get stats for fs that the specified file resides in
+ * \param stats Stats
+ * \return 0 on success, negated error code on error
+ */
+/*
+static int FuseStatFs(const char *p_path, struct statvfs *stats) {
+  struct statvfs CacheFileFsStats;
+  int ret;
+
+  if(glob_xmount_cfg.Writable==TRUE) {
+    // If write support is enabled, return stats of fs upon which cache file
+    // resides in
+    if((ret=statvfs(glob_xmount_cfg.pCacheFile,&CacheFileFsStats))==0) {
+      memcpy(stats,&CacheFileFsStats,sizeof(struct statvfs));
+      return 0;
+    } else {
+      LOG_ERROR("Couldn't get stats for fs upon which resides \"%s\"\n",
+                glob_xmount_cfg.pCacheFile)
+      return ret;
+    }
+  } else {
+    // TODO: Return read only
+    return 0;
+  }
+}
+*/
+
+// FUSE write implementation
+/*!
+ * \param p_buf Buffer containing data to write
+ * \param size Number of bytes to write
+ * \param offset Offset to start writing at
+ * \param p_fi: File info struct
+ *
+ * Returns:
+ *   Written bytes on success, negated error code on error
+ */
+static int FuseWrite(const char *p_path,
+                     const char *p_buf,
+                     size_t size,
+                     off_t offset,
+                     struct fuse_file_info *p_fi)
+{
+  (void)p_fi;
+
+  uint64_t len;
+
+  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+    // Wait for other threads to end reading/writing data
+    pthread_mutex_lock(&glob_mutex_image_rw);
+
+    // Get virtual image file size
+    if(!GetVirtImageSize(&len)) {
+      LOG_ERROR("Couldn't get virtual image size!\n")
+      pthread_mutex_unlock(&glob_mutex_image_rw);
+      return 0;
+    }
+    if(offset<len) {
+      if(offset+size>len) size=len-offset;
+      if(SetVirtImageData(p_buf,offset,size)!=size) {
+        LOG_ERROR("Couldn't write data to virtual image file!\n")
+        pthread_mutex_unlock(&glob_mutex_image_rw);
+        return 0;
+      }
+    } else {
+      LOG_DEBUG("Attempt to write past EOF of virtual image file\n")
+      pthread_mutex_unlock(&glob_mutex_image_rw);
+      return 0;
+    }
+
+    // Allow other threads to read/write data again
+    pthread_mutex_unlock(&glob_mutex_image_rw);
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+    pthread_mutex_lock(&glob_mutex_image_rw);
+    len=glob_vmdk_file_size;
+    if((offset+size)>len) {
+      // Enlarge or create buffer if needed
+      if(len==0) {
+        len=offset+size;
+        XMOUNT_MALLOC(glob_p_vmdk_file,char*,len*sizeof(char))
+      } else {
+        len=offset+size;
+        XMOUNT_REALLOC(glob_p_vmdk_file,char*,len*sizeof(char))
+      }
+      glob_vmdk_file_size=offset+size;
+    }
+    // Copy data to buffer
+    memcpy(glob_p_vmdk_file+offset,p_buf,size);
+    pthread_mutex_unlock(&glob_mutex_image_rw);
+  } else if(glob_p_vmdk_lockfile_name!=NULL &&
+            strcmp(p_path,glob_p_vmdk_lockfile_name)==0)
+  {
+    pthread_mutex_lock(&glob_mutex_image_rw);
+    if((offset+size)>glob_vmdk_lockfile_size) {
+      // Enlarge or create buffer if needed
+      if(glob_vmdk_lockfile_size==0) {
+        glob_vmdk_lockfile_size=offset+size;
+        XMOUNT_MALLOC(glob_p_vmdk_lockfile_data,char*,
+                      glob_vmdk_lockfile_size*sizeof(char))
+      } else {
+        glob_vmdk_lockfile_size=offset+size;
+        XMOUNT_REALLOC(glob_p_vmdk_lockfile_data,char*,
+                       glob_vmdk_lockfile_size*sizeof(char))
+      }
+    }
+    // Copy data to buffer
+    memcpy(glob_p_vmdk_lockfile_data+offset,p_buf,size);
+    pthread_mutex_unlock(&glob_mutex_image_rw);
+  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+    // Attempt to write data to read only image info file
+    LOG_DEBUG("Attempt to write data to virtual info file\n");
+    return -ENOENT;
+  } else {
+    // Attempt to write to non existant file
+    LOG_DEBUG("Attempt to write to the non existant file \"%s\"\n",p_path)
+    return -ENOENT;
+  }
+
+  return size;
+}
+
+/*******************************************************************************
+ * Main
+ ******************************************************************************/
 int main(int argc, char *argv[]) {
   char **pp_input_filenames=NULL;
   int input_filenames_count=0;
   int nargc=0;
   char **pp_nargv=NULL;
   char *p_mountpoint=NULL;
+  struct stat file_stat;
   int ret;
   int fuse_ret;
   char *p_err_msg;
+
+  // Set implemented FUSE functions
+  struct fuse_operations xmount_operations = {
+    //.access=FuseAccess,
+    .getattr=FuseGetAttr,
+    .mkdir=FuseMkDir,
+    .mknod=FuseMkNod,
+    .open=FuseOpen,
+    .readdir=FuseReadDir,
+    .read=FuseRead,
+    .rename=FuseRename,
+    .rmdir=FuseRmDir,
+    //.statfs=FuseStatFs,
+    .unlink=FuseUnlink,
+    .write=FuseWrite
+  };
 
   // Disable std output / std input buffering
   setbuf(stdout,NULL);
@@ -2872,7 +2682,19 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // TODO: Check if mountpoint is a valid dir
+  // Check if mountpoint is a valid dir
+  if(stat(p_mountpoint,&file_stat)!=0) {
+    LOG_ERROR("Unable to stat mount point '%s'!\n",p_mountpoint);
+    PrintUsage(argv[0]);
+    UnloadInputLibs();
+    return 1;
+  }
+  if(!S_ISDIR(file_stat.st_mode)) {
+    LOG_ERROR("Mount point '%s' is not a directory!\n",p_mountpoint);
+    PrintUsage(argv[0]);
+    UnloadInputLibs();
+    return 1;
+  }
 
   // If no input type was specified, default to "dd"
   if(glob_xmount_cfg.p_orig_image_type==NULL) {
@@ -2974,10 +2796,10 @@ int main(int argc, char *argv[]) {
 
   if(glob_xmount_cfg.Debug==TRUE) {
     LOG_DEBUG("Partial MD5 hash of input image file: ")
-    for(int i=0;i<8;i++) printf("%02hhx",
-                            *(((char*)(&(glob_xmount_cfg.InputHashLo)))+i));
-    for(int i=0;i<8;i++) printf("%02hhx",
-                            *(((char*)(&(glob_xmount_cfg.InputHashHi)))+i));
+    for(int i=0;i<8;i++)
+      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.InputHashLo)))+i));
+    for(int i=0;i<8;i++)
+      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.InputHashHi)))+i));
     printf("\n");
   }
 
@@ -3308,5 +3130,21 @@ int main(int argc, char *argv[]) {
             * Re-implemented InitVirtImageInfoFile using input lib's
               GetInfofileContent function.
             * Further code cleanups.
+  20140807: * Further code cleanups.
+            * Renamed GetVirtFileAttr to FuseGetAttr
+            * Renamed CreateVirtDir to FuseMkDir
+            * Renamed CreateVirtDir to FuseMkNod
+            * Renamed OpenVirtFile to FuseOpen
+            * Renamed GetVirtFiles to FuseReadDir
+            * Renamed ReadVirtFile to FuseRead
+            * Renamed RenameVirtFile to FuseRename
+            * Renamed DeleteVirtDir to FuseRmDir
+            * Renamed DeleteVirtFile to FuseUnlink
+            * Renamed WriteVirtFile to FuseWrite
+            * Fixed bug in CalculateInputImageHash where always HASH_AMOUNT
+              bytes were hased even if input image is smaller.
+            * Fixed a newly introduced bug in FuseRead and GetVirtImageData
+              returning -EIO when trying to read behind EOF. The correct return
+              value is 0.
 */
 
