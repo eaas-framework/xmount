@@ -4,6 +4,10 @@ project(xmount C)
 include(CheckIncludeFiles)
 #include(CheckCSourceCompiles)
 
+# Only for internal packaging
+#set(STATIC_EWF 1)
+#set(STATIC_AFF 1)
+
 # Make sure CMAKE_BUILD_TYPE is set
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")

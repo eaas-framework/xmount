@@ -1,3 +1,12 @@
+xmount (0.7.0) stable; urgency=low
+
+  * Changed build system from autoconf / automake to cmake
+  * Moved input image support into external libs
+  * Added --offset command line parameter
+  * Massive code cleanup including some small bug fixes
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Wed, 13 Aug 2014 17:00:00 +0200
+
 xmount (0.6.0) stable; urgency=low
 
   * Added faster aff input support (using libaaff).
