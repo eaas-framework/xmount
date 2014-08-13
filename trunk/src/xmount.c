@@ -21,23 +21,35 @@
 #include <config.h>
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <string.h>
+#include <inttypes.h> // For PRI*
 #include <errno.h>
 #include <dlfcn.h> // For dlopen, dlclose, dlsym
 #include <dirent.h> // For opendir, readdir, closedir
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h> // For fstat
-#ifndef __APPLE__
-  #include <linux/fs.h>
+#include <sys/types.h>
+#ifdef HAVE_LINUX_FS_H
+  #include <linux/fs.h> // For SEEK_* ??
 #endif
+#include <grp.h> // For getgrnam
 #include <pthread.h>
-#include <time.h>
+#include <time.h> // For time
+
+#define FUSE_USE_VERSION 26
+#include <fuse.h>
 
 #include "xmount.h"
 #include "md5.h"
+#include "endianness.h"
+#include "macros.h"
+
+#define XMOUNT_COPYRIGHT_NOTICE \
+  "xmount v%s Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>"
 
 /*******************************************************************************
  * Global vars
@@ -110,22 +122,6 @@ static void LogMessage(char *p_msg_type,
   va_end(var_list);
 }
 
-//! Print warning messages to stdout
-/*!
- * \param p_msg Message string
- * \param ... Variable params with values to include in message string
- */
-static void LogWarnMessage(char *p_msg,...) {
-  va_list var_list;
-
-  // Print message "header"
-  printf("WARNING: ");
-  // Print message with variable parameters
-  va_start(var_list,p_msg);
-  vprintf(p_msg,var_list);
-  va_end(var_list);
-}
-
 //! Print usage instructions (cmdline options etc..)
 /*!
  * \param p_prog_name Program name (argv[0])
@@ -134,23 +130,27 @@ static void PrintUsage(char *p_prog_name) {
   char *p_buf;
   int first=1;
 
-  printf("\nxmount v%s copyright (c) 2008-2014 by Gillen Daniel "
-         "<gillen.dan@pinguin.lu>\n",XMOUNT_VERSION);
+  printf("\n" XMOUNT_COPYRIGHT_NOTICE "\n",XMOUNT_VERSION);
   printf("\nUsage:\n");
-  printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",p_prog_name);
+  printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",
+         p_prog_name);
   printf("Options:\n");
   printf("  fopts:\n");
   printf("    -d : Enable FUSE's and xmount's debug mode.\n");
   printf("    -h : Display this help message.\n");
   printf("    -s : Run single threaded.\n");
-  printf("    -o no_allow_other : Disable automatic addition of FUSE's allow_other option.\n");
-  printf("    -o <fmopts> : Specify fuse mount options. Will also disable automatic\n");
+  printf("    -o no_allow_other : Disable automatic addition of FUSE's "
+           "allow_other option.\n");
+  printf("    -o <fmopts> : Specify fuse mount options. Will also disable "
+           "automatic\n");
   printf("                  addition of FUSE's allow_other option!\n");
-  printf("    INFO: For VMDK emulation, you have to uncomment \"user_allow_other\" in\n");
+  printf("    INFO: For VMDK emulation, you have to uncomment "
+           "\"user_allow_other\" in\n");
   printf("          /etc/fuse.conf or run xmount as root.\n");
   printf("\n");
   printf("  mopts:\n");
-  printf("    --cache <file> : Enable virtual write support and set cachefile to use.\n");
+  printf("    --cache <file> : Enable virtual write support and set cachefile "
+           "to use.\n");
   printf("    --in <itype> : Input image format. <itype> can be ");
 
   // List supported input types
@@ -167,28 +167,37 @@ static void PrintUsage(char *p_prog_name) {
   printf(".\n");
 
   printf("    --inopts <iopts> : Specify input library specific options.\n");
-  printf("    --info : Print out some infos about used compiler and libraries.\n");
-  printf("    --offset <off> : Move the output image data start <off> bytes into the input image.\n");
-  printf("    --out <otype> : Output image format. <otype> can be \"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk(s)\".\n");
-  printf("    --owcache <file> : Same as --cache <file> but overwrites existing cache.\n");
+  printf("    --info : Print out infos about used compiler and libraries.\n");
+  printf("    --offset <off> : Move the output image data start <off> bytes "
+           "into the input image.\n");
+  printf("    --out <otype> : Output image format. "
+           "<otype> can be \"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk(s)\".\n");
+  printf("    --owcache <file> : Same as --cache <file> but overwrites "
+           "existing cache.\n");
   printf("    --rw <file> : Same as --cache <file>.\n");
   printf("    --version : Same as --info.\n");
 #ifndef __APPLE__
-  printf("    INFO: Input and output image type defaults to \"dd\" if not specified.\n");
+  printf("    INFO: Input and output image type defaults to \"dd\" if not "
+           "specified.\n");
 #else
-  printf("    INFO: Input image type defaults to \"dd\" and output image type defaults to \"dmg\" if not specified.\n");
+  printf("    INFO: Input image type defaults to \"dd\" and output image type "
+           "defaults to \"dmg\" if not specified.\n");
 #endif
-  printf("    WARNING: Output image type \"vmdk(s)\" should be considered experimental!\n");
+  printf("    WARNING: Output image type \"vmdk(s)\" should be considered "
+           "experimental!\n");
   printf("\n");
   printf("  ifile:\n");
-  printf("    Input image file. If your input image is split into multiple files, you have to specify them all!\n");
+  printf("    Input image file. If your input image is split into multiple "
+           "files, you have to specify them all!\n");
   printf("\n");
   printf("  mntp:\n");
   printf("    Mount point where virtual files should be located.\n");
   printf("\n");
   printf("  iopts:\n");
-  printf("    Some input libraries might support an own set of options to configure / tune their behaviour.\n");
-  printf("    Input libraries supporting this feature (if any) and and their options are listed below.\n");
+  printf("    Some input libraries might support an own set of options to "
+           "configure / tune their behaviour.\n");
+  printf("    Input libraries supporting this feature (if any) and and their "
+           "options are listed below.\n");
   printf("\n");
 
   // List input lib options
@@ -203,44 +212,79 @@ static void PrintUsage(char *p_prog_name) {
 
 //! Check fuse settings
 /*!
- * Check if FUSE allows us to pass the -o allow_other parameter.
- * This only works if we are root or user_allow_other is set in
- * /etc/fuse.conf.
+ * Check if FUSE allows us to pass the -o allow_other parameter. This only works
+ * if we are root or user_allow_other is set in /etc/fuse.conf.
  *
- * \return TRUE on success, FALSE on error
+ * In addition, this function also checks if the user is member of the fuse
+ * group which is generally needed to use fuse at all.
  */
-static int CheckFuseAllowOther() {
-  if(geteuid()!=0) {
-    // Not running xmount as root. Try to read FUSE's config file /etc/fuse.conf
-    FILE *hFuseConf=(FILE*)FOPEN("/etc/fuse.conf","r");
-    if(hFuseConf==NULL) {
-      LogWarnMessage("FUSE will not allow other users nor root to access your "
-                     "virtual harddisk image. To change this behavior, please "
-                     "add \"user_allow_other\" to /etc/fuse.conf or execute "
-                     "xmount as root.\n");
-      return FALSE;
+static void CheckFuseSettings() {
+  FILE *h_fuse_conf;
+  char line[256];
+  int found;
+  struct group *p_group;
+  char *p_username;
+
+  if(geteuid()==0) {
+    // Running as root, there should be no problems
+    glob_xmount_cfg.may_set_fuse_allow_other=TRUE;
+    return;
+  }
+
+  // Check if a fuse group exists and if so, make sure user is a member of it
+  p_group=getgrnam("fuse");
+  if(p_group!=NULL) {
+    // Get effective user name
+    p_username=cuserid(NULL);
+    // Check if user is member of fuse group
+    found=FALSE;
+    while(*(p_group->gr_mem)!=NULL) {
+      if(strcmp(*(p_group->gr_mem),p_username)==0) {
+        found=TRUE;
+        break;
+      }
+      p_group->gr_mem++;
     }
+    if(found==FALSE) {
+      printf("\nWARNING: You are not a member of the \"fuse\" group. This will "
+               "prevent you from mounting images using xmount. Please add "
+               "yourself to the \"fuse\" group using the command "
+               "\"sudo usermod -a -G fuse %s\" and reboot your system or "
+               "execute xmount as root.\n\n",
+             p_username);
+      return;
+    }
+  } else {
+    printf("\nWARNING: Your system does not seem to have a \"fuse\" group. If "
+             "mounting works, you can ignore this message.\n\n");
+  }
+
+  // Read FUSE's config file /etc/fuse.conf and check for set user_allow_other
+  h_fuse_conf=(FILE*)FOPEN("/etc/fuse.conf","r");
+  if(h_fuse_conf!=NULL) {
     // Search conf file for set user_allow_others
-    char line[256];
-    int PermSet=FALSE;
-    while(fgets(line,sizeof(line),hFuseConf)!=NULL && PermSet!=TRUE) {
+    found=FALSE;
+    while(fgets(line,sizeof(line),h_fuse_conf)!=NULL) {
       // TODO: This works as long as there is no other parameter beginning with
       // "user_allow_other" :)
-      if(strncmp(line,"user_allow_other",strlen("user_allow_other"))==0) {
-        PermSet=TRUE;
+      if(strncmp(line,"user_allow_other",16)==0) {
+        found=TRUE;
+        break;
       }
     }
-    fclose(hFuseConf);
-    if(PermSet==FALSE) {
-      LogWarnMessage("FUSE will not allow other users nor root to access your "
-                     "virtual harddisk image. To change this behavior, please "
-                     "add \"user_allow_other\" to /etc/fuse.conf or execute "
-                     "xmount as root.\n");
-      return FALSE;
+    fclose(h_fuse_conf);
+    if(found==FALSE) {
+      printf("\nWARNING: FUSE will not allow other users nor root to access "
+               "your virtual harddisk image. To change this behavior, please "
+               "add \"user_allow_other\" to /etc/fuse.conf or execute xmount "
+               "as root.\n\n");
+      glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
     }
+  } else {
+    printf("\nWARNING: Unable to open /etc/fuse.conf. If mounting works, you "
+             "can ignore this message.\n\n");
+    glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
   }
-  // Running xmount as root or user_allow_other is set in /etc/fuse.conf
-  return TRUE;
 }
 
 //! Parse command line options
@@ -279,7 +323,7 @@ static int ParseCmdLine(const int argc,
         opts++;
         XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
         XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
-        glob_xmount_cfg.Debug=TRUE;
+        glob_xmount_cfg.debug=TRUE;
       } else if(strcmp(pp_argv[i],"-h")==0) {
         // Print help message
         PrintUsage(pp_argv[0]);
@@ -326,15 +370,15 @@ static int ParseCmdLine(const int argc,
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,pp_argv[i])
-          glob_xmount_cfg.Writable=TRUE;
+          XMOUNT_STRSET(glob_xmount_cfg.p_cache_file,pp_argv[i])
+          glob_xmount_cfg.writable=TRUE;
         } else {
-          LOG_ERROR("You must specify a cache file to read/write data from/to!\n")
+          LOG_ERROR("You must specify a cache file!\n")
           PrintUsage(pp_argv[0]);
           exit(1);
         }
         LOG_DEBUG("Enabling virtual write support using cache file \"%s\"\n",
-                  glob_xmount_cfg.pCacheFile)
+                  glob_xmount_cfg.p_cache_file)
       } else if(strcmp(pp_argv[i],"--in")==0) {
         // Specify input image type
         // Next parameter must be image type
@@ -406,21 +450,20 @@ static int ParseCmdLine(const int argc,
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount_cfg.pCacheFile,pp_argv[i])
-          glob_xmount_cfg.Writable=TRUE;
-          glob_xmount_cfg.OverwriteCache=TRUE;
+          XMOUNT_STRSET(glob_xmount_cfg.p_cache_file,pp_argv[i])
+          glob_xmount_cfg.writable=TRUE;
+          glob_xmount_cfg.overwrite_cache=TRUE;
         } else {
-          LOG_ERROR("You must specify a cache file to read/write data from/to!\n")
+          LOG_ERROR("You must specify a cache file!\n")
           PrintUsage(pp_argv[0]);
           exit(1);
         }
-        LOG_DEBUG("Enabling virtual write support overwriting cache file \"%s\"\n",
-                  glob_xmount_cfg.pCacheFile)
+        LOG_DEBUG("Enabling virtual write support overwriting cache file %s\n",
+                  glob_xmount_cfg.p_cache_file)
       } else if(strcmp(pp_argv[i],"--version")==0 ||
                 strcmp(pp_argv[i],"--info")==0)
       {
-        printf("xmount v%s copyright (c) 2008-2014 by Gillen Daniel "
-               "<gillen.dan@pinguin.lu>\n\n",XMOUNT_VERSION);
+        printf(XMOUNT_COPYRIGHT_NOTICE "\n\n",XMOUNT_VERSION);
 #ifdef __GNUC__
         printf("  compile timestamp: %s %s\n",__DATE__,__TIME__);
         printf("  gcc version: %s\n",__VERSION__);
@@ -496,7 +539,7 @@ static int ParseCmdLine(const int argc,
     XMOUNT_STRAPP((*ppp_nargv)[opts-1],(*ppp_filenames)[0])
     if(FuseAllowOther==TRUE) {
       // Try to add "allow_other" to FUSE's cmd-line params
-      if(CheckFuseAllowOther()==TRUE) {
+      if(glob_xmount_cfg.may_set_fuse_allow_other) {
         XMOUNT_STRAPP((*ppp_nargv)[opts-1],",allow_other")
       }
     }
@@ -523,57 +566,57 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   tmp=strrchr(p_orig_name,'.');
 
   // Set leading '/'
-  XMOUNT_STRSET(glob_xmount_cfg.pVirtualImagePath,"/")
-  XMOUNT_STRSET(glob_xmount_cfg.pVirtualImageInfoPath,"/")
+  XMOUNT_STRSET(glob_xmount_cfg.p_virtual_image_path,"/")
+  XMOUNT_STRSET(glob_xmount_cfg.p_virtual_info_path,"/")
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
-    XMOUNT_STRSET(glob_xmount_cfg.pVirtualVmdkPath,"/")
+    XMOUNT_STRSET(glob_xmount_cfg.p_virtual_vmdk_path,"/")
   }
 
   // Copy filename
   if(tmp==NULL) {
     // Input image filename has no extension
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,p_orig_name)
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,p_orig_name)
+    XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,p_orig_name)
+    XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_info_path,p_orig_name)
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
        glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
     {
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualVmdkPath,p_orig_name)
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_vmdk_path,p_orig_name)
     }
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,".info")
+    XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_info_path,".info")
   } else {
-    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImagePath,p_orig_name,
+    XMOUNT_STRNAPP(glob_xmount_cfg.p_virtual_image_path,p_orig_name,
                    strlen(p_orig_name)-strlen(tmp))
-    XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualImageInfoPath,p_orig_name,
+    XMOUNT_STRNAPP(glob_xmount_cfg.p_virtual_info_path,p_orig_name,
                    strlen(p_orig_name)-strlen(tmp))
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
        glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
     {
-      XMOUNT_STRNAPP(glob_xmount_cfg.pVirtualVmdkPath,p_orig_name,
+      XMOUNT_STRNAPP(glob_xmount_cfg.p_virtual_vmdk_path,p_orig_name,
                      strlen(p_orig_name)-strlen(tmp))
     }
-    XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImageInfoPath,".info")
+    XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_info_path,".info")
   }
 
   // Add virtual file extensions
   switch(glob_xmount_cfg.VirtImageType) {
     case VirtImageType_DD:
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,".dd")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,".dd")
       break;
     case VirtImageType_DMG:
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,".dmg")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,".dmg")
       break;
     case VirtImageType_VDI:
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,".vdi")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,".vdi")
       break;
     case VirtImageType_VHD:
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,".vhd")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,".vhd")
       break;
     case VirtImageType_VMDK:
     case VirtImageType_VMDKS:
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualImagePath,".dd")
-      XMOUNT_STRAPP(glob_xmount_cfg.pVirtualVmdkPath,".vmdk")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_image_path,".dd")
+      XMOUNT_STRAPP(glob_xmount_cfg.p_virtual_vmdk_path,".vmdk")
       break;
     default:
       LOG_ERROR("Unknown virtual image type!\n")
@@ -581,14 +624,14 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   }
 
   LOG_DEBUG("Set virtual image name to \"%s\"\n",
-            glob_xmount_cfg.pVirtualImagePath)
+            glob_xmount_cfg.p_virtual_image_path)
   LOG_DEBUG("Set virtual image info name to \"%s\"\n",
-            glob_xmount_cfg.pVirtualImageInfoPath)
+            glob_xmount_cfg.p_virtual_info_path)
   if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     LOG_DEBUG("Set virtual vmdk name to \"%s\"\n",
-              glob_xmount_cfg.pVirtualVmdkPath)
+              glob_xmount_cfg.p_virtual_vmdk_path)
   }
   return TRUE;
 }
@@ -608,8 +651,8 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
 
   // When size was already queryed, use old value rather than regetting value
   // from disk
-  if(glob_xmount_cfg.OrigImageSize!=0 && !without_offset) {
-    *p_size=glob_xmount_cfg.OrigImageSize;
+  if(glob_xmount_cfg.orig_image_size!=0 && !without_offset) {
+    *p_size=glob_xmount_cfg.orig_image_size;
     return TRUE;
   }
 
@@ -626,7 +669,7 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
     (*p_size)-=glob_xmount_cfg.orig_img_offset;
 
     // Save size so we have not to reget it from disk next time
-    glob_xmount_cfg.OrigImageSize=*p_size;
+    glob_xmount_cfg.orig_image_size=*p_size;
   }
 
   return TRUE;
@@ -638,8 +681,8 @@ static int GetOrigImageSize(uint64_t *p_size, int without_offset) {
  * \return TRUE on success, FALSE on error
  */
 static int GetVirtImageSize(uint64_t *p_size) {
-  if(glob_xmount_cfg.VirtImageSize!=0) {
-    *p_size=glob_xmount_cfg.VirtImageSize;
+  if(glob_xmount_cfg.virt_image_size!=0) {
+    *p_size=glob_xmount_cfg.virt_image_size;
     return TRUE;
   }
 
@@ -678,7 +721,7 @@ static int GetVirtImageSize(uint64_t *p_size) {
       return FALSE;
   }
 
-  glob_xmount_cfg.VirtImageSize=*p_size;
+  glob_xmount_cfg.virt_image_size=*p_size;
   return TRUE;
 }
 
@@ -779,7 +822,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         } else {
           cur_to_read=to_read;
         }
-        if(glob_xmount_cfg.Writable==TRUE &&
+        if(glob_xmount_cfg.writable==TRUE &&
            glob_p_cache_header->VdiFileHeaderCached==TRUE)
         {
           // VDI header was already cached
@@ -841,7 +884,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
     if(block_off+to_read>CACHE_BLOCK_SIZE) {
       cur_to_read=CACHE_BLOCK_SIZE-block_off;
     } else cur_to_read=to_read;
-    if(glob_xmount_cfg.Writable==TRUE &&
+    if(glob_xmount_cfg.writable==TRUE &&
        glob_p_cache_blkidx[cur_block].Assigned==TRUE)
     {
       // Write support enabled and need to read altered data from cachefile
@@ -890,7 +933,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         break;
       case VirtImageType_VHD:
         // Micro$oft has choosen to use a footer rather then a header.
-        if(glob_xmount_cfg.Writable==TRUE &&
+        if(glob_xmount_cfg.writable==TRUE &&
            glob_p_cache_header->VhdFileHeaderCached==TRUE)
         {
           // VHD footer was already cached
@@ -1459,7 +1502,8 @@ static int InitVirtVdiHeader() {
           strlen(VDI_FILE_COMMENT)+1);
   glob_p_vdi_header->u32Signature=VDI_IMAGE_SIGNATURE;
   glob_p_vdi_header->u32Version=VDI_IMAGE_VERSION;
-  glob_p_vdi_header->cbHeader=0x00000180;  // No idea what this is for! Testimage had same value
+  // No idea what the following value is for! Testimage had same value
+  glob_p_vdi_header->cbHeader=0x00000180;
   glob_p_vdi_header->u32Type=VDI_IMAGE_TYPE_FIXED;
   glob_p_vdi_header->fFlags=VDI_IMAGE_FLAGS;
   strncpy(glob_p_vdi_header->szComment,VDI_HEADER_COMMENT,
@@ -1480,12 +1524,8 @@ static int InitVirtVdiHeader() {
   // Use partial MD5 input file hash as creation UUID and generate a random
   // modification UUID. VBox won't accept immages where create and modify UUIDS
   // aren't set.
-  glob_p_vdi_header->uuidCreate_l=glob_xmount_cfg.InputHashLo;
-  glob_p_vdi_header->uuidCreate_h=glob_xmount_cfg.InputHashHi;
-  //*((uint32_t*)(&(glob_p_vdi_header->uuidCreate_l)))=rand();
-  //*((uint32_t*)(&(glob_p_vdi_header->uuidCreate_l))+4)=rand();
-  //*((uint32_t*)(&(glob_p_vdi_header->uuidCreate_h)))=rand();
-  //*((uint32_t*)(&(glob_p_vdi_header->uuidCreate_h))+4)=rand();
+  glob_p_vdi_header->uuidCreate_l=glob_xmount_cfg.input_hash_lo;
+  glob_p_vdi_header->uuidCreate_h=glob_xmount_cfg.input_hash_hi;
 
 #define rand64(var) {              \
   *((uint32_t*)&(var))=rand();     \
@@ -1586,8 +1626,8 @@ static int InitVirtVhdHeader() {
 
   glob_p_vhd_header->disk_type=VHD_IMAGE_HVAL_DISK_TYPE;
 
-  glob_p_vhd_header->uuid_l=glob_xmount_cfg.InputHashLo;
-  glob_p_vhd_header->uuid_h=glob_xmount_cfg.InputHashHi;
+  glob_p_vhd_header->uuid_l=glob_xmount_cfg.input_hash_lo;
+  glob_p_vhd_header->uuid_h=glob_xmount_cfg.input_hash_hi;
   glob_p_vhd_header->saved_state=0x00;
 
   // Calculate footer checksum
@@ -1639,14 +1679,14 @@ static int InitVirtualVmdkFile() {
     sprintf(buf,
             VMDK_DESC_FILE,
             image_blocks,
-            (glob_xmount_cfg.pVirtualImagePath)+1,
+            (glob_xmount_cfg.p_virtual_image_path)+1,
             "ide");
   } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS){
     // VMDK with SCSI bus
     sprintf(buf,
             VMDK_DESC_FILE,
             image_blocks,
-            (glob_xmount_cfg.pVirtualImagePath)+1,
+            (glob_xmount_cfg.p_virtual_image_path)+1,
             "scsi");
   } else {
     LOG_ERROR("Unknown virtual VMDK file format!\n")
@@ -1702,28 +1742,28 @@ static int InitCacheFile() {
   uint32_t needed_blocks=0;
   uint64_t buf;
 
-  if(!glob_xmount_cfg.OverwriteCache) {
+  if(!glob_xmount_cfg.overwrite_cache) {
     // Try to open an existing cache file or create a new one
-    glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.pCacheFile,"rb+");
+    glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.p_cache_file,"rb+");
     if(glob_p_cache_file==NULL) {
       // As the c lib seems to have no possibility to open a file rw wether it
       // exists or not (w+ does not work because it truncates an existing file),
       // when r+ returns NULL the file could simply not exist
       LOG_DEBUG("Cache file does not exist. Creating new one\n")
-      glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.pCacheFile,"wb+");
+      glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.p_cache_file,"wb+");
       if(glob_p_cache_file==NULL) {
         // There is really a problem opening the file
         LOG_ERROR("Couldn't open cache file \"%s\"!\n",
-                  glob_xmount_cfg.pCacheFile)
+                  glob_xmount_cfg.p_cache_file)
         return FALSE;
       }
     }
   } else {
     // Overwrite existing cache file or create a new one
-    glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.pCacheFile,"wb+");
+    glob_p_cache_file=(FILE*)FOPEN(glob_xmount_cfg.p_cache_file,"wb+");
     if(glob_p_cache_file==NULL) {
       LOG_ERROR("Couldn't open cache file \"%s\"!\n",
-                glob_xmount_cfg.pCacheFile)
+                glob_xmount_cfg.p_cache_file)
       return FALSE;
     }
   }
@@ -1908,8 +1948,9 @@ static int LoadInputLibs() {
     strcpy(p_library_path+base_library_path_len,p_dirent->d_name);
     p_libxmount_in=dlopen(p_library_path,RTLD_NOW);
     if(p_libxmount_in==NULL) {
-      LOG_ERROR("Unable to load input library '%s'!\n",p_library_path);
-      LOG_DEBUG("DLOPEN returned '%s'.\n",dlerror());
+      LOG_ERROR("Unable to load input library '%s': %s!\n",
+                p_library_path,
+                dlerror());
       continue;
     }
 
@@ -2090,9 +2131,9 @@ static int FuseGetAttr(const char *p_path, struct stat *p_stat) {
     // Attributes of mountpoint
     p_stat->st_mode=S_IFDIR | 0777;
     p_stat->st_nlink=2;
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_image_path)==0) {
     // Attributes of virtual image
-    if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+    if(!glob_xmount_cfg.writable) p_stat->st_mode=S_IFREG | 0444;
     else p_stat->st_mode=S_IFREG | 0666;
     p_stat->st_nlink=1;
     // Get virtual image file size
@@ -2106,7 +2147,7 @@ static int FuseGetAttr(const char *p_path, struct stat *p_stat) {
       p_stat->st_blocks=p_stat->st_size/512;
       if(p_stat->st_size%512!=0) p_stat->st_blocks++;
     }
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_info_path)==0) {
     // Attributes of virtual image info file
     p_stat->st_mode=S_IFREG | 0444;
     p_stat->st_nlink=1;
@@ -2118,9 +2159,9 @@ static int FuseGetAttr(const char *p_path, struct stat *p_stat) {
             glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     // Some special files only present when emulating VMDK files
-    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+    if(strcmp(p_path,glob_xmount_cfg.p_virtual_vmdk_path)==0) {
       // Attributes of virtual vmdk file
-      if(!glob_xmount_cfg.Writable) p_stat->st_mode=S_IFREG | 0444;
+      if(!glob_xmount_cfg.writable) p_stat->st_mode=S_IFREG | 0444;
       else p_stat->st_mode=S_IFREG | 0666;
       p_stat->st_nlink=1;
       // Get virtual image info file size
@@ -2164,8 +2205,8 @@ static int FuseMkDir(const char *p_path, mode_t mode) {
      glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
     if(glob_p_vmdk_lockdir1==NULL)  {
-      char aVmdkLockDir[strlen(glob_xmount_cfg.pVirtualVmdkPath)+5];
-      sprintf(aVmdkLockDir,"%s.lck",glob_xmount_cfg.pVirtualVmdkPath);
+      char aVmdkLockDir[strlen(glob_xmount_cfg.p_virtual_vmdk_path)+5];
+      sprintf(aVmdkLockDir,"%s.lck",glob_xmount_cfg.p_virtual_vmdk_path);
       if(strcmp(p_path,aVmdkLockDir)==0) {
         LOG_DEBUG("Creating virtual directory \"%s\"\n",aVmdkLockDir)
         XMOUNT_STRSET(glob_p_vmdk_lockdir1,aVmdkLockDir)
@@ -2243,13 +2284,13 @@ static int FuseReadDir(const char *p_path,
     filler(p_buf,".",NULL,0);
     filler(p_buf,"..",NULL,0);
     // Add our virtual files (p+1 to ignore starting "/")
-    filler(p_buf,glob_xmount_cfg.pVirtualImagePath+1,NULL,0);
-    filler(p_buf,glob_xmount_cfg.pVirtualImageInfoPath+1,NULL,0);
+    filler(p_buf,glob_xmount_cfg.p_virtual_image_path+1,NULL,0);
+    filler(p_buf,glob_xmount_cfg.p_virtual_info_path+1,NULL,0);
     if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
        glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
     {
       // For VMDK's, we use an additional descriptor file
-      filler(p_buf,glob_xmount_cfg.pVirtualVmdkPath+1,NULL,0);
+      filler(p_buf,glob_xmount_cfg.p_virtual_vmdk_path+1,NULL,0);
       // And there could also be a lock directory
       if(glob_p_vmdk_lockdir1!=NULL) {
         filler(p_buf,glob_p_vmdk_lockdir1+1,NULL,0);
@@ -2288,7 +2329,7 @@ static int FuseReadDir(const char *p_path,
 static int FuseOpen(const char *p_path, struct fuse_file_info *p_fi) {
 
 #define CHECK_OPEN_PERMS() {                                              \
-  if(!glob_xmount_cfg.Writable && (p_fi->flags & 3)!=O_RDONLY) {          \
+  if(!glob_xmount_cfg.writable && (p_fi->flags & 3)!=O_RDONLY) {          \
     LOG_DEBUG("Attempt to open the read-only file \"%s\" for writing.\n", \
               p_path)                                                     \
     return -EACCES;                                                       \
@@ -2296,14 +2337,14 @@ static int FuseOpen(const char *p_path, struct fuse_file_info *p_fi) {
   return 0;                                                               \
 }
 
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0 ||
-     strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0)
+  if(strcmp(p_path,glob_xmount_cfg.p_virtual_image_path)==0 ||
+     strcmp(p_path,glob_xmount_cfg.p_virtual_info_path)==0)
   {
     CHECK_OPEN_PERMS();
   } else if(glob_xmount_cfg.VirtImageType==VirtImageType_VMDK ||
             glob_xmount_cfg.VirtImageType==VirtImageType_VMDKS)
   {
-    if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0 ||
+    if(strcmp(p_path,glob_xmount_cfg.p_virtual_vmdk_path)==0 ||
          (glob_p_vmdk_lockfile_name!=NULL &&
             strcmp(p_path,glob_p_vmdk_lockfile_name)==0))
     {
@@ -2311,7 +2352,7 @@ static int FuseOpen(const char *p_path, struct fuse_file_info *p_fi) {
     }
   }
 
-#undef CHECK_PERMS
+#undef CHECK_OPEN_PERMS
 
   LOG_DEBUG("Attempt to open inexistant file \"%s\".\n",p_path);
   return -ENOENT;
@@ -2357,7 +2398,7 @@ static int FuseRead(const char *p_path,
   }                                                                            \
 }
 
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+  if(strcmp(p_path,glob_xmount_cfg.p_virtual_image_path)==0) {
     // Read data from virtual output file
     // Wait for other threads to end reading/writing data
     pthread_mutex_lock(&glob_mutex_image_rw);
@@ -2367,13 +2408,13 @@ static int FuseRead(const char *p_path,
     }
     // Allow other threads to read/write data again
     pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_info_path)==0) {
     // Read data from virtual info file
     READ_MEM_FILE(glob_p_info_file,
                   strlen(glob_p_info_file),
                   "info",
                   glob_mutex_info_read);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_vmdk_path)==0) {
     // Read data from virtual vmdk file
     READ_MEM_FILE(glob_p_vmdk_file,
                   glob_vmdk_file_size,
@@ -2486,15 +2527,15 @@ static int FuseStatFs(const char *p_path, struct statvfs *stats) {
   struct statvfs CacheFileFsStats;
   int ret;
 
-  if(glob_xmount_cfg.Writable==TRUE) {
+  if(glob_xmount_cfg.writable==TRUE) {
     // If write support is enabled, return stats of fs upon which cache file
     // resides in
-    if((ret=statvfs(glob_xmount_cfg.pCacheFile,&CacheFileFsStats))==0) {
+    if((ret=statvfs(glob_xmount_cfg.p_cache_file,&CacheFileFsStats))==0) {
       memcpy(stats,&CacheFileFsStats,sizeof(struct statvfs));
       return 0;
     } else {
       LOG_ERROR("Couldn't get stats for fs upon which resides \"%s\"\n",
-                glob_xmount_cfg.pCacheFile)
+                glob_xmount_cfg.p_cache_file)
       return ret;
     }
   } else {
@@ -2524,7 +2565,7 @@ static int FuseWrite(const char *p_path,
 
   uint64_t len;
 
-  if(strcmp(p_path,glob_xmount_cfg.pVirtualImagePath)==0) {
+  if(strcmp(p_path,glob_xmount_cfg.p_virtual_image_path)==0) {
     // Wait for other threads to end reading/writing data
     pthread_mutex_lock(&glob_mutex_image_rw);
 
@@ -2549,7 +2590,7 @@ static int FuseWrite(const char *p_path,
 
     // Allow other threads to read/write data again
     pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualVmdkPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_vmdk_path)==0) {
     pthread_mutex_lock(&glob_mutex_image_rw);
     len=glob_vmdk_file_size;
     if((offset+size)>len) {
@@ -2585,7 +2626,7 @@ static int FuseWrite(const char *p_path,
     // Copy data to buffer
     memcpy(glob_p_vmdk_lockfile_data+offset,p_buf,size);
     pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount_cfg.pVirtualImageInfoPath)==0) {
+  } else if(strcmp(p_path,glob_xmount_cfg.p_virtual_info_path)==0) {
     // Attempt to write data to read only image info file
     LOG_DEBUG("Attempt to write data to virtual info file\n");
     return -ENOENT;
@@ -2628,7 +2669,7 @@ int main(int argc, char *argv[]) {
     .write=FuseWrite
   };
 
-  // Disable std output / std input buffering
+  // Disable std output / input buffering
   setbuf(stdout,NULL);
   setbuf(stderr,NULL);
 
@@ -2639,25 +2680,29 @@ int main(int argc, char *argv[]) {
 #else
   glob_xmount_cfg.VirtImageType=VirtImageType_DMG;
 #endif
-  glob_xmount_cfg.Debug=FALSE;
-  glob_xmount_cfg.pVirtualImagePath=NULL;
-  glob_xmount_cfg.pVirtualVmdkPath=NULL;
-  glob_xmount_cfg.pVirtualImageInfoPath=NULL;
-  glob_xmount_cfg.Writable=FALSE;
-  glob_xmount_cfg.OverwriteCache=FALSE;
-  glob_xmount_cfg.pCacheFile=NULL;
-  glob_xmount_cfg.OrigImageSize=0;
-  glob_xmount_cfg.VirtImageSize=0;
-  glob_xmount_cfg.InputHashLo=0;
-  glob_xmount_cfg.InputHashHi=0;
+  glob_xmount_cfg.debug=FALSE;
+  glob_xmount_cfg.p_virtual_image_path=NULL;
+  glob_xmount_cfg.p_virtual_vmdk_path=NULL;
+  glob_xmount_cfg.p_virtual_info_path=NULL;
+  glob_xmount_cfg.writable=FALSE;
+  glob_xmount_cfg.overwrite_cache=FALSE;
+  glob_xmount_cfg.p_cache_file=NULL;
+  glob_xmount_cfg.orig_image_size=0;
+  glob_xmount_cfg.virt_image_size=0;
+  glob_xmount_cfg.input_hash_lo=0;
+  glob_xmount_cfg.input_hash_hi=0;
   glob_xmount_cfg.orig_img_offset=0;
   glob_xmount_cfg.p_lib_params=NULL;
+  glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
 
   // Load input libs
   if(!LoadInputLibs()) {
     LOG_ERROR("Unable to load any input libraries!\n")
     return 1;
   }
+
+  // Check FUSE settings
+  CheckFuseSettings();
 
   // Parse command line options
   if(!ParseCmdLine(argc,
@@ -2736,7 +2781,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if(glob_xmount_cfg.Debug==TRUE) {
+  if(glob_xmount_cfg.debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")
     for(int i=0;i<nargc;i++) { printf("%s ",pp_nargv[i]); }
     printf("\n");
@@ -2787,19 +2832,19 @@ int main(int argc, char *argv[]) {
   }
 
   // Calculate partial MD5 hash of input image file
-  if(CalculateInputImageHash(&(glob_xmount_cfg.InputHashLo),
-                             &(glob_xmount_cfg.InputHashHi))==FALSE)
+  if(CalculateInputImageHash(&(glob_xmount_cfg.input_hash_lo),
+                             &(glob_xmount_cfg.input_hash_hi))==FALSE)
   {
     LOG_ERROR("Couldn't calculate partial hash of input image file!\n")
     return 1;
   }
 
-  if(glob_xmount_cfg.Debug==TRUE) {
+  if(glob_xmount_cfg.debug==TRUE) {
     LOG_DEBUG("Partial MD5 hash of input image file: ")
     for(int i=0;i<8;i++)
-      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.InputHashLo)))+i));
+      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.input_hash_lo)))+i));
     for(int i=0;i<8;i++)
-      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.InputHashHi)))+i));
+      printf("%02hhx",*(((char*)(&(glob_xmount_cfg.input_hash_hi)))+i));
     printf("\n");
   }
 
@@ -2852,7 +2897,7 @@ int main(int argc, char *argv[]) {
       break;
   }
 
-  if(glob_xmount_cfg.Writable) {
+  if(glob_xmount_cfg.writable) {
     // Init cache file and cache file block index
     if(!InitCacheFile()) {
       LOG_ERROR("Couldn't initialize cache file!\n")
@@ -2882,7 +2927,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Close cache file if write support was enabled
-  if(glob_xmount_cfg.Writable) {
+  if(glob_xmount_cfg.writable) {
     fclose(glob_p_cache_file);
     free(glob_p_cache_header);
   }
@@ -2904,7 +2949,7 @@ int main(int argc, char *argv[]) {
     case VirtImageType_VMDK:
     case VirtImageType_VMDKS: {
       free(glob_p_vmdk_file);
-      free(glob_xmount_cfg.pVirtualVmdkPath);
+      free(glob_xmount_cfg.p_virtual_vmdk_path);
       if(glob_p_vmdk_lockfile_name!=NULL) free(glob_p_vmdk_lockfile_name);
       if(glob_p_vmdk_lockfile_data!=NULL) free(glob_p_vmdk_lockfile_data);
       if(glob_p_vmdk_lockdir1!=NULL) free(glob_p_vmdk_lockdir1);
@@ -2925,10 +2970,10 @@ int main(int argc, char *argv[]) {
   // Free mountpoint
   if(p_mountpoint!=NULL) free(p_mountpoint);
   // Free virtual paths
-  free(glob_xmount_cfg.pVirtualImagePath);
-  free(glob_xmount_cfg.pVirtualImageInfoPath);
+  free(glob_xmount_cfg.p_virtual_image_path);
+  free(glob_xmount_cfg.p_virtual_info_path);
   // Free cachefile path
-  free(glob_xmount_cfg.pCacheFile);
+  free(glob_xmount_cfg.p_cache_file);
 
   // Unload input libs
   UnloadInputLibs();
@@ -3146,5 +3191,7 @@ int main(int argc, char *argv[]) {
             * Fixed a newly introduced bug in FuseRead and GetVirtImageData
               returning -EIO when trying to read behind EOF. The correct return
               value is 0.
+  20140811: * Renamed CheckFuseAllowOther to CheckFuseSettings and added a
+              check to see if user is part of the fuse group.
 */
 

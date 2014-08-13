@@ -15,14 +15,10 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#undef HAVE_LIBAFF_STATIC
-
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h> // For O_RDONLY
 
-// Need to include this header first as afflib.h uses uint*_t types without
-// including correct header
 #include "../libxmount_input.h"
 
 #ifndef HAVE_LIBAFF_STATIC

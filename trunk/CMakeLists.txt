@@ -5,15 +5,15 @@ include(CheckIncludeFiles)
 #include(CheckCSourceCompiles)
 
 # Make sure CMAKE_BUILD_TYPE is set
-if(CMAKE_BUILD_TYPE STREQUAL "")
+if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
-else(CMAKE_BUILD_TYPE STREQUAL "")
+else(NOT CMAKE_BUILD_TYPE)
   if(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR
           CMAKE_BUILD_TYPE STREQUAL "Debug"))
     message(FATAL_ERROR "Only build types 'Release' and 'Debug' are supported!")
   endif(NOT (CMAKE_BUILD_TYPE STREQUAL "Release" OR
              CMAKE_BUILD_TYPE STREQUAL "Debug"))
-endif(CMAKE_BUILD_TYPE STREQUAL "")
+endif(NOT CMAKE_BUILD_TYPE)
 
 # Add cmake_modules dir to CMAKE_MODULE_PATH
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules/")
@@ -33,6 +33,7 @@ check_include_files(sys/ioctl.h HAVE_SYS_IOCTL_H)
 check_include_files(sys/stat.h HAVE_SYS_STAT_H)
 check_include_files(sys/types.h HAVE_SYS_TYPES_H)
 check_include_files(linux/fs.h HAVE_LINUX_FS_H)
+check_include_files(grp.h HAVE_GRP_H)
 check_include_files(pthread.h HAVE_PTHREAD_H)
 check_include_files(time.h HAVE_TIME_H)
 check_include_files(inttypes.h HAVE_INTTYPES_H)
@@ -79,4 +80,7 @@ set(CMAKE_C_FLAGS_DEBUG "-ggdb -O0 ${CMAKE_C_FLAGS}")
 # Compile stuff in sub dirs
 add_subdirectory(libxmount_input)
 add_subdirectory(src)
+
+# Install man page
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/xmount.1 DESTINATION share/man/man1)
 

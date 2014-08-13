@@ -15,10 +15,10 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#undef HAVE_LIBEWF_STATIC
-
 #include <stdlib.h>
 #include <string.h>
+
+#include "../libxmount_input.h"
 
 #ifndef HAVE_LIBEWF_STATIC
   #include <libewf.h>
@@ -26,7 +26,6 @@
   #include "libewf/include/libewf.h"
 #endif
 
-#include "../libxmount_input.h"
 #include "libxmount_input_ewf.h"
 
 #ifndef LIBEWF_HANDLE

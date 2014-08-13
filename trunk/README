@@ -5,10 +5,11 @@ Table of contents
   1.0 What is xmount? - A short description
   2.0 A deeper view of things
     2.1 Emulated DD file
-    2.2 Emulated VDI file
-    2.3 Emulated VMDK file
-    2.4 Emulated VHD file
-    2.5 Virtual write access
+    2.2 Emulated DMG file
+    2.3 Emulated VDI file
+    2.4 Emulated VMDK file
+    2.5 Emulated VHD file
+    2.6 Virtual write access
   3.0 Installation instructions
     3.1 Prerequisits
     3.1 Install from a package
@@ -17,7 +18,7 @@ Table of contents
     4.1 xmount usage examples
 
 0.0 Author and license stuff
-  xmount Copyright (c) 2008-2012 by Gillen Daniel <gillen.dan@pinguin.lu>
+  xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>
 
   This program is free software: you can redistribute it and/or modify it under
   the terms of the GNU General Public License as published by the Free Software
@@ -40,28 +41,40 @@ Table of contents
 
 1.0 What is xmount? - A short description
   xmount allows you to convert on-the-fly between multiple input and output
-  harddisk image types. xmount creates a virtual file system using FUSE
+  harddisk image formats. xmount creates a virtual file system using FUSE
   (Filesystem in Userspace) that contains a virtual representation of the input
-  image. The virtual representation can be in raw DD, VirtualBox's virtual disk
-  file format, Microsoft's Virtual Hard Disk Image format or in VmWare's VMDK
-  file format. Input images can be raw DD, EWF (Expert Witness Compression
-  Format) or AFF (Advanced Forensic Format) files. In addition, xmount also
-  supports virtual write access to the output files that is redirected to a
-  cache file. This makes it possible to boot acquired harddisk images using
-  QEMU, KVM, VirtualBox, VmWare or alike.
+  image.
+
+  The virtual representation can be in raw DD, Apple's Disk Image format (DMG),
+  VirtualBox's virtual disk file format (VDI), Microsoft's Virtual Hard Disk
+  Image format (VHD) or in VmWare's VMDK file format.
+
+  Input images can be raw DD, EWF (Expert Witness Compression Format) or AFF
+  (Advanced Forensic Format) files.
+
+  In addition, xmount also supports virtual write access to the output files
+  that is redirected to a cache file. This makes it possible to boot acquired
+  harddisk images using QEMU, KVM, VirtualBox, VmWare or alike.
 
 2.0 A deeper view of things
   2.1 Emulated DD file
     This is the standard data representation used by xmount. It is a file
-    containing the raw data contained in the input image file.
+    containing the raw data contained in the input image file. Except for OSx
+    (see 2.2) this is the default output format when no --out option is
+    specified.
 
-  2.2 Emulated VDI file
+  2.2 Emulated DMG file
+    This is also a file containing the raw data contained in the input image
+    file but with a .dmg file extension. On OSx, this is the default output
+    format when no --out option is specified.
+
+  2.3 Emulated VDI file
     When using the "--out vdi" command line parameter, a VirtualBox disk file
     is emulated. This means that xmount builds a virtual VDI header and prepends
     it to the raw data contained in the input image. The VDI file can be used in
     VirtualBox as a virtual disk file.
 
-  2.3 Emulated VMDK file
+  2.4 Emulated VMDK file
     When using the "--out vmdk(s)" command line paramter, a VMWare virtual disk
     file will be emulated. This mainly consists in building a VMDK descriptor
     file that will access an emulated DD file. You can use this VMDK file to
@@ -75,12 +88,12 @@ Table of contents
     WARNING: VMDK support should be considered experimental and currently the
              VMDK descriptor file isn't cached.
 
-  2.4 Emulated VHD file
+  2.5 Emulated VHD file
     When using the "--out vhd" command line parameter, a Virtual Hard Disk Image
     file is emulated by appending to the raw data a valid VHD footer. Valid here
     means as described in Microsoft's Virtual Hard Disk Image Format specs v1.
 
-  2.5 Virtual write access
+  2.6 Virtual write access
     By using the "--cache <cache_file>" command line parameter, xmount allows
     you to change data in the emulated image files. All changes are written to a
     separate cache file. No data will ever be written to the original input
@@ -96,30 +109,37 @@ Table of contents
 
   3.1 Prerequisits
     SYSTEM:
-      Some sort of Linux with a recent kernel (2.6.x or above).
+      - Linux: Some sort of Linux with a recent kernel (2.6.x or above).
+      - OSx: OSx 10.6 or above
+
     FUSE:
       Your os must support FUSE and have the appropriate libraries installed.
       (See http://fuse.sourceforge.net/ for more informations). To be able to
-      install from source, you also need the FUSE header files.
+      install from source, you also need the FUSE header files. On OSx, you can
+      use osxfuse instead.
+
     LIBEWF:
       To enable EWF input image support. Get it from
       http://sourceforge.net/projects/libewf/
+
     LIBAFF:
       To enable AFF input image support. Get it from http://www.afflib.org/
 
   3.2 Install from a package
     Chances are I provide prebuild binary packages for Debian / Ubuntu. In this
     case, you only have to fire up your distribution's package manager and
-    install xmount. See https://www.pinguin.lu for more informations and
+    install xmount. See https://www.pinguin.lu/xmount for more information and
     download links.
 
   3.3 Install from source
     After having checked the prerequisits, you should be able to compile and
-    install xmount by simply issuing the following three commands:
+    install xmount by simply issuing the following commands:
 
-    # ./configure
-    # make
-    # make install
+    $ mkdir build
+    $ cd build
+    $ cmake -DCMAKE_BUILD_TYPE=Release ..
+    $ make
+    $ sudo make install
 
 4.0 xmount command line parameters
   xmount [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>
@@ -130,21 +150,32 @@ Table of contents
     -o no_allow_other : Disable automatic addition of FUSE's allow_other option.
     -o <fmopts> : Specify fuse mount options. Will also disable automatic
                   addition of FUSE's allow_other option!
+
   mopts:
     --cache <file> : Enable virtual write support and set cachefile to use.
     --in <itype> : Input image format. <itype> can be "dd", "ewf".
+    --inopts <iopts> : Specify input library specific options.
     --info : Print out some infos about used compiler and libraries.
-    --out <otype> : Output image format. <otype> can be "dd", "vdi", "vhd", "vmdk(s)".
+    --offset <off> : Move the output image data start <off> bytes into the input
+                     image.
+    --out <otype> : Output image format.
+                    <otype> can be "dd", "dmg", "vdi", "vhd", "vmdk(s)".
     --owcache <file> : Same as --cache <file> but overwrites existing cache.
-    --rw <file> : Same as --cache <file>.
+    --rw <file> : Same as --cache <file>. Deprecated!
     --version : Same as --info.
     INFO: Input and output image type defaults to "dd" if not specified.
+
   ifile:
-    Input image file. If you use EWF files, you have to specify all image
-    segments! (If your shell supports it, you can use .E?? as file extension
-    to specify them all)
+    Input image file. If your input image is split into multiple files, you have
+    to specify them all!
+
   mntp:
     Mount point where virtual files should be located.
+
+  iopts:
+    Some input libraries might support an own set of options to configure / tune
+    their behaviour. If so, their options can be specified here as comma
+    sepearated list of key=value pairs.
 
   4.1 xmount usage examples
     To xmount an EWF harddisk image from your acquired disk as a raw DD image

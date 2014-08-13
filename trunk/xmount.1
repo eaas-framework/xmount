@@ -1,29 +1,34 @@
-.\" 
-.TH "xmount" "1" "May 9, 2012" "Gillen Daniel" "xmount"
+.\"
+.TH "xmount" "1" "Aug 11, 2014" "Gillen Daniel" "xmount"
 .SH "NAME"
 xmount \- Tool to crossmount between multiple input and output harddisk image files
 
 .SH "SYNOPSIS"
 .B xmount
 [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>
-.br 
+.br
 
 .SH "DESCRIPTION"
 .B xmount
-allows you to convert on\-the\-fly between multiple input and output
-harddisk image types. xmount creates a virtual file system using FUSE
+allows you to convert on-the-fly between multiple input and output
+harddisk image formats. xmount creates a virtual file system using FUSE
 (Filesystem in Userspace) that contains a virtual representation of the input
-image. The virtual representation can be in raw DD, VirtualBox's virtual disk
-file format, Microsoft's Virtual Hard Disk Image format or in VmWare's VMDK
-file format. Input images can be raw DD, EWF (Expert Witness Compression
-Format) or AFF (Advanced Forensic Format) files. In addition, xmount also
-supports virtual write access to the output files that is redirected to a
-cache file. This makes it possible to boot acquired harddisk images using
-QEMU, KVM, VirtualBox, VmWare or alike.
-.br 
+image.
+
+The virtual representation can be in raw DD, Apple's Disk Image format (DMG),
+VirtualBox's virtual disk file format (VDI), Microsoft's Virtual Hard Disk
+Image format (VHD) or in VmWare's VMDK file format.
+
+Input images can be raw DD, EWF (Expert Witness Compression Format) or AFF
+(Advanced Forensic Format) files.
+
+In addition, xmount also supports virtual write access to the output files
+that is redirected to a cache file. This makes it possible to boot acquired
+harddisk images using QEMU, KVM, VirtualBox, VmWare or alike.
+.br
 
 .SH "OPTIONS"
-.B 
+.B
 fopts: (Options specific to FUSE)
   \-d: Enable FUSE's and xmount's debug mode.
   \-h: Display this help message.
@@ -34,17 +39,22 @@ fopts: (Options specific to FUSE)
     allow_other option!
   INFO: For VMDK emulation, you have to uncomment "user_allow_other" in
         /etc/fuse.conf or run xmount as root.
-.br 
-.B 
+.br
+
+.B
 mopts: (Options specific to xmount)
   \-\-cache <file> :
     Enable virtual write support and set cachefile to use.
   \-\-in <type> :
-    Specify input image type. Type can be "dd" or "ewf".
+    Specify input image type. Type can be "dd", "ewf", "aff".
+  \-\-inopts <iopts> :
+    Specify input library specific options.
   \-\-info :
     Print out some infos about used compiler and libraries.
+  \-\-offset <off> :
+    Move the output image data start <off> bytes into the input image.
   \-\-out <type> :
-    Specify output image type. Type can be "dd", "vdi", "vhd", "vmdk(s)".
+    Specify output image type. Type can be "dd", "dmg", "vdi", "vhd", "vmdk(s)".
   \-\-owcache <file> :
     Same as \-\-cache <file> but overwrites existing cache.
   \-\-rw <cache_file> :
@@ -52,17 +62,25 @@ mopts: (Options specific to xmount)
   \-\-version :
     Same as \-\-info.
   INFO: Input and output image type defaults to "dd" if not specified.
-.br 
-.B 
+.br
+
+.B
 ifile:
-  Input image file. If you use EWF files, you have to specify all image
-  segments! (If your shell supports it, you can use .E?? as file
-  extension to specify them files)
-.br 
-.B 
+  Input image file. If your input image is split into multiple files, you have
+  to specify them all!
+.br
+
+.B
 mntp:
   Mount point where virtual files should be located.
-.br 
+.br
+
+.B
+iopts: (Options specific to input library)
+  Some input libraries might support an own set of options to configure / tune
+  their behaviour. If so, their options can be specified here as comma
+  sepearated list of key=value pairs.
+.br
 
 .SH "BUGS"
 Hopefully none. If you find any, please e\-mail to <bugs@pinguin.lu>.
