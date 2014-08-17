@@ -10,10 +10,16 @@ if(NOT STATIC_EWF)
   include_directories(${LIBEWF_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${LIBEWF_LIBRARIES})
 else(NOT STATIC_EWF)
+  add_definitions(-DHAVE_LIBEWF_STATIC)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libewf/include)
   set(LIBS ${LIBS} ${CMAKE_CURRENT_SOURCE_DIR}/libewf/libewf/.libs/libewf.a)
-  set(LIBS ${LIBS} -lz)
-  add_definitions(-DHAVE_LIBEWF_STATIC)
+  if(NOT APPLE)
+    set(LIBS ${LIBS} -lz)
+  else(NOT APPLE)
+    # As most of libewf's deps on OSx come from MacPorts, better link in
+    # everything statically
+    set(LIBS ${LIBS} "/opt/local/lib/libz.a")
+  endif(NOT APPLE)
 endif(NOT STATIC_EWF)
 
 target_link_libraries(xmount_input_ewf ${LIBS})

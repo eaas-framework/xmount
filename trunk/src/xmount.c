@@ -36,7 +36,10 @@
 #ifdef HAVE_LINUX_FS_H
   #include <linux/fs.h> // For SEEK_* ??
 #endif
-#include <grp.h> // For getgrnam
+#if !defined(__APPLE__) && defined(HAVE_GRP_H) && defined(HAVE_PWD_H)
+  #include <grp.h> // For getgrnam, struct group
+  #include <pwd.h> // For getpwuid, struct passwd
+#endif
 #include <pthread.h>
 #include <time.h> // For time
 
@@ -219,11 +222,15 @@ static void PrintUsage(char *p_prog_name) {
  * group which is generally needed to use fuse at all.
  */
 static void CheckFuseSettings() {
+#if !defined(__APPLE__) && defined(HAVE_GRP_H) && defined(HAVE_PWD_H)
+  struct group *p_group;
+  struct passwd *p_passwd;
+#endif
+  int found;
   FILE *h_fuse_conf;
   char line[256];
-  int found;
-  struct group *p_group;
-  char *p_username;
+
+  glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
 
   if(geteuid()==0) {
     // Running as root, there should be no problems
@@ -231,15 +238,22 @@ static void CheckFuseSettings() {
     return;
   }
 
-  // Check if a fuse group exists and if so, make sure user is a member of it
+#if !defined(__APPLE__) && defined(HAVE_GRP_H) && defined(HAVE_PWD_H)
+  // Check if a fuse group exists and if so, make sure user is a member of it.
+  // Makes only sense on Linux because as far as I know osxfuse has no own group
   p_group=getgrnam("fuse");
   if(p_group!=NULL) {
     // Get effective user name
-    p_username=cuserid(NULL);
+    p_passwd=getpwuid(geteuid());
+    if(p_passwd==NULL) {
+      printf("\nWARNING: Unable to determine your effective user name. If "
+             "mounting works, you can ignore this message.\n\n");
+      return;
+    }
     // Check if user is member of fuse group
     found=FALSE;
     while(*(p_group->gr_mem)!=NULL) {
-      if(strcmp(*(p_group->gr_mem),p_username)==0) {
+      if(strcmp(*(p_group->gr_mem),p_passwd->pw_name)==0) {
         found=TRUE;
         break;
       }
@@ -251,13 +265,14 @@ static void CheckFuseSettings() {
                "yourself to the \"fuse\" group using the command "
                "\"sudo usermod -a -G fuse %s\" and reboot your system or "
                "execute xmount as root.\n\n",
-             p_username);
+             p_passwd->pw_name);
       return;
     }
   } else {
     printf("\nWARNING: Your system does not seem to have a \"fuse\" group. If "
              "mounting works, you can ignore this message.\n\n");
   }
+#endif
 
   // Read FUSE's config file /etc/fuse.conf and check for set user_allow_other
   h_fuse_conf=(FILE*)FOPEN("/etc/fuse.conf","r");
@@ -273,17 +288,20 @@ static void CheckFuseSettings() {
       }
     }
     fclose(h_fuse_conf);
-    if(found==FALSE) {
+    if(found==TRUE) {
+      glob_xmount_cfg.may_set_fuse_allow_other=TRUE;
+    } else {
       printf("\nWARNING: FUSE will not allow other users nor root to access "
                "your virtual harddisk image. To change this behavior, please "
                "add \"user_allow_other\" to /etc/fuse.conf or execute xmount "
                "as root.\n\n");
-      glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
     }
   } else {
     printf("\nWARNING: Unable to open /etc/fuse.conf. If mounting works, you "
-             "can ignore this message.\n\n");
-    glob_xmount_cfg.may_set_fuse_allow_other=FALSE;
+             "can ignore this message. If you encounter issues, please create "
+             "the file and add a single line containing the string "
+             "\"user_allow_other\" or execute xmount as root.\n\n");
+    return;
   }
 }
 
@@ -3193,5 +3211,8 @@ int main(int argc, char *argv[]) {
               value is 0.
   20140811: * Renamed CheckFuseAllowOther to CheckFuseSettings and added a
               check to see if user is part of the fuse group.
+  20140814: * Replaced cuserid() with getpwuid(geteuid()) in CheckFuseSettings
+              as it is deprecated on Linux and not available on OSx.
+            * Only build fuse group checks from CheckFuseSettings on Linux.
 */
 

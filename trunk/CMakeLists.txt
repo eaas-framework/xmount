@@ -8,6 +8,11 @@ include(CheckIncludeFiles)
 #set(STATIC_EWF 1)
 #set(STATIC_AFF 1)
 
+if(APPLE)
+  # On OSx, do not try to find frameworks but only std headers / libraries
+  set(CMAKE_FIND_FRAMEWORK "NEVER")
+endif(APPLE)
+
 # Make sure CMAKE_BUILD_TYPE is set
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -38,6 +43,7 @@ check_include_files(sys/stat.h HAVE_SYS_STAT_H)
 check_include_files(sys/types.h HAVE_SYS_TYPES_H)
 check_include_files(linux/fs.h HAVE_LINUX_FS_H)
 check_include_files(grp.h HAVE_GRP_H)
+check_include_files(pwd.h HAVE_PWD_H)
 check_include_files(pthread.h HAVE_PTHREAD_H)
 check_include_files(time.h HAVE_TIME_H)
 check_include_files(inttypes.h HAVE_INTTYPES_H)
@@ -48,12 +54,9 @@ check_include_files(libkern/OSByteOrder.h HAVE_LIBKERN_OSBYTEORDER_H)
 # Check for required libs
 if(NOT APPLE)
   find_package(LibFUSE REQUIRED)
-  include_directories(${LIBFUSE_INCLUDE_DIRS})
-  set(LIBS ${LIBS} ${LIBFUSE_LIBRARIES})
 else(NOT APPLE)
+  # On OSx, search for osxfuse
   find_package(LibOSXFUSE REQUIRED)
-  include_directories(${LIBOSXFUSE_INCLUDE_DIRS})
-  set(LIBS ${LIBS} ${LIBOSXFUSE_LIBRARIES})
 endif(NOT APPLE)
 
 # Generate config.h and add it's path to the include dirs

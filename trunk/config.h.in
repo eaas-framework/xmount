@@ -34,6 +34,8 @@
 #cmakedefine HAVE_SYS_IOCTL_H 1
 #cmakedefine HAVE_SYS_TYPES_H 1
 #cmakedefine HAVE_LINUX_FS_H 1
+#cmakedefine HAVE_GRP_H 1
+#cmakedefine HAVE_PWD_H 1
 #cmakedefine HAVE_PTHREAD_H 1
 #cmakedefine HAVE_TIME_H 1
 #cmakedefine HAVE_INTTYPES_H 1

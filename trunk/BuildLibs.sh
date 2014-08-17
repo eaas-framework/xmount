@@ -25,7 +25,7 @@ JOBS=$1
   read -p "Ready to configure LIBAFF?"
   cd libaff
   ./bootstrap.sh
-  CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --disable-qemu --disable-libewf --disable-fuse --disable-shared --enable-static --disable-s3 --enable-threading
+  CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --disable-qemu --disable-libewf --disable-fuse --disable-s3 --disable-shared --enable-static --enable-threading
   echo
   read -p "Ready to compile LIBAFF?"
   make -j$JOBS
