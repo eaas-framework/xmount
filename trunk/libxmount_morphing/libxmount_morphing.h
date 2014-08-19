@@ -15,32 +15,35 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#ifndef LIBXMOUNT_INPUT_H
-#define LIBXMOUNT_INPUT_H
+#ifndef LIBXMOUNT_MORPHING_H
+#define LIBXMOUNT_MORPHING_H
 
-#define LIBXMOUNT_INPUT_API_VERSION 1
+#define LIBXMOUNT_MORPHING_API_VERSION 1
 
 #include <config.h>
 
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
 
+#include "../libxmount_input/libxmount_input.h"
+
 //! Structure containing pointers to the lib's functions
-typedef struct s_LibXmountInputFunctions {
+typedef struct s_LibXmountMorphingFunctions {
   //! Function to initialize handle
   /*!
    * This function is called once to allow the lib to alloc any needed
    * structures before other functions that rely upon a valid handle are called
-   * (for ex. OptionsParse or Open).
+   * (for ex. OptionsParse or Morph).
    *
-   * The p_format parameter specifies one of the formats returned by
-   * LibXmount_Input_GetSupportedFormats() which should be used for this handle.
+   * The p_format parameter specifies one of the morphing functions returned by
+   * LibXmount_Morphing_GetSupportedMorphFunctions() which should be used for
+   * this handle.
    *
    * \param pp_handle Pointer to store handle to
-   * \param p_format Input image format
+   * \param p_morph_function Morph function to use
    * \return 0 on success or error code
    */
-  int (*CreateHandle)(void **pp_handle, char *p_format);
+  int (*CreateHandle)(void **pp_handle, char *p_morph_function);
 
   //! Function to destroy handle
   /*!
@@ -56,52 +59,24 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*DestroyHandle)(void **pp_handle);
 
-  //! Function to open input image(s)
+  //! Function to start morphing
   /*!
-   * Opens the specified image(s) for reading.
+   * Begins to morph input image
    *
-   * \param pp_handle Pointer to store handle of opened image to
-   * \param pp_filename_arr Array containing all specified input images
-   * \param filename_arr_len Length of pp_filename_arr
+   * \param p_handle Handle
+   * \param p_input_functions ts_LibXmountInputFunctions structure
    * \return 0 on success or error code
    */
-  int (*Open)(void **pp_handle,
-              const char **pp_filename_arr,
-              uint64_t filename_arr_len);
+  int (*Morph)(void *p_handle,
+               pts_LibXmountInputFunctions p_input_functions);
 
-  //! Function to close opened input image(s)
-  /*!
-   * Closes all input images and frees any memory allocaed during opening but
-   * does not invalidate the main handle. Further calls to for ex. Open() must
-   * be possible without first calling CreateHandle again!
-   *
-   * \param pp_handle Pointer to the handle of the opened image
-   * \return 0 on success or error code
-   */
-  int (*Close)(void **pp_handle);
-
-  //! Function to get the amount of opened images
+  //! Function to get the size of the morphed data
   /*!
    * \param p_handle Handle to the opened image
-   * \param p_count Pointer to store the image count to
-   * \return 0 on success or error code
-   */
-  int (*ImageCount)(void *p_handle,
-                    uint64_t *p_count);
-
-  //! Function to get an input image's size
-  /*!
-   * Returns the real size of the specified input image. Real means the size of
-   * the uncompressed or otherwise made available data contained inside the
-   * input image.
-   *
-   * \param p_handle Handle to the opened image
-   * \param image Image number for which size is requested (0 = first image)
    * \param p_size Pointer to store input image's size to
    * \return 0 on success or error code
    */
   int (*Size)(void *p_handle,
-              uint64_t image,
               uint64_t *p_size);
 
   //! Function to read data from an input image
@@ -111,14 +86,12 @@ typedef struct s_LibXmountInputFunctions {
    * as should be read.
    *
    * \param p_handle Handle to the opened image
-   * \param image Image number for which data is requested (0 = first image)
    * \param offset Position at which to start reading
    * \param p_buf Buffer to store read data to
    * \param count Amount of bytes to read
    * \return 0 on success or error code
    */
   int (*Read)(void *p_handle,
-              uint64_t image,
               uint64_t offset,
               char *p_buf,
               uint32_t count);
@@ -183,41 +156,43 @@ typedef struct s_LibXmountInputFunctions {
    * \param p_buf Buffer to free
    */
   void (*FreeBuffer)(void *p_buf);
-} ts_LibXmountInputFunctions, *pts_LibXmountInputFunctions;
+} ts_LibXmountMorphingFunctions, *pts_LibXmountMorphingFunctions;
 
 //! Get library API version
 /*!
- * This function should return the value of LIBXMOUNT_INPUT_API_VERSION
+ * This function should return the value of LIBXMOUNT_MORPHING_API_VERSION
  *
  * \return Supported version
  */
-uint8_t LibXmount_Input_GetApiVersion();
-typedef uint8_t (*t_LibXmount_Input_GetApiVersion)();
+uint8_t LibXmount_Morphing_GetApiVersion();
+typedef uint8_t (*t_LibXmount_Morphing_GetApiVersion)();
 
-//! Get a list of supported formats
+//! Get a list of supported morphing functions
 /*!
- * Gets a list of supported input image formats. These are the strings
- * specified with xmount's --in <string> command line option. The returned
- * string must be a constant list of image formats split by \0 chars. To mark
- * the end of the string, a single \0 must be used.
+ * Gets a list of supported morphing functions. These is the string
+ * specified with xmount's --morph <string> command line option. The returned
+ * string must be a constant vector of morphing functions split by \0 chars. To
+ * mark the end of the vector, a single \0 must be used.
  *
  * As an example, "first\0second\0\0" would be a correct string to return for
- * a lib supporting two input image formats.
+ * a lib supporting two morphing functions.
  *
- * \return List containing supported format strings
+ * \return Vector containing supported morphing functions
  */
-const char* LibXmount_Input_GetSupportedFormats();
-typedef const char* (*t_LibXmount_Input_GetSupportedFormats)();
+const char* LibXmount_Morphing_GetSupportedMorphFunctions();
+typedef const char* (*t_LibXmount_Morphing_GetSupportedMorphFunctions)();
 
-//! Get the lib's s_LibXmountInputFunctions structure
+//! Get the lib's s_LibXmountMorphingFunctions structure
 /*!
- * This function should set the members of the given s_LibXmountInputFunctions
- * structure to the internal lib functions. All members have to be set.
+ * This function should set the members of the given
+ * s_LibXmountMorphingFunctions structure to the internal lib functions. All
+ * members have to be set.
  *
- * \param p_functions s_LibXmountInputFunctions structure to fill
+ * \param p_functions s_LibXmountMorphingFunctions structure to fill
  */
-void LibXmount_Input_GetFunctions(pts_LibXmountInputFunctions p_functions);
-typedef void (*t_LibXmount_Input_GetFunctions)(pts_LibXmountInputFunctions);
+void LibXmount_Morphing_GetFunctions(pts_LibXmountMorphingFunctions p_functions);
+typedef void (*t_LibXmount_Morphing_GetFunctions)(pts_LibXmountMorphingFunctions);
 
-#endif // LIBXMOUNT_INPUT_H
+
+#endif // LIBXMOUNT_MORPHING_H
 
