@@ -63,10 +63,6 @@ static ts_XmountConfData glob_xmount_cfg;
 //! Struct containing pointers to the libxmount_input functions
 static pts_InputLib *glob_pp_input_libs=NULL;
 static uint32_t glob_input_libs_count=0;
-static pts_LibXmountInputFunctions glob_p_input_functions=NULL;
-
-//! Handle for input image
-static void *glob_p_input_image=NULL;
 
 //! Pointer to virtual info file
 static char *glob_p_info_file=NULL;
@@ -135,8 +131,7 @@ static void PrintUsage(char *p_prog_name) {
 
   printf("\n" XMOUNT_COPYRIGHT_NOTICE "\n",XMOUNT_VERSION);
   printf("\nUsage:\n");
-  printf("  %s [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>\n\n",
-         p_prog_name);
+  printf("  %s [fopts] --in <itype> <ifile> [<mopts>] <mntp>\n\n",p_prog_name);
   printf("Options:\n");
   printf("  fopts:\n");
   printf("    -d : Enable FUSE's and xmount's debug mode.\n");
@@ -145,18 +140,16 @@ static void PrintUsage(char *p_prog_name) {
   printf("    -o no_allow_other : Disable automatic addition of FUSE's "
            "allow_other option.\n");
   printf("    -o <fmopts> : Specify fuse mount options. Will also disable "
-           "automatic\n");
-  printf("                  addition of FUSE's allow_other option!\n");
-  printf("    INFO: For VMDK emulation, you have to uncomment "
-           "\"user_allow_other\" in\n");
-  printf("          /etc/fuse.conf or run xmount as root.\n");
+           "automatic addition of FUSE's allow_other option!\n");
   printf("\n");
   printf("  mopts:\n");
-  printf("    --cache <file> : Enable virtual write support and set cachefile "
-           "to use.\n");
-  printf("    --in <itype> : Input image format. <itype> can be ");
+  printf("    --cache <cfile> : Enable virtual write support.\n");
+  printf("      <cfile> specifies the cache file to use.\n");
+  printf("    --in <itype> <ifile> : Input image format and source file(s). "
+           "May be specified multiple times.\n");
+  printf("      <itype> can be ");
 
-  // List supported input types
+  // List supported input formats
   for(uint32_t i=0;i<glob_input_libs_count;i++) {
     p_buf=glob_pp_input_libs[i]->p_supported_input_types;
     while(*p_buf!='\0') {
@@ -169,37 +162,52 @@ static void PrintUsage(char *p_prog_name) {
   }
   printf(".\n");
 
+  printf("      <ifile> specifies the source file. If your image is split into "
+           "multiple files, you have to specify them all!\n");
   printf("    --inopts <iopts> : Specify input library specific options.\n");
+  printf("      <iopts> specifies a comma separated list of key=value options. "
+           "See below for possible values.\n");
   printf("    --info : Print out infos about used compiler and libraries.\n");
+  printf("    --morph <mtype> : Morphing function to apply to input image(s). "
+           "If not specified, defaults to \"combine\".\n");
+  printf("      <mtype> can be ");
+
+  // TODO: List supported morphing functions
+  printf(".\n");
+
   printf("    --offset <off> : Move the output image data start <off> bytes "
-           "into the input image.\n");
-  printf("    --out <otype> : Output image format. "
-           "<otype> can be \"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk(s)\".\n");
-  printf("    --owcache <file> : Same as --cache <file> but overwrites "
-           "existing cache.\n");
-  printf("    --rw <file> : Same as --cache <file>.\n");
-  printf("    --version : Same as --info.\n");
-#ifndef __APPLE__
-  printf("    INFO: Input and output image type defaults to \"dd\" if not "
-           "specified.\n");
+           "into the input image(s).\n");
+  printf("    --out <otype> : Output image format. If not specified, "
+           "defaults to ");
+#ifdef __APPLE__
+  printf("\"dmg\".\n");
 #else
-  printf("    INFO: Input image type defaults to \"dd\" and output image type "
-           "defaults to \"dmg\" if not specified.\n");
+  printf("\"dd\".\n");
 #endif
-  printf("    WARNING: Output image type \"vmdk(s)\" should be considered "
-           "experimental!\n");
-  printf("\n");
-  printf("  ifile:\n");
-  printf("    Input image file. If your input image is split into multiple "
-           "files, you have to specify them all!\n");
+  printf("      <otype> can be ");
+
+  // List supported output formats
+  printf("\"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk\", \"vmdks\".\n");
+
+  printf("    --owcache <file> : Same as --cache <file> but overwrites "
+           "existing cache file.\n");
+  printf("    --version : Same as --info.\n");
   printf("\n");
   printf("  mntp:\n");
   printf("    Mount point where virtual files should be located.\n");
   printf("\n");
-  printf("  iopts:\n");
-  printf("    Some input libraries might support an own set of options to "
+  printf("Infos:\n");
+  printf("  * The --in option is mandatory!\n");
+  printf("  * If you specify --in multiple times, all images are morphed "
+           "using the specified morphing function before they are converted to "
+           "the specified output format.\n");
+  printf("  * For VMDK emulation, you have to uncomment \"user_allow_other\" "
+           "in /etc/fuse.conf or run xmount as root.\n");
+  printf("\n");
+  printf("Input library specific options:\n");
+  printf("  Some input libraries might support an own set of options to "
            "configure / tune their behaviour.\n");
-  printf("    Input libraries supporting this feature (if any) and and their "
+  printf("  Input libraries supporting this feature (if any) and and their "
            "options are listed below.\n");
   printf("\n");
 
@@ -311,8 +319,6 @@ static void CheckFuseSettings() {
  * \param pp_argv Array containing cmdline params
  * \param p_nargv Number of FUSE options is written to this var
  * \param ppp_nargv FUSE options are written to this array
- * \param p_filename_count Number of input image files is written to this var
- * \param ppp_filenames Input image filenames are written to this array
  * \param pp_mountpoint Mountpoint is written to this var
  * \return TRUE on success, FALSE on error
  */
@@ -320,12 +326,11 @@ static int ParseCmdLine(const int argc,
                         char **pp_argv,
                         int *p_nargv,
                         char ***ppp_nargv,
-                        int *p_filename_count,
-                        char ***ppp_filenames,
                         char **pp_mountpoint)
 {
   int i=1,files=0,opts=0,FuseMinusOControl=TRUE,FuseAllowOther=TRUE,first;
   char *p_buf;
+  pts_InputImage p_input_image;
 
   // add pp_argv[0] to ppp_nargv
   opts++;
@@ -335,7 +340,7 @@ static int ParseCmdLine(const int argc,
   // Parse options
   while(i<argc && *pp_argv[i]=='-') {
     if(strlen(pp_argv[i])>1 && *(pp_argv[i]+1)!='-') {
-      // Options beginning with - are mostly FUSE specific
+      // Options beginning with one - are mostly FUSE specific
       if(strcmp(pp_argv[i],"-d")==0) {
         // Enable FUSE's and xmount's debug mode
         opts++;
@@ -345,7 +350,7 @@ static int ParseCmdLine(const int argc,
       } else if(strcmp(pp_argv[i],"-h")==0) {
         // Print help message
         PrintUsage(pp_argv[0]);
-        exit(1);
+        exit(0);
       } else if(strcmp(pp_argv[i],"-o")==0) {
         // Next parameter specifies fuse / lib mount options
         if((argc+1)>i) {
@@ -363,8 +368,7 @@ static int ParseCmdLine(const int argc,
           } else FuseAllowOther=FALSE;
         } else {
           LOG_ERROR("Couldn't parse mount options!\n")
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
       } else if(strcmp(pp_argv[i],"-s")==0) {
         // Enable FUSE's single threaded mode
@@ -378,8 +382,7 @@ static int ParseCmdLine(const int argc,
         XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
       } else {
         LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
-        PrintUsage(pp_argv[0]);
-        exit(1);
+        return FALSE;
       }
     } else {
       // Options beginning with -- are xmount specific
@@ -392,28 +395,50 @@ static int ParseCmdLine(const int argc,
           glob_xmount_cfg.writable=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file!\n")
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
         LOG_DEBUG("Enabling virtual write support using cache file \"%s\"\n",
                   glob_xmount_cfg.p_cache_file)
       } else if(strcmp(pp_argv[i],"--in")==0) {
-        // Specify input image type
-        // Next parameter must be image type
-        if((argc+1)>i) {
+        // Specify input image type and source files
+        if((argc+2)>i) {
           i++;
-          if(glob_xmount_cfg.p_orig_image_type==NULL) {
-            XMOUNT_STRSET(glob_xmount_cfg.p_orig_image_type,pp_argv[i]);
-            LOG_DEBUG("Setting input image type to '%s'\n",pp_argv[i]);
-          } else {
-            LOG_ERROR("You can only specify --in once!")
-            PrintUsage(pp_argv[0]);
-            exit(1);
+          // Alloc and init new ts_InputImage struct
+          XMOUNT_MALLOC(p_input_image,pts_InputImage,sizeof(ts_InputImage));
+          XMOUNT_STRSET(p_input_image->p_type,pp_argv[i]);
+          p_input_image->pp_files=NULL;
+          p_input_image->p_functions=NULL;
+          p_input_image->p_handle=NULL;
+          // Parse input image filename(s) and add to p_input_image->pp_files
+          i++;
+          p_input_image->files_count=0;
+          while(i<(argc-1) && strcmp(pp_argv[i],"--")!=0) {
+            p_input_image->files_count++;
+            XMOUNT_REALLOC(p_input_image->pp_files,
+                           char**,
+                           p_input_image->files_count*sizeof(char*));
+            XMOUNT_STRSET(p_input_image->pp_files[p_input_image->files_count-1],
+                          pp_argv[i]);
+            i++;
           }
+          if(p_input_image->files_count==0) {
+            LOG_ERROR("No input files specified for \"--in %s\"!\n",
+                      p_input_image->p_type)
+            free(p_input_image->p_type);
+            free(p_input_image);
+            return FALSE;
+          }
+          // Add input image struct to input image array
+          glob_xmount_cfg.input_images_count++;
+          XMOUNT_REALLOC(glob_xmount_cfg.pp_input_images,
+                         pts_InputImage*,
+                         glob_xmount_cfg.input_images_count*
+                           sizeof(pts_InputImage));
+          glob_xmount_cfg.pp_input_images[glob_xmount_cfg.input_images_count-1]=
+            p_input_image;
         } else {
-          LOG_ERROR("You must specify an input image type!\n");
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          LOG_ERROR("You must specify an input image type and source file!\n");
+          return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--inopts")==0) {
         if((argc+1)>i) {
@@ -422,13 +447,11 @@ static int ParseCmdLine(const int argc,
             XMOUNT_STRSET(glob_xmount_cfg.p_lib_params,pp_argv[i]);
           } else {
             LOG_ERROR("You can only specify --inopts once!")
-            PrintUsage(pp_argv[0]);
-            exit(1);
+            return FALSE;
           }
         } else {
           LOG_ERROR("You must specify special options!\n");
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--out")==0) {
         // Specify output image type
@@ -455,13 +478,11 @@ static int ParseCmdLine(const int argc,
             LOG_DEBUG("Setting virtual image type to VMDKS\n")
           } else {
             LOG_ERROR("Unknown output image type \"%s\"!\n",pp_argv[i])
-            PrintUsage(pp_argv[0]);
-            exit(1);
+            return FALSE;
           }
         } else {
           LOG_ERROR("You must specify an output image type!\n");
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--owcache")==0) {
         // Enable writable access to mounted image and overwrite existing cache
@@ -473,8 +494,7 @@ static int ParseCmdLine(const int argc,
           glob_xmount_cfg.overwrite_cache=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file!\n")
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
         LOG_DEBUG("Enabling virtual write support overwriting cache file %s\n",
                   glob_xmount_cfg.p_cache_file)
@@ -508,33 +528,17 @@ static int ParseCmdLine(const int argc,
           glob_xmount_cfg.orig_img_offset=strtoull(pp_argv[i],NULL,10);
         } else {
           LOG_ERROR("You must specify an offset!\n")
-          PrintUsage(pp_argv[0]);
-          exit(1);
+          return FALSE;
         }
         LOG_DEBUG("Setting input image offset to \"%" PRIu64 "\"\n",
                   glob_xmount_cfg.orig_img_offset)
       } else {
         LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
-        PrintUsage(pp_argv[0]);
-        exit(1);
+        return FALSE;
       }
     }
     i++;
   }
-  
-  // Parse input image filename(s)
-  while(i<(argc-1)) {
-    files++;
-    XMOUNT_REALLOC(*ppp_filenames,char**,files*sizeof(char*))
-    XMOUNT_STRSET((*ppp_filenames)[files-1],pp_argv[i])
-    i++;
-  }
-  if(files==0) {
-    LOG_ERROR("No input files specified!\n")
-    PrintUsage(pp_argv[0]);
-    exit(1);
-  }
-  *p_filename_count=files;
 
   // Extract mountpoint
   if(i==(argc-1)) {
@@ -544,8 +548,7 @@ static int ParseCmdLine(const int argc,
     XMOUNT_STRSET((*ppp_nargv)[opts-1],*pp_mountpoint)
   } else {
     LOG_ERROR("No mountpoint specified!\n")
-    PrintUsage(pp_argv[0]);
-    exit(1);
+    return FALSE;
   }
 
   if(FuseMinusOControl==TRUE) {
@@ -2086,22 +2089,22 @@ static void UnloadInputLibs() {
 /*!
  * \return TRUE on success, FALSE on error
  */
-static int FindInputLib() {
+static int FindInputLib(pts_InputImage p_input_image) {
   char *p_buf;
 
   LOG_DEBUG("Trying to find suitable library for input type '%s'.\n",
-            glob_xmount_cfg.p_orig_image_type);
+            p_input_image->p_type);
 
   // Loop over all loaded libs
   for(uint32_t i=0;i<glob_input_libs_count;i++) {
     LOG_DEBUG("Checking input library %s\n",glob_pp_input_libs[i]->p_name);
     p_buf=glob_pp_input_libs[i]->p_supported_input_types;
     while(*p_buf!='\0') {
-      if(strcmp(p_buf,glob_xmount_cfg.p_orig_image_type)==0) {
+      if(strcmp(p_buf,p_input_image->p_type)==0) {
         // Library supports input type, set lib functions
         LOG_DEBUG("Input library '%s' pretends to handle that input type.\n",
                   glob_pp_input_libs[i]->p_name);
-        glob_p_input_functions=&(glob_pp_input_libs[i]->lib_functions);
+        p_input_image->p_functions=&(glob_pp_input_libs[i]->lib_functions);
         return TRUE;
       }
       p_buf+=(strlen(p_buf)+1);
@@ -2661,8 +2664,6 @@ static int FuseWrite(const char *p_path,
  * Main
  ******************************************************************************/
 int main(int argc, char *argv[]) {
-  char **pp_input_filenames=NULL;
-  int input_filenames_count=0;
   int nargc=0;
   char **pp_nargv=NULL;
   char *p_mountpoint=NULL;
@@ -2692,7 +2693,8 @@ int main(int argc, char *argv[]) {
   setbuf(stderr,NULL);
 
   // Init glob_xmount_cfg
-  glob_xmount_cfg.p_orig_image_type=NULL;
+  glob_xmount_cfg.input_images_count=0;
+  glob_xmount_cfg.pp_input_images=NULL;
 #ifndef __APPLE__
   glob_xmount_cfg.VirtImageType=VirtImageType_DD;
 #else
@@ -2727,18 +2729,37 @@ int main(int argc, char *argv[]) {
                    argv,
                    &nargc,
                    &pp_nargv,
-                   &input_filenames_count,
-                   &pp_input_filenames,
                    &p_mountpoint))
   {
-    LOG_ERROR("Error parsing command line options!\n")
-    //PrintUsage(argv[0]);
+    PrintUsage(argv[0]);
     UnloadInputLibs();
+    if(glob_xmount_cfg.pp_input_images!=NULL) {
+      for(uint64_t i=0;i<glob_xmount_cfg.input_images_count;i++) {
+        free(glob_xmount_cfg.pp_input_images[i]->p_type);
+        for(uint64_t ii=0;
+            ii<glob_xmount_cfg.pp_input_images[i]->files_count;
+            ii++)
+        {
+          free(gglob_xmount_cfg.pp_input_images[i]->pp_files[ii]);
+        }
+        // There will always be files if struct was added to pp_input_images,
+        // so no need to check for NULL here
+        free(free(gglob_xmount_cfg.pp_input_images[i]->pp_files);
+        free(glob_xmount_cfg.pp_input_images[i]);
+      }
+      free(glob_xmount_cfg.pp_input_images);
+    }
     return 1;
   }
 
   // Check command line options
-  if(nargc<2 /*|| input_filenames_count==0 || p_mountpoint==NULL*/) {
+  if(glob_xmount_cfg.input_images_count==0) {
+    LOG_ERROR("No --in command line option specified!\n")
+    PrintUsage(argv[0]);
+    UnloadInputLibs();
+    return 1;
+  }
+  if(nargc<2) {
     LOG_ERROR("Couldn't parse command line options!\n")
     PrintUsage(argv[0]);
     UnloadInputLibs();
@@ -2759,79 +2780,119 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // If no input type was specified, default to "dd"
-  if(glob_xmount_cfg.p_orig_image_type==NULL) {
-    XMOUNT_STRSET(glob_xmount_cfg.p_orig_image_type,"dd");
-  }
-
-  // Find an input lib for the specified input type
-  if(!FindInputLib()) {
-    LOG_ERROR("Unknown input image type \"%s\"!\n",
-              glob_xmount_cfg.p_orig_image_type)
-    PrintUsage(argv[0]);
-    UnloadInputLibs();
-    return 1;
-  }
-
-  // Init input image handle
-  ret=glob_p_input_functions->CreateHandle(&glob_p_input_image);
-  if(ret!=0) {
-    LOG_ERROR("Unable to init input handle: %s!\n",
-              glob_p_input_functions->GetErrorMessage(ret));
-    return 1;
-  }
-
-  // Parse input lib specific options
-  if(glob_xmount_cfg.p_lib_params!=NULL) {
-    ret=glob_p_input_functions->OptionsParse(glob_p_input_image,
-                                             glob_xmount_cfg.p_lib_params,
-                                             &p_err_msg);
-    if(ret!=0) {
-      if(p_err_msg!=NULL) {
-        LOG_ERROR("Unable to parse input library specific options: %s: %s!\n",
-                  glob_p_input_functions->GetErrorMessage(ret),
-                  p_err_msg);
-        glob_p_input_functions->FreeBuffer(p_err_msg);
-      } else {
-        LOG_ERROR("Unable to parse input library specific options: %s!\n",
-                  glob_p_input_functions->GetErrorMessage(ret));
-      }
-    }
-  }
-
   if(glob_xmount_cfg.debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")
     for(int i=0;i<nargc;i++) { printf("%s ",pp_nargv[i]); }
     printf("\n");
   }
 
+  // Load input images
+  for(uint64_t i=0;i<glob_xmount_cfg.input_images_count;i++) {
+    if(glob_xmount_cfg.debug==TRUE) {
+      if(glob_xmount_cfg.pp_input_images[i]->files_count==1) {
+        LOG_DEBUG("Loading image file \"%s\"...\n",
+                  glob_xmount_cfg.pp_input_images[i]->pp_files[0])
+      } else {
+        LOG_DEBUG("Loading image files \"%s .. %s\"...\n",
+                  glob_xmount_cfg.pp_input_images[i]->pp_files[0],
+                  glob_xmount_cfg.pp_input_images[i]->
+                    pp_files[glob_xmount_cfg.pp_input_images[i]->files_count-1])
+      }
+    }
+
+    // Find input lib
+    if(!FindInputLib(glob_xmount_cfg.pp_input_images[i])) {
+      LOG_ERROR("Unknown input image type '%s' for input image '%s'!\n",
+                glob_xmount_cfg.pp_input_images[i]->p_type,
+                glob_xmount_cfg.pp_input_images[i]->pp_files[0])
+      PrintUsage(argv[0]);
+      // TODO: Free already created handles
+      UnloadInputLibs();
+      // TODO: Free glob_xmount_cfg members
+      return 1;
+    }
+
+    // Init input image handle
+    ret=
+      glob_p_input_functions->
+        CreateHandle(&(glob_xmount_cfg.pp_input_images[i]->p_handle),
+                     glob_xmount_cfg.pp_input_images[i]->p_type);
+    if(ret!=0) {
+      LOG_ERROR("Unable to init input handle for input image '%s': %s!\n",
+                glob_xmount_cfg.pp_input_images[i]->pp_files[0],
+                glob_xmount_cfg.pp_input_images[i]->p_functions->
+                  GetErrorMessage(ret));
+      // TODO: Free already created handles
+      UnloadInputLibs();
+      // TODO: Free glob_xmount_cfg members
+      return 1;
+    }
+
+    // Parse input lib specific options
+    if(glob_xmount_cfg.p_lib_params!=NULL) {
+      ret=
+        glob_xmount_cfg.pp_input_images[i]->
+          p_functions->
+            OptionsParse(glob_xmount_cfg.pp_input_images[i]->p_handle,
+                         glob_xmount_cfg.p_lib_params,
+                         &p_err_msg);
+      if(ret!=0) {
+        if(p_err_msg!=NULL) {
+          LOG_ERROR("Unable to parse input library specific options for image "
+                      "'%s': %s: %s!\n",
+                    glob_xmount_cfg.pp_input_images[i]->pp_files[0],
+                    glob_xmount_cfg.pp_input_images[i]->p_functions->
+                      GetErrorMessage(ret),
+                    p_err_msg);
+          glob_xmount_cfg.pp_input_images[i]->p_functions->FreeBuffer(p_err_msg);
+          // TODO: Free already created handles
+          UnloadInputLibs();
+          // TODO: Free glob_xmount_cfg members
+          return 1;
+        } else {
+          LOG_ERROR("Unable to parse input library specific options for image "
+                      "'%s': %s!\n",
+                    glob_xmount_cfg.pp_input_images[i]->pp_files[0],
+                    glob_xmount_cfg.pp_input_images[i]->p_functions->
+                      GetErrorMessage(ret));
+          // TODO: Free already created handles
+          UnloadInputLibs();
+          // TODO: Free glob_xmount_cfg members
+          return 1;
+        }
+      }
+    }
+
+    // Open input image
+    ret=
+      glob_xmount_cfg.pp_input_images[i]->
+        p_functions->
+          Open(&glob_xmount_cfg.pp_input_images[i]->p_handle,
+               (const char**)(glob_xmount_cfg.pp_input_images[i]->pp_files),
+               glob_xmount_cfg.pp_input_images[i]->files_count);
+    if(ret!=0) {
+      LOG_ERROR("Unable to open input image file '%s': %s!\n",
+                glob_xmount_cfg.pp_input_images[i]->pp_files[0]
+                glob_xmount_cfg.pp_input_images[i]->p_functions->
+                  GetErrorMessage(ret));
+      // TODO: Free already created handles
+      UnloadInputLibs();
+      // TODO: Free glob_xmount_cfg members
+      return 1;
+    }
+
+    // TODO: Get size, save to ->size, check offset, substract offset
+    // Add GetMorphedImageSize, GetMorphedImageData
+
+    LOG_DEBUG("Input image loaded successfully\n")
+  }
+
   // Init mutexes
   pthread_mutex_init(&glob_mutex_image_rw,NULL);
   pthread_mutex_init(&glob_mutex_info_read,NULL);
 
-  if(input_filenames_count==1) {
-    LOG_DEBUG("Loading image file \"%s\"...\n",
-              pp_input_filenames[0])
-  } else {
-    LOG_DEBUG("Loading image files \"%s .. %s\"...\n",
-              pp_input_filenames[0],
-              pp_input_filenames[input_filenames_count-1])
-  }
-
   // Init random generator
   srand(time(NULL));
-
-  // Open input image
-  ret=glob_p_input_functions->Open(&glob_p_input_image,
-                                   (const char**)pp_input_filenames,
-                                   input_filenames_count);
-  if(ret!=0) {
-    LOG_ERROR("Unable to open input image file: %s!\n",
-              glob_p_input_functions->GetErrorMessage(ret));
-    UnloadInputLibs();
-    return 1;
-  }
-  LOG_DEBUG("Input image file opened successfully\n")
 
   // If an offset was specified, make sure it is within limits
   if(glob_xmount_cfg.orig_img_offset!=0) {

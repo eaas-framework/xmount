@@ -117,7 +117,8 @@ static int DdRead0 (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
 /*
  * DdCreateHandle
  */
-static int DdCreateHandle(void **pp_handle) {
+static int DdCreateHandle(void **pp_handle, char *p_format) {
+  (void)p_format;
   t_pdd p_dd=NULL;
 
   p_dd=(t_pdd)malloc(sizeof(t_dd));

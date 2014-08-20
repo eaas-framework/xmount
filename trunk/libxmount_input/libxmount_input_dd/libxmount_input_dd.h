@@ -89,7 +89,7 @@ typedef struct {
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int DdCreateHandle(void **pp_handle);
+static int DdCreateHandle(void **pp_handle, char *p_format);
 static int DdDestroyHandle(void **pp_handle);
 static int DdOpen(void **pp_handle,
                   const char **pp_filename_arr,

@@ -69,7 +69,9 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*
  * AffCreateHandle
  */
-static int AffCreateHandle(void **pp_handle) {
+static int AffCreateHandle(void **pp_handle, char *p_format) {
+  (void)p_format;
+
   *pp_handle=NULL;
   return AFF_OK;
 }

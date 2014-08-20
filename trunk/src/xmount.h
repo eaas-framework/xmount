@@ -59,10 +59,28 @@ typedef struct s_InputLib {
   ts_LibXmountInputFunctions lib_functions;
 } ts_InputLib, *pts_InputLib;
 
+//! Input image array element
+typedef struct s_InputImage {
+  //! Image type
+  char *p_type;
+  //! Image source file count
+  uint64_t files_count;
+  //! Image source files
+  char **pp_files;
+  //! Input lib functions for this image
+  pts_LibXmountInputFunctions p_functions;
+  //! Image handle
+  void *p_handle;
+  //! Image size
+  uint64_t size;
+} ts_InputImage, *pts_InputImage;
+
 //! Various xmount runtime options
 typedef struct s_XmountConfData {
-  //! Input image type
-  char *p_orig_image_type;
+  //! Input image count
+  uint64_t input_images_count;
+  //! Input images info
+  pts_InputImage *pp_input_images;
   //! Virtual image type
   te_VirtImageType VirtImageType;
   //! Enable debug output
@@ -79,13 +97,13 @@ typedef struct s_XmountConfData {
   uint8_t overwrite_cache;
   //! Cache file to save changes to
   char *p_cache_file;
-  //! Size of input image
+  //! Size of input image (after morph)
   uint64_t orig_image_size;
   //! Size of virtual image
   uint64_t virt_image_size;
-  //! MD5 hash of partial input image (lower 64 bit)
+  //! MD5 hash of partial input image (lower 64 bit) (after morph)
   uint64_t input_hash_lo;
-  //! MD5 hash of partial input image (higher 64 bit)
+  //! MD5 hash of partial input image (higher 64 bit) (after morph)
   uint64_t input_hash_hi;
   //! Input image offset
   uint64_t orig_img_offset;

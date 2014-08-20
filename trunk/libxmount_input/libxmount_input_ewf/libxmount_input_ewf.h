@@ -39,7 +39,7 @@ enum {
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int EwfCreateHandle(void **pp_handle);
+static int EwfCreateHandle(void **pp_handle, char *p_format);
 static int EwfDestroyHandle(void **pp_handle);
 static int EwfOpen(void **pp_handle,
                    const char **pp_filename_arr,

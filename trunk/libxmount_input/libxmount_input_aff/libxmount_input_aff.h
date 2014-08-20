@@ -36,7 +36,7 @@ enum {
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int AffCreateHandle(void **pp_handle);
+static int AffCreateHandle(void **pp_handle, char *p_format);
 static int AffDestroyHandle(void **pp_handle);
 static int AffOpen(void **pp_handle,
                    const char **pp_filename_arr,

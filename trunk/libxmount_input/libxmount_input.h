@@ -36,7 +36,7 @@ typedef struct s_LibXmountInputFunctions {
    * The p_format parameter specifies one of the formats returned by
    * LibXmount_Input_GetSupportedFormats() which should be used for this handle.
    *
-   * \param pp_handle Pointer to store handle to
+   * \param pp_handle Pointer to handle
    * \param p_format Input image format
    * \return 0 on success or error code
    */
@@ -51,16 +51,16 @@ typedef struct s_LibXmountInputFunctions {
    * By convention, after this function has been called, *pp_handle must be
    * NULL.
    *
-   * \param pp_handle Pointer to store handle to
+   * \param pp_handle Pointer to handle
    * \return 0 on success or error code
    */
   int (*DestroyHandle)(void **pp_handle);
 
-  //! Function to open input image(s)
+  //! Function to open input image
   /*!
-   * Opens the specified image(s) for reading.
+   * Opens the specified image for reading.
    *
-   * \param pp_handle Pointer to store handle of opened image to
+   * \param pp_handle Pointer to handle
    * \param pp_filename_arr Array containing all specified input images
    * \param filename_arr_len Length of pp_filename_arr
    * \return 0 on success or error code
@@ -69,10 +69,10 @@ typedef struct s_LibXmountInputFunctions {
               const char **pp_filename_arr,
               uint64_t filename_arr_len);
 
-  //! Function to close opened input image(s)
+  //! Function to close opened input image
   /*!
-   * Closes all input images and frees any memory allocaed during opening but
-   * does not invalidate the main handle. Further calls to for ex. Open() must
+   * Closes input image and frees any memory allocaed during opening but does
+   * not invalidate the main handle. Further calls to for ex. Open() must still
    * be possible without first calling CreateHandle again!
    *
    * \param pp_handle Pointer to the handle of the opened image
@@ -80,45 +80,32 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*Close)(void **pp_handle);
 
-  //! Function to get the amount of opened images
+  //! Function to get the input image's size
   /*!
-   * \param p_handle Handle to the opened image
-   * \param p_count Pointer to store the image count to
-   * \return 0 on success or error code
-   */
-  int (*ImageCount)(void *p_handle,
-                    uint64_t *p_count);
-
-  //! Function to get an input image's size
-  /*!
-   * Returns the real size of the specified input image. Real means the size of
-   * the uncompressed or otherwise made available data contained inside the
-   * input image.
+   * Returns the real size of the input image. Real means the size of the
+   * uncompressed or otherwise made available data contained inside the input
+   * image.
    *
-   * \param p_handle Handle to the opened image
-   * \param image Image number for which size is requested (0 = first image)
+   * \param p_handle Handle
    * \param p_size Pointer to store input image's size to
    * \return 0 on success or error code
    */
   int (*Size)(void *p_handle,
-              uint64_t image,
               uint64_t *p_size);
 
-  //! Function to read data from an input image
+  //! Function to read data from input image
   /*!
    * Reads count bytes at offset from input image and copies them into memory
    * starting at the address of p_buf. Memory is pre-allocated to as much bytes
    * as should be read.
    *
-   * \param p_handle Handle to the opened image
-   * \param image Image number for which data is requested (0 = first image)
+   * \param p_handle Handle
    * \param offset Position at which to start reading
    * \param p_buf Buffer to store read data to
    * \param count Amount of bytes to read
    * \return 0 on success or error code
    */
   int (*Read)(void *p_handle,
-              uint64_t image,
               uint64_t offset,
               char *p_buf,
               uint32_t count);
@@ -144,7 +131,7 @@ typedef struct s_LibXmountInputFunctions {
    * found, this function should fail and return an error message in pp_error.
    * pp_error will be freed by the caller by using FreeBuffer.
    *
-   * \param p_handle Handle to the opened image
+   * \param p_handle Handle
    * \param p_options String with specified options
    * \param pp_error Pointer to a string with error message
    * \return 0 on success or error code and error message
@@ -159,7 +146,7 @@ typedef struct s_LibXmountInputFunctions {
    * called once when the info file is generated. The returned string is then
    * freed with a call to FreeBuffer.
    *
-   * \param p_handle Handle to the opened image
+   * \param p_handle Handle
    * \param pp_info_buf Pointer to store the null-terminated content
    * \return 0 on success or error code
    */
@@ -198,13 +185,13 @@ typedef uint8_t (*t_LibXmount_Input_GetApiVersion)();
 /*!
  * Gets a list of supported input image formats. These are the strings
  * specified with xmount's --in <string> command line option. The returned
- * string must be a constant list of image formats split by \0 chars. To mark
- * the end of the string, a single \0 must be used.
+ * string must be a constant vector of image formats split by \0 chars. To mark
+ * the end of the vector, a single \0 must be used.
  *
- * As an example, "first\0second\0\0" would be a correct string to return for
+ * As an example, "first\0second\0\0" would be a correct vector to return for
  * a lib supporting two input image formats.
  *
- * \return List containing supported format strings
+ * \return Vector containing supported format strings
  */
 const char* LibXmount_Input_GetSupportedFormats();
 typedef const char* (*t_LibXmount_Input_GetSupportedFormats)();

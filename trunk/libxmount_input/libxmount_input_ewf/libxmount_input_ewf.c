@@ -73,7 +73,8 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*
  * EwfCreateHandle
  */
-static int EwfCreateHandle(void **pp_handle) {
+static int EwfCreateHandle(void **pp_handle, char *p_format) {
+  (void)p_format;
   *pp_handle=NULL;
 
 #ifdef HAVE_LIBEWF_V2_API
