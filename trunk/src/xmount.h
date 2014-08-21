@@ -19,6 +19,7 @@
 *******************************************************************************/
 
 #include "../libxmount_input/libxmount_input.h"
+#include "../libxmount_morphing/libxmount_morphing.h"
 
 #undef FALSE
 #undef TRUE
@@ -75,11 +76,23 @@ typedef struct s_InputImage {
   uint64_t size;
 } ts_InputImage, *pts_InputImage;
 
-//! Various xmount runtime options
-typedef struct s_XmountConfData {
+//! Infos about morphing libs
+typedef struct s_MorphingLib {
+  //! Filename of lib (without path)
+  char *p_name;
+  //! Handle to the loaded lib
+  void *p_lib;
+  //! Array of supported morphing types
+  char *p_supported_morph_types;
+  //! Struct containing lib functions
+  ts_LibXmountMorphingFunctions lib_functions;
+} ts_MorphingLib, *pts_MorphingLib;
+
+//! Xmount global runtime data
+typedef struct s_XmountData {
   //! Input image count
   uint64_t input_images_count;
-  //! Input images info
+  //! Input images
   pts_InputImage *pp_input_images;
   //! Virtual image type
   te_VirtImageType VirtImageType;
@@ -111,7 +124,11 @@ typedef struct s_XmountConfData {
   char *p_lib_params;
   //! Set if we are allowed to set fuse's allow_other option
   uint8_t may_set_fuse_allow_other;
-} ts_XmountConfData;
+  //! Specified morph type
+  char *p_morph_type;
+  //! Morph lib params
+  char **pp_morph_params;
+} ts_XmountData;
 
 #define VDI_FILE_COMMENT "<<< This is a virtual VDI image >>>"
 #define VDI_HEADER_COMMENT "This VDI was emulated using xmount v" XMOUNT_VERSION

@@ -25,7 +25,11 @@
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
 
-#include "../libxmount_input/libxmount_input.h"
+typedef struct s_LibXmountMorphingInputImage {
+  void *p_image_handle;
+  int (*Size)(void *p_handle, uint64_t *p_size);
+  int (*Read)(void *p_handle, uint64_t offset, char *p_buf, uint32_t count);
+} ts_LibXmountMorphingInputImage, *pts_LibXmountMorphingInputImage;
 
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountMorphingFunctions {
@@ -68,7 +72,7 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*Morph)(void *p_handle,
-               pts_LibXmountInputFunctions p_input_functions);
+               pts_LibXmountMorphingInputImage *pp_input_images);
 
   //! Function to get the size of the morphed data
   /*!
@@ -92,8 +96,8 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*Read)(void *p_handle,
-              uint64_t offset,
               char *p_buf,
+              uint64_t offset,
               uint32_t count);
 
   //! Function to get a help message for any supported lib-specific options
@@ -179,8 +183,8 @@ typedef uint8_t (*t_LibXmount_Morphing_GetApiVersion)();
  *
  * \return Vector containing supported morphing functions
  */
-const char* LibXmount_Morphing_GetSupportedMorphFunctions();
-typedef const char* (*t_LibXmount_Morphing_GetSupportedMorphFunctions)();
+const char* LibXmount_Morphing_GetSupportedTypes();
+typedef const char* (*t_LibXmount_Morphing_GetSupportedTypes)();
 
 //! Get the lib's s_LibXmountMorphingFunctions structure
 /*!

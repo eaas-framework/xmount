@@ -33,7 +33,7 @@
 #define LOG_WARNING(...) \
   LogMessage("WARNING",(char*)__FUNCTION__,__LINE__,__VA_ARGS__);
 #define LOG_DEBUG(...) { \
-  if(glob_xmount_cfg.debug) \
+  if(glob_xmount.debug) \
     LogMessage("DEBUG",(char*)__FUNCTION__,__LINE__,__VA_ARGS__); \
 }
 
