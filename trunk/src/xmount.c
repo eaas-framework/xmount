@@ -60,7 +60,7 @@
 //! Struct that contains various runtime configuration options
 static ts_XmountData glob_xmount;
 
-//! Structs containing pointers to the libxmount_inputfunctions
+//! Structs containing pointers to the libxmount_input functions
 static uint32_t glob_input_libs_count=0;
 static pts_InputLib *glob_pp_input_libs=NULL;
 
@@ -69,6 +69,7 @@ static uint32_t glob_morphing_libs_count=0;
 static pts_MorphingLib *glob_pp_morphing_libs=NULL;
 pts_LibXmountMorphingFunctions glob_p_morphing_functions=NULL;
 void *glob_p_morphing_handle=NULL;
+pts_LibXmountMorphingInputImage *glob_pp_morphing_input_images=NULL;
 
 //! Pointer to virtual info file
 static char *glob_p_info_file=NULL;
@@ -418,7 +419,7 @@ static int ParseCmdLine(const int argc,
           // Parse input image filename(s) and add to p_input_image->pp_files
           i++;
           p_input_image->files_count=0;
-          while(i<(argc-1) && strcmp(pp_argv[i],"--")!=0) {
+          while(i<(argc-1) && strncmp(pp_argv[i],"--",2)!=0) {
             p_input_image->files_count++;
             XMOUNT_REALLOC(p_input_image->pp_files,
                            char**,
@@ -427,6 +428,7 @@ static int ParseCmdLine(const int argc,
                           pp_argv[i]);
             i++;
           }
+          i--;
           if(p_input_image->files_count==0) {
             LOG_ERROR("No input files specified for \"--in %s\"!\n",
                       p_input_image->p_type)
@@ -516,6 +518,20 @@ static int ParseCmdLine(const int argc,
         for(uint32_t ii=0;ii<glob_input_libs_count;ii++) {
           printf("    - %s supporting ",glob_pp_input_libs[ii]->p_name);
           p_buf=glob_pp_input_libs[ii]->p_supported_input_types;
+          first=TRUE;
+          while(*p_buf!='\0') {
+            if(first) {
+              printf("\"%s\"",p_buf);
+              first=FALSE;
+            } else printf(", \"%s\"",p_buf);
+            p_buf+=(strlen(p_buf)+1);
+          }
+          printf("\n");
+        }
+        printf("  loaded morphing libraries:\n");
+        for(uint32_t ii=0;ii<glob_morphing_libs_count;ii++) {
+          printf("    - %s supporting ",glob_pp_morphing_libs[ii]->p_name);
+          p_buf=glob_pp_morphing_libs[ii]->p_supported_morphing_types;
           first=TRUE;
           while(*p_buf!='\0') {
             if(first) {
@@ -805,7 +821,7 @@ static ssize_t GetInputImageData(pts_InputImage p_image,
                                  to_read);
   if(ret!=0) {
     LOG_ERROR("Couldn't read %zd bytes at offset %" PRIu64
-                " from input iamge!\n",
+                " from input image!\n",
               to_read,
               offset,
               p_image->p_functions->GetErrorMessage(ret));
@@ -813,6 +829,15 @@ static ssize_t GetInputImageData(pts_InputImage p_image,
   }
 
   return to_read;
+}
+
+//! Wrapper for GetInputImageData
+static int GetInputImageData_MorphWrapper(void *p_image,
+                                          char *p_buf,
+                                          off_t offset,
+                                          size_t size)
+{
+  return GetInputImageData((pts_InputImage)p_image,p_buf,offset,size);
 }
 
 //! Read data from morphed image
@@ -2183,10 +2208,10 @@ static int LoadLibs() {
         p_buf+=(strlen(p_buf)+1);
       }
       supported_formats_len++;
-      XMOUNT_MALLOC(p_morphing_lib->p_supported_morph_types,
+      XMOUNT_MALLOC(p_morphing_lib->p_supported_morphing_types,
                     char*,
                     supported_formats_len);
-      memcpy(p_morphing_lib->p_supported_morph_types,
+      memcpy(p_morphing_lib->p_supported_morphing_types,
              p_supported_formats,
              supported_formats_len);
 
@@ -2306,7 +2331,7 @@ static int FindMorphingLib() {
   for(uint32_t i=0;i<glob_morphing_libs_count;i++) {
     LOG_DEBUG("Checking morphing library %s\n",
               glob_pp_morphing_libs[i]->p_name);
-    p_buf=glob_pp_morphing_libs[i]->p_supported_morph_types;
+    p_buf=glob_pp_morphing_libs[i]->p_supported_morphing_types;
     while(*p_buf!='\0') {
       if(strcmp(p_buf,glob_xmount.p_morph_type)==0) {
         // Library supports morph type, set lib functions
@@ -2879,6 +2904,7 @@ int main(int argc, char *argv[]) {
   int ret;
   int fuse_ret;
   char *p_err_msg;
+  pts_LibXmountMorphingInputImage p_morphing_input_image;
 
   // Set implemented FUSE functions
   struct fuse_operations xmount_operations = {
@@ -2922,6 +2948,7 @@ int main(int argc, char *argv[]) {
   glob_xmount.orig_img_offset=0;
   glob_xmount.p_lib_params=NULL;
   glob_xmount.may_set_fuse_allow_other=FALSE;
+  glob_xmount.p_morph_type=NULL;
 
   // Load input and morphing libs
   if(!LoadLibs()) {
@@ -2972,6 +2999,9 @@ int main(int argc, char *argv[]) {
     PrintUsage(argv[0]);
     UnloadInputLibs();
     return 1;
+  }
+  if(glob_xmount.p_morph_type==NULL) {
+    XMOUNT_STRSET(glob_xmount.p_morph_type,"combine");
   }
 
   // Check if mountpoint is a valid dir
@@ -3113,8 +3143,6 @@ int main(int argc, char *argv[]) {
       glob_xmount.pp_input_images[i]->size-=glob_xmount.orig_img_offset;
     }
 
-    // Add GetMorphedImageSize, GetMorphedImageData
-
     LOG_DEBUG("Input image loaded successfully\n")
   }
 
@@ -3126,13 +3154,44 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // TODO: Init morphing
-/*
-  ret=glob_p_morphing_functions->Morph();
+  // Init morphing
+  ret=glob_p_morphing_functions->CreateHandle(&glob_p_morphing_handle,
+                                              glob_xmount.p_morph_type);
   if(ret!=0) {
-  
+    LOG_ERROR("Unable to create morphing handle: %s!\n",
+              glob_p_morphing_functions->GetErrorMessage(ret));
+    // TODO: Free
+    return 1;
   }
-*/
+  glob_pp_morphing_input_images=
+    malloc(glob_xmount.input_images_count*
+             sizeof(pts_LibXmountMorphingInputImage));
+  if(glob_pp_morphing_input_images==NULL) {
+    // TODO: Free
+    return 1;
+  }
+  for(uint64_t i=0;i<glob_xmount.input_images_count;i++) {
+    p_morphing_input_image=malloc(sizeof(ts_LibXmountMorphingInputImage));
+    if(p_morphing_input_image==NULL) {
+      // TODO: Free
+      return 1;
+    }
+    p_morphing_input_image->p_image_handle=glob_xmount.pp_input_images[i];
+    // TODO: Error check
+    GetInputImageSize(glob_xmount.pp_input_images[i]->p_handle,
+                      &(p_morphing_input_image->size));
+    p_morphing_input_image->Read=&GetInputImageData_MorphWrapper;
+    glob_pp_morphing_input_images[i]=p_morphing_input_image;
+  }
+  ret=glob_p_morphing_functions->Morph(glob_p_morphing_handle,
+                                       glob_xmount.input_images_count,
+                                       glob_pp_morphing_input_images);
+  if(ret!=0) {
+    LOG_ERROR("Unable to start morphing: %s!\n",
+              glob_p_morphing_functions->GetErrorMessage(ret));
+    // TODO: Free
+    return 1;
+  }
 
   // Init mutexes
   pthread_mutex_init(&glob_mutex_image_rw,NULL);

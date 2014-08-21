@@ -27,8 +27,8 @@
 
 typedef struct s_LibXmountMorphingInputImage {
   void *p_image_handle;
-  int (*Size)(void *p_handle, uint64_t *p_size);
-  int (*Read)(void *p_handle, uint64_t offset, char *p_buf, uint32_t count);
+  uint64_t size;
+  int (*Read)(void *p_handle, char *p_buf, off_t offset, size_t count);
 } ts_LibXmountMorphingInputImage, *pts_LibXmountMorphingInputImage;
 
 //! Structure containing pointers to the lib's functions
@@ -44,10 +44,10 @@ typedef struct s_LibXmountMorphingFunctions {
    * this handle.
    *
    * \param pp_handle Pointer to store handle to
-   * \param p_morph_function Morph function to use
+   * \param p_type Morph type to use
    * \return 0 on success or error code
    */
-  int (*CreateHandle)(void **pp_handle, char *p_morph_function);
+  int (*CreateHandle)(void **pp_handle, char *p_type);
 
   //! Function to destroy handle
   /*!
@@ -72,7 +72,8 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*Morph)(void *p_handle,
-               pts_LibXmountMorphingInputImage *pp_input_images);
+               uint64_t input_images,
+               const pts_LibXmountMorphingInputImage *pp_input_images);
 
   //! Function to get the size of the morphed data
   /*!
@@ -90,15 +91,15 @@ typedef struct s_LibXmountMorphingFunctions {
    * as should be read.
    *
    * \param p_handle Handle to the opened image
-   * \param offset Position at which to start reading
    * \param p_buf Buffer to store read data to
+   * \param offset Position at which to start reading
    * \param count Amount of bytes to read
-   * \return 0 on success or error code
+   * \return Read bytes on success or negated error code on error
    */
   int (*Read)(void *p_handle,
               char *p_buf,
-              uint64_t offset,
-              uint32_t count);
+              off_t offset,
+              size_t count);
 
   //! Function to get a help message for any supported lib-specific options
   /*!

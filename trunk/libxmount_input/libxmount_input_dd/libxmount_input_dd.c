@@ -159,6 +159,9 @@ static int DdOpen(void **pp_handle,
   pdd->TotalSize = 0;
   for (uint64_t i=0; i < pdd->Pieces; i++) 
   {
+  
+  printf("Opening %s\n",pp_filename_arr[i]);
+  
     pPiece = &pdd->pPieceArr[i];
     pPiece->pFilename = strdup (pp_filename_arr[i]);
     if (pPiece->pFilename == NULL)

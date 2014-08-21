@@ -83,7 +83,7 @@ typedef struct s_MorphingLib {
   //! Handle to the loaded lib
   void *p_lib;
   //! Array of supported morphing types
-  char *p_supported_morph_types;
+  char *p_supported_morphing_types;
   //! Struct containing lib functions
   ts_LibXmountMorphingFunctions lib_functions;
 } ts_MorphingLib, *pts_MorphingLib;
