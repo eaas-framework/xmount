@@ -48,7 +48,8 @@ static int CombineSize(void *p_handle,
 static int CombineRead(void *p_handle,
                        char *p_buf,
                        off_t offset,
-                       size_t count);
+                       size_t count,
+                       size_t *p_read);
 static const char* CombineOptionsHelp();
 static int CombineOptionsParse(void *p_handle,
                                char *p_options,

@@ -684,34 +684,6 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   return TRUE;
 }
 
-//! Get size of input image
-/*!
- * \param p_image Image for which to retrieve size
- * \param p_size Buf to save size to
- * \return TRUE on success, FALSE on error
- */
-static int GetInputImageSize(pts_InputImage p_image, uint64_t *p_size) {
-  int ret;
-
-  // Check if size has been saved
-  if(p_image->size!=0) {
-    // Size was saved, return that value
-    *p_size=p_image->size;
-    return TRUE;
-  }
-
-  // Size has not been saved, get it
-  ret=p_image->p_functions->Size(p_image->p_handle,p_size);
-  if(ret!=0) {
-    LOG_ERROR("Unable to determine size of input image '%s': %s!\n",
-              p_image->pp_files[0],
-              p_image->p_functions->GetErrorMessage(ret));
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
 //! Get size of morphed image
 /*!
  * \param p_size Buf to save size to
@@ -786,32 +758,40 @@ static int GetVirtImageSize(uint64_t *p_size) {
  * \param p_buf Pointer to buffer to write read data to (must be preallocated!)
  * \param offset Offset at which data should be read
  * \param size Size of data which should be read (size of buffer)
- * \return Number of read bytes on success or "-1" on error
+ * \param p_read Number of read bytes on success
+ * \return 0 on success, negated error code on error
  */
-static ssize_t GetInputImageData(pts_InputImage p_image,
-                                 char *p_buf,
-                                 off_t offset,
-                                 size_t size)
+static int GetInputImageData(pts_InputImage p_image,
+                             char *p_buf,
+                             off_t offset,
+                             size_t size,
+                             size_t *p_read)
 {
-  ssize_t ret;
+  int ret;
   size_t to_read=0;
-  uint64_t image_size=0;
+
+  LOG_DEBUG("Trying to read %zu bytes at offset %zu from input image '%s'\n",
+            size,
+            offset,
+            p_image->pp_files[0]);
 
   // Make sure we aren't reading past EOF of image file
-  if(!GetInputImageSize(p_image,&image_size)) {
-    LOG_ERROR("Couldn't get input image size!\n")
-    return -1;
-  }
-  if(offset>=image_size) {
+  if(offset>=p_image->size) {
     // Offset is beyond image size
-    LOG_DEBUG("Offset is beyond input image size.\n")
+    LOG_DEBUG("Offset %zu is at / beyond size of input image '%s'.\n",
+              offset,
+              p_image->pp_files[0]);
+    *p_read=0;
     return 0;
   }
-  if(offset+size>image_size) {
+  if(offset+size>p_image->size) {
     // Attempt to read data past EOF of image file
-    to_read=image_size-offset;
-    LOG_DEBUG("Attempt to read data past EOF of input image. Corrected size "
-              "from %zd to %zd.\n",size,to_read)
+    to_read=p_image->size-offset;
+    LOG_DEBUG("Attempt to read data past EOF of input image '%s'. "
+                "Corrected size from %zu to %zu.\n",
+              p_image->pp_files[0],
+              size,
+              to_read);
   } else to_read=size;
 
   // Read data from image file (adding input image offset if one was specified)
@@ -820,24 +800,27 @@ static ssize_t GetInputImageData(pts_InputImage p_image,
                                  p_buf,
                                  to_read);
   if(ret!=0) {
-    LOG_ERROR("Couldn't read %zd bytes at offset %" PRIu64
-                " from input image!\n",
+    LOG_ERROR("Couldn't read %zu bytes at offset %zu from input image "
+                "'%s': %s!\n",
               to_read,
               offset,
+              p_image->pp_files[0],
               p_image->p_functions->GetErrorMessage(ret));
-    return -1;
+    return -EIO;
   }
 
-  return to_read;
+  *p_read=to_read;
+  return 0;
 }
 
 //! Wrapper for GetInputImageData
 static int GetInputImageData_MorphWrapper(void *p_image,
                                           char *p_buf,
                                           off_t offset,
-                                          size_t size)
+                                          size_t size,
+                                          size_t *p_read)
 {
-  return GetInputImageData((pts_InputImage)p_image,p_buf,offset,size);
+  return GetInputImageData((pts_InputImage)p_image,p_buf,offset,size,p_read);
 }
 
 //! Read data from morphed image
@@ -845,28 +828,35 @@ static int GetInputImageData_MorphWrapper(void *p_image,
  * \param p_buf Pointer to buffer to write read data to (must be preallocated!)
  * \param offset Offset at which data should be read
  * \param size Size of data which should be read (size of buffer)
- * \return Number of read bytes on success or "-1" on error
+ * \param p_read Number of read bytes on success
+ * \return TRUE on success, negated error code on error
  */
-static ssize_t GetMorphedImageData(char *p_buf, off_t offset, size_t size) {
+static int GetMorphedImageData(char *p_buf,
+                               off_t offset,
+                               size_t size,
+                               size_t *p_read)
+{
   int ret;
   size_t to_read=0;
+  size_t read;
   uint64_t image_size=0;
 
   // Make sure we aren't reading past EOF of image file
-  if(!GetMorphedImageSize(&image_size)) {
-    LOG_ERROR("Couldn't get morphed image size!\n")
-    return -1;
+  if(GetMorphedImageSize(&image_size)!=TRUE) {
+    LOG_ERROR("Couldn't get size of morphed image!\n");
+    return -EIO;
   }
   if(offset>=image_size) {
     // Offset is beyond image size
-    LOG_DEBUG("Offset is beyond morphed image size.\n")
+    LOG_DEBUG("Offset %zu is at / beyond size of morphed image.\n",offset);
+    *p_read=0;
     return 0;
   }
   if(offset+size>image_size) {
     // Attempt to read data past EOF of morphed image file
     to_read=image_size-offset;
     LOG_DEBUG("Attempt to read data past EOF of morphed image. Corrected size "
-                "from %zd to %zd.\n",
+                "from %zu to %zu.\n",
               size,
               to_read);
   } else to_read=size;
@@ -875,17 +865,18 @@ static ssize_t GetMorphedImageData(char *p_buf, off_t offset, size_t size) {
   ret=glob_p_morphing_functions->Read(glob_p_morphing_handle,
                                       p_buf,
                                       offset,
-                                      to_read);
+                                      to_read,
+                                      &read);
   if(ret!=0) {
-    LOG_ERROR("Couldn't read %zd bytes at offset %" PRIu64
-                " from morphed image!\n",
+    LOG_ERROR("Couldn't read %zu bytes at offset %zu from morphed image: %s!\n",
               to_read,
               offset,
               glob_p_morphing_functions->GetErrorMessage(ret));
-    return -1;
+    return -EIO;
   }
 
-  return to_read;
+  *p_read=to_read;
+  return TRUE;
 }
 
 //! Read data from virtual image
@@ -898,30 +889,31 @@ static ssize_t GetMorphedImageData(char *p_buf, off_t offset, size_t size) {
 static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
   uint32_t cur_block=0;
   uint64_t morphed_image_size, virt_image_size;
-  size_t to_read=0, cur_to_read=0;
+  size_t read, to_read=0, cur_to_read=0;
   off_t file_off=offset, block_off=0;
   size_t to_read_later=0;
+  int ret;
 
   // Get virtual image size
-  if(!GetVirtImageSize(&virt_image_size)) {
-    LOG_ERROR("Couldn't get virtual image size!\n")
+  if(GetVirtImageSize(&virt_image_size)!=TRUE) {
+    LOG_ERROR("Couldn't get size of virtual image!\n")
     return -EIO;
   }
-
   if(offset>=virt_image_size) {
-    LOG_ERROR("Attempt to read behind EOF of virtual image!\n")
+    LOG_DEBUG("Offset %zu is at / beyond size of virtual image.\n",offset);
     return 0;
   }
-
   if(offset+size>virt_image_size) {
-    LOG_DEBUG("Attempt to read pas EOF of virtual image file\n")
-    LOG_DEBUG("Adjusting read size from %u to %u\n",size,virt_image_size-offset)
+    LOG_DEBUG("Attempt to read data past EOF of virtual image. Corrected size "
+                "from %zu to %zu.\n",
+              size,
+              virt_image_size-offset);
     size=virt_image_size-offset;
   }
-
   to_read=size;
 
-  if(!GetMorphedImageSize(&morphed_image_size)) {
+  // Get morphed image size
+  if(GetMorphedImageSize(&morphed_image_size)!=TRUE) {
     LOG_ERROR("Couldn't get morphed image size!")
     return -EIO;
   }
@@ -1022,16 +1014,14 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
                 " from cache file\n",cur_to_read,file_off)
     } else {
       // No write support or data not cached
-      if(GetMorphedImageData(p_buf,
-                             file_off,
-                             cur_to_read)!=cur_to_read)
-      {
+      ret=GetMorphedImageData(p_buf,file_off,cur_to_read,&read);
+      if(ret!=TRUE || read!=cur_to_read) {
         LOG_ERROR("Couldn't read data from virtual image!\n")
         return -EIO;
       }
-      LOG_DEBUG("Read %zd bytes at offset %" PRIu64
-                  " from virtual image file\n",cur_to_read,
-                file_off)
+      LOG_DEBUG("Read %zu bytes at offset %zu from virtual image file\n",
+                cur_to_read,
+                file_off);
     }
     cur_block++;
     block_off=0;
@@ -1322,7 +1312,8 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   off_t block_offset=0;
   char *p_write_buf=(char*)p_buf;
   char *p_buf2;
-  ssize_t ret;
+  int ret;
+  size_t read;
 
   // Get virtual image size
   if(!GetVirtImageSize(&virt_image_size)) {
@@ -1422,11 +1413,12 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
       if(block_offset!=0) {
         // Changed data does not begin at block boundry. Need to prepend
         // with data from virtual image file
-        XMOUNT_MALLOC(p_buf2,char*,block_offset*sizeof(char))
-        if(GetMorphedImageData(p_buf2,
-                               file_offset-block_offset,
-                               block_offset)!=block_offset)
-        {
+        XMOUNT_MALLOC(p_buf2,char*,block_offset*sizeof(char));
+        ret=GetMorphedImageData(p_buf2,
+                                file_offset-block_offset,
+                                block_offset,
+                                &read);
+        if(ret!=TRUE || read!=block_offset) {
           LOG_ERROR("Couldn't read data from morphed image!\n")
           return -1;
         }
@@ -1457,20 +1449,20 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
         memset(p_buf2,0,CACHE_BLOCK_SIZE-(block_offset+to_write_now));
         if((file_offset-block_offset)+CACHE_BLOCK_SIZE>orig_image_size) {
           // Original image is smaller than full cache block
-          if(GetMorphedImageData(p_buf2,
-                                 file_offset+to_write_now,
-                                 orig_image_size-(file_offset+to_write_now))!=
-               orig_image_size-(file_offset+to_write_now))
-          {
+          ret=GetMorphedImageData(p_buf2,
+                                  file_offset+to_write_now,
+                                  orig_image_size-(file_offset+to_write_now),
+                                  &read);
+          if(ret!=TRUE || read!=orig_image_size-(file_offset+to_write_now)) {
             LOG_ERROR("Couldn't read data from virtual image file!\n")
             return -1;
           }
         } else {
-          if(GetMorphedImageData(p_buf2,
-                                 file_offset+to_write_now,
-                                 CACHE_BLOCK_SIZE-(block_offset+to_write_now))!=
-               CACHE_BLOCK_SIZE-(block_offset+to_write_now))
-          {
+          ret=GetMorphedImageData(p_buf2,
+                                  file_offset+to_write_now,
+                                  CACHE_BLOCK_SIZE-(block_offset+to_write_now),
+                                  &read);
+          if(ret!=TRUE || read!=CACHE_BLOCK_SIZE-(block_offset+to_write_now)) {
             LOG_ERROR("Couldn't read data from virtual image file!\n")
             return -1;
           }
@@ -1562,23 +1554,27 @@ static int CalculateInputImageHash(uint64_t *p_hash_low,
   char hash[16];
   md5_state_t md5_state;
   char *p_buf;
-  XMOUNT_MALLOC(p_buf,char*,HASH_AMOUNT*sizeof(char))
-  size_t read_data=GetMorphedImageData(p_buf,0,HASH_AMOUNT);
-  if(read_data>0) {
-    // Calculate MD5 hash
-    md5_init(&md5_state);
-    md5_append(&md5_state,(const md5_byte_t*)p_buf,read_data);
-    md5_finish(&md5_state,(md5_byte_t*)hash);
-    // Convert MD5 hash into two 64bit integers
-    *p_hash_low=*((uint64_t*)hash);
-    *p_hash_high=*((uint64_t*)(hash+8));
-    free(p_buf);
-    return TRUE;
-  } else {
+  int ret;
+  size_t read_data;
+
+  XMOUNT_MALLOC(p_buf,char*,HASH_AMOUNT*sizeof(char));
+  ret=GetMorphedImageData(p_buf,0,HASH_AMOUNT,&read_data);
+  if(ret!=TRUE || read_data==0) {
     LOG_ERROR("Couldn't read data from morphed image file!\n")
     free(p_buf);
     return FALSE;
   }
+
+  // Calculate MD5 hash
+  md5_init(&md5_state);
+  md5_append(&md5_state,(const md5_byte_t*)p_buf,read_data);
+  md5_finish(&md5_state,(md5_byte_t*)hash);
+  // Convert MD5 hash into two 64bit integers
+  *p_hash_low=*((uint64_t*)hash);
+  *p_hash_high=*((uint64_t*)(hash+8));
+  free(p_buf);
+
+  return TRUE;
 }
 
 //! Build and init virtual VDI file header
@@ -3116,20 +3112,23 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 
-    // If an offset was specified, determine size of all input images, check it
-    // against offset and save "corrected" size
+    // Determine input image size
+    ret=glob_xmount.pp_input_images[i]->
+      p_functions->
+        Size(glob_xmount.pp_input_images[i]->p_handle,
+             &(glob_xmount.pp_input_images[i]->size));
+    if(ret!=0) {
+      LOG_ERROR("Unable to determine size of input image '%s': %s!\n",
+                glob_xmount.pp_input_images[i]->pp_files[0],
+                glob_xmount.pp_input_images[i]->
+                  p_functions->GetErrorMessage(ret));
+      // TODO: Free
+      return 1;
+    }
+
+    // If an offset was specified, check it against offset and change size
     if(glob_xmount.orig_img_offset!=0) {
-      if(GetInputImageSize(glob_xmount.pp_input_images[i],
-                           &(glob_xmount.pp_input_images[i]->size))!=TRUE)
-      {
-        // TODO: Free already created handles
-        UnloadInputLibs();
-        // TODO: Free glob_xmount members
-        return 1;
-      }
-      if(glob_xmount.orig_img_offset>
-         glob_xmount.pp_input_images[i]->size)
-      {
+      if(glob_xmount.orig_img_offset>glob_xmount.pp_input_images[i]->size) {
         LOG_ERROR("The specified offset is larger then the size of the input "
                     "image '%s'! (%" PRIu64 " > %" PRIu64 ")\n",
                   glob_xmount.pp_input_images[i]->pp_files[0],
@@ -3177,9 +3176,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     p_morphing_input_image->p_image_handle=glob_xmount.pp_input_images[i];
-    // TODO: Error check
-    GetInputImageSize(glob_xmount.pp_input_images[i]->p_handle,
-                      &(p_morphing_input_image->size));
+    p_morphing_input_image->size=glob_xmount.pp_input_images[i]->size;
     p_morphing_input_image->Read=&GetInputImageData_MorphWrapper;
     glob_pp_morphing_input_images[i]=p_morphing_input_image;
   }

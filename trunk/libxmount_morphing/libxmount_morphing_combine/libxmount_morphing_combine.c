@@ -16,10 +16,13 @@
 *******************************************************************************/
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "../libxmount_morphing.h"
 #include "libxmount_morphing_combine.h"
+
+#define DEBUG
 
 /*******************************************************************************
  * LibXmount_Morphing API implementation
@@ -100,14 +103,24 @@ static int CombineMorph(void *p_handle,
 {
   pts_CombineHandle p_combine_handle=(pts_CombineHandle)p_handle;
 
-  // Add given values to out handle
+  // Add given values to our handle
   p_combine_handle->input_images_count=input_images;
   p_combine_handle->pp_input_images=pp_input_images;
 
   // Calculate morphed image size
   for(uint64_t i=0;i<input_images;i++) {
+#ifdef DEBUG
+    printf("Adding %" PRIu64 " bytes from image %" PRIu64 " to morphed size.\n",
+           pp_input_images[i]->size,
+           i);
+#endif
     p_combine_handle->morphed_image_size+=pp_input_images[i]->size;
   }
+
+#ifdef DEBUG
+  printf("Total morphed image size is %" PRIu64 " bytes.\n",
+         p_combine_handle->morphed_image_size);
+#endif
 
   return COMBINE_OK;
 }
@@ -126,13 +139,15 @@ static int CombineSize(void *p_handle, uint64_t *p_size) {
 static int CombineRead(void *p_handle,
                        char *p_buf,
                        off_t offset,
-                       size_t count)
+                       size_t count,
+                       size_t *p_read)
 {
   pts_CombineHandle p_combine_handle=(pts_CombineHandle)p_handle;
   uint64_t cur_input_image=0;
   off_t cur_offset=offset;
   int ret;
   size_t cur_count;
+  size_t read;
 
   // Make sure read parameters are within morphed image bounds
   if(offset>=p_combine_handle->morphed_image_size ||
@@ -165,8 +180,9 @@ static int CombineRead(void *p_handle,
                  p_image_handle,
                p_buf,
                cur_offset,
-               cur_count);
-    if(ret==-1) return COMBINE_CANNOT_READ_DATA;
+               cur_count,
+               &read);
+    if(ret!=0 || read!=cur_count) return COMBINE_CANNOT_READ_DATA;
 
     p_buf+=cur_count;
     cur_offset=0;
@@ -174,6 +190,7 @@ static int CombineRead(void *p_handle,
     cur_input_image++;
   }
 
+  *p_read=count;
   return COMBINE_OK;
 }
 
