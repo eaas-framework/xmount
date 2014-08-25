@@ -32,103 +32,9 @@
 #define IMAGE_INFO_HEADER "The following values have been extracted from " \
                           "the mounted image file:\n\n"
 
-//! Virtual image types
-typedef enum e_VirtImageType {
-  //! Virtual image is a DD file
-  VirtImageType_DD,
-  //! Virtual image is a DMG file
-  VirtImageType_DMG,
-  //! Virtual image is a VDI file
-  VirtImageType_VDI,
-  //! Virtual image is a VMDK file (IDE bus)
-  VirtImageType_VMDK,
-  //! Virtual image is a VMDK file (SCSI bus)
-  VirtImageType_VMDKS,
-  //! Virtual image is a VHD file
-  VirtImageType_VHD
-} te_VirtImageType;
-
-//! Infos about input libs
-typedef struct s_InputLib {
-  //! Filename of lib (without path)
-  char *p_name;
-  //! Handle to the loaded lib
-  void *p_lib;
-  //! Array of supported input types
-  char *p_supported_input_types;
-  //! Struct containing lib functions
-  ts_LibXmountInputFunctions lib_functions;
-} ts_InputLib, *pts_InputLib;
-
-//! Input image array element
-typedef struct s_InputImage {
-  //! Image type
-  char *p_type;
-  //! Image source file count
-  uint64_t files_count;
-  //! Image source files
-  char **pp_files;
-  //! Input lib functions for this image
-  pts_LibXmountInputFunctions p_functions;
-  //! Image handle
-  void *p_handle;
-  //! Image size
-  uint64_t size;
-} ts_InputImage, *pts_InputImage;
-
-//! Infos about morphing libs
-typedef struct s_MorphingLib {
-  //! Filename of lib (without path)
-  char *p_name;
-  //! Handle to the loaded lib
-  void *p_lib;
-  //! Array of supported morphing types
-  char *p_supported_morphing_types;
-  //! Struct containing lib functions
-  ts_LibXmountMorphingFunctions lib_functions;
-} ts_MorphingLib, *pts_MorphingLib;
-
-//! Xmount global runtime data
-typedef struct s_XmountData {
-  //! Input image count
-  uint64_t input_images_count;
-  //! Input images
-  pts_InputImage *pp_input_images;
-  //! Virtual image type
-  te_VirtImageType VirtImageType;
-  //! Enable debug output
-  uint8_t debug;
-  //! Path of virtual image file
-  char *p_virtual_image_path;
-  //! Path of virtual VMDK file
-  char *p_virtual_vmdk_path;
-  //! Path of virtual image info file
-  char *p_virtual_info_path;
-  //! Enable virtual write support
-  uint8_t writable;
-  //! Overwrite existing cache
-  uint8_t overwrite_cache;
-  //! Cache file to save changes to
-  char *p_cache_file;
-  //! Size of input image (after morph)
-  uint64_t orig_image_size;
-  //! Size of virtual image
-  uint64_t virt_image_size;
-  //! MD5 hash of partial input image (lower 64 bit) (after morph)
-  uint64_t input_hash_lo;
-  //! MD5 hash of partial input image (higher 64 bit) (after morph)
-  uint64_t input_hash_hi;
-  //! Input image offset
-  uint64_t orig_img_offset;
-  //! Input lib params
-  char *p_lib_params;
-  //! Set if we are allowed to set fuse's allow_other option
-  uint8_t may_set_fuse_allow_other;
-  //! Specified morph type
-  char *p_morph_type;
-  //! Morph lib params
-  char **pp_morph_params;
-} ts_XmountData;
+/*******************************************************************************
+ * Structures of output images
+ ******************************************************************************/
 
 #define VDI_FILE_COMMENT "<<< This is a virtual VDI image >>>"
 #define VDI_HEADER_COMMENT "This VDI was emulated using xmount v" XMOUNT_VERSION
@@ -266,6 +172,10 @@ typedef struct s_VhdFileHeader {
   char reserved[427];
 } __attribute__ ((packed)) ts_VhdFileHeader, *pts_VhdFileHeader;
 
+/*******************************************************************************
+ * Xmount specific structures
+ ******************************************************************************/
+
 #ifdef __LP64__
   #define CACHE_BLOCK_FREE 0xFFFFFFFFFFFFFFFF
 #else
@@ -335,6 +245,163 @@ typedef struct s_CacheFileHeader_v1 {
   uint64_t pVdiFileHeader;
   //! Set to 1 if VMDK file is cached
 } ts_CacheFileHeader_v1, *pts_CacheFileHeader_v1;
+
+//! Virtual image types
+typedef enum e_VirtImageType {
+  //! Virtual image is a DD file
+  VirtImageType_DD,
+  //! Virtual image is a DMG file
+  VirtImageType_DMG,
+  //! Virtual image is a VDI file
+  VirtImageType_VDI,
+  //! Virtual image is a VMDK file (IDE bus)
+  VirtImageType_VMDK,
+  //! Virtual image is a VMDK file (SCSI bus)
+  VirtImageType_VMDKS,
+  //! Virtual image is a VHD file
+  VirtImageType_VHD
+} te_VirtImageType;
+
+//! Structure containing infos about input libs
+typedef struct s_InputLib {
+  //! Filename of lib (without path)
+  char *p_name;
+  //! Handle to the loaded lib
+  void *p_lib;
+  //! Array of supported input types
+  char *p_supported_input_types;
+  //! Struct containing lib functions
+  ts_LibXmountInputFunctions lib_functions;
+} ts_InputLib, *pts_InputLib;
+
+//! Structure containing infos about input images
+typedef struct s_InputImage {
+  //! Image type
+  char *p_type;
+  //! Image source file count
+  uint64_t files_count;
+  //! Image source files
+  char **pp_files;
+  //! Input lib functions for this image
+  pts_LibXmountInputFunctions p_functions;
+  //! Image handle
+  void *p_handle;
+  //! Image size
+  uint64_t size;
+} ts_InputImage, *pts_InputImage;
+
+typedef struct s_InputData {
+  //! Loaded input lib count
+  uint32_t libs_count;
+  //! Array containing infos about loaded input libs
+  pts_InputLib *pp_libs;
+  //! Input lib params (--inopts)
+  char *p_lib_params;
+  //! Input image count
+  uint64_t images_count;
+  //! Input images
+  pts_InputImage *pp_images;
+  //! Input image offset (--offset)
+  uint64_t image_offset;
+  //! MD5 hash of partial input image (lower 64 bit) (after morph)
+  uint64_t image_hash_lo;
+  //! MD5 hash of partial input image (higher 64 bit) (after morph)
+  uint64_t image_hash_hi;
+} ts_InputData;
+
+//! Structure containing infos about morphing libs
+typedef struct s_MorphingLib {
+  //! Filename of lib (without path)
+  char *p_name;
+  //! Handle to the loaded lib
+  void *p_lib;
+  //! Array of supported morphing types
+  char *p_supported_morphing_types;
+  //! Struct containing lib functions
+  ts_LibXmountMorphingFunctions lib_functions;
+} ts_MorphingLib, *pts_MorphingLib;
+
+//! Structures and vars needed for morph support
+typedef struct s_MorphingData {
+  //! Loaded morphing lib count
+  uint32_t libs_count;
+  //! Array containing infos about loaded morphing libs
+  pts_MorphingLib *pp_libs;
+  //! Specified morphing type (--morph)
+  char *p_morph_type;
+  //! Specified morphing lib params (--morphopts)
+  char **pp_lib_params;
+  //! Handle to initialized morphing lib
+  void *p_handle;
+  //! Morphing functions of initialized lib
+  pts_LibXmountMorphingFunctions p_functions;
+  //! Input image functions passed to morphing lib
+  ts_LibXmountMorphingInputFunctions input_image_functions;
+} ts_MorphingData;
+
+//! Structures and vars needed for VDI support
+typedef struct s_OutputImageVdiData {
+  uint32_t vdi_header_size;
+  pts_VdiFileHeader p_vdi_header;
+  uint32_t vdi_block_map_size;
+  char *p_vdi_block_map;
+} ts_OutputImageVdiData;
+
+//! Structures and vars needed for VHD support
+typedef struct s_OutputImageVhdData {
+  ts_VhdFileHeader *p_vhd_header;
+} ts_OutputImageVhdData;
+
+//! Structures and vars needed for VMDK support
+typedef struct s_OutputImageVmdkData {
+  //! Path of virtual VMDK file
+  char *p_virtual_vmdk_path;
+  char *p_vmdk_file;
+  int vmdk_file_size;
+  char *p_vmdk_lockdir1;
+  char *p_vmdk_lockdir2;
+  char *p_vmdk_lockfile_data;
+  int vmdk_lockfile_size;
+  char *p_vmdk_lockfile_name;
+} ts_OutputImageVmdkData;
+
+//! Structure containing infos about output image
+typedef struct s_OutputData {
+  //! Virtual image type
+  te_VirtImageType VirtImageType;
+  //! Size
+  uint64_t image_size;
+  //! Writable? (Set to 1 if --cache was specified)
+  uint8_t writable;
+  //! Path of virtual image file
+  char *p_virtual_image_path;
+  //! VDI related data
+  ts_OutputImageVdiData vdi;
+  //! VHD related data
+  ts_OutputImageVhdData vhd;
+  //! VMDK related data
+  ts_OutputImageVmdkData vmdk;
+} ts_OutputData;
+
+//! Structure containing global xmount runtime infos
+typedef struct s_XmountData {
+  //! Input image related data
+  ts_InputData input;
+  //! Morphing related data
+  ts_MorphingData morphing;
+  //! Output image related data
+  ts_OutputData output;
+  //! Path of virtual image info file
+  char *p_virtual_info_path;
+  //! Enable debug output
+  uint8_t debug;
+  //! Overwrite existing cache
+  uint8_t overwrite_cache;
+  //! Cache file to save changes to
+  char *p_cache_file;
+  //! Set if we are allowed to set fuse's allow_other option
+  uint8_t may_set_fuse_allow_other;
+} ts_XmountData;
 
 /*
   ----- Change log -----

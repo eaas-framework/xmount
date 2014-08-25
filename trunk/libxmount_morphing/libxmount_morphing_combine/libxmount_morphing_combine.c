@@ -64,20 +64,26 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
 /*
  * CombineCreateHandle
  */
-static int CombineCreateHandle(void **pp_handle, char *p_format) {
-  pts_CombineHandle p_handle;
+static int CombineCreateHandle(void **pp_handle,
+                               char *p_format,
+                               uint8_t debug)
+{
+  pts_CombineHandle p_combine_handle;
+
+  LOG_DEBUG("Creating new LibXmount_Morphing_Combine handle\n");
 
   // Alloc new handle
-  p_handle=malloc(sizeof(ts_CombineHandle));
-  if(p_handle==NULL) return COMBINE_MEMALLOC_FAILED;
+  p_combine_handle=malloc(sizeof(ts_CombineHandle));
+  if(p_combine_handle==NULL) return COMBINE_MEMALLOC_FAILED;
 
   // Init handle values
-  p_handle->input_images_count=0;
-  p_handle->pp_input_images=NULL;
-  p_handle->morphed_image_size=0;
+  p_combine_handle->debug=debug;
+  p_combine_handle->input_images_count=0;
+  p_combine_handle->p_input_functions=NULL;
+  p_combine_handle->morphed_image_size=0;
 
   // Return new handle
-  *pp_handle=p_handle;
+  *pp_handle=p_combine_handle;
   return COMBINE_OK;
 }
 
@@ -85,10 +91,12 @@ static int CombineCreateHandle(void **pp_handle, char *p_format) {
  * CombineDestroyHandle
  */
 static int CombineDestroyHandle(void **pp_handle) {
-  pts_CombineHandle p_handle=(pts_CombineHandle)*pp_handle;
+  pts_CombineHandle p_combine_handle=(pts_CombineHandle)*pp_handle;
+
+  LOG_DEBUG("Freeing LibXmount_Morphing_Combine handle\n");
 
   // Free handle
-  free(p_handle);
+  free(p_combine_handle);
 
   *pp_handle=NULL;
   return COMBINE_OK;
@@ -98,29 +106,39 @@ static int CombineDestroyHandle(void **pp_handle) {
  * CombineMorph
  */
 static int CombineMorph(void *p_handle,
-                        uint64_t input_images,
-                        const pts_LibXmountMorphingInputImage *pp_input_images)
+                        pts_LibXmountMorphingInputFunctions p_input_functions)
 {
   pts_CombineHandle p_combine_handle=(pts_CombineHandle)p_handle;
+  int ret;
+  uint64_t input_image_size;
 
-  // Add given values to our handle
-  p_combine_handle->input_images_count=input_images;
-  p_combine_handle->pp_input_images=pp_input_images;
+  LOG_DEBUG("Initializing LibXmount_Morphing_Combine\n");
 
-  // Calculate morphed image size
-  for(uint64_t i=0;i<input_images;i++) {
-#ifdef DEBUG
-    printf("Adding %" PRIu64 " bytes from image %" PRIu64 " to morphed size.\n",
-           pp_input_images[i]->size,
-           i);
-#endif
-    p_combine_handle->morphed_image_size+=pp_input_images[i]->size;
+  // Set input functions and get image count
+  p_combine_handle->p_input_functions=p_input_functions;
+  if(p_combine_handle->
+       p_input_functions->
+         ImageCount(&p_combine_handle->input_images_count)!=0)
+  {
+    return COMBINE_CANNOT_GET_IMAGECOUNT;
   }
 
-#ifdef DEBUG
-  printf("Total morphed image size is %" PRIu64 " bytes.\n",
-         p_combine_handle->morphed_image_size);
-#endif
+  // Calculate morphed image size
+  for(uint64_t i=0;i<p_combine_handle->input_images_count;i++) {
+    ret=p_combine_handle->
+          p_input_functions->
+            Size(i,&input_image_size);
+    if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
+
+    LOG_DEBUG("Adding %" PRIu64 " bytes from image %" PRIu64 "\n",
+              input_image_size,
+              i);
+
+    p_combine_handle->morphed_image_size+=input_image_size;
+  }
+
+  LOG_DEBUG("Total morphed image size is %" PRIu64 " bytes\n",
+            p_combine_handle->morphed_image_size);
 
   return COMBINE_OK;
 }
@@ -144,10 +162,15 @@ static int CombineRead(void *p_handle,
 {
   pts_CombineHandle p_combine_handle=(pts_CombineHandle)p_handle;
   uint64_t cur_input_image=0;
+  uint64_t cur_input_image_size=0;
   off_t cur_offset=offset;
   int ret;
   size_t cur_count;
   size_t read;
+
+  LOG_DEBUG("Reading %zu bytes at offset %zu from morphed image\n",
+            count,
+            offset);
 
   // Make sure read parameters are within morphed image bounds
   if(offset>=p_combine_handle->morphed_image_size ||
@@ -157,27 +180,38 @@ static int CombineRead(void *p_handle,
   }
 
   // Search starting image to read from
-  while(cur_offset>=p_combine_handle->pp_input_images[cur_input_image]->size) {
-    cur_offset-=p_combine_handle->pp_input_images[cur_input_image]->size;
+  ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                &cur_input_image_size);
+  while(ret==0 && cur_offset>=cur_input_image_size) {
+    cur_offset-=cur_input_image_size;
     cur_input_image++;
+    ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                  &cur_input_image_size);
   }
+  if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
 
   // Read data
-  while(count!=0) {
+  while(cur_input_image<p_combine_handle->input_images_count && count!=0) {
+    // Get current input image size
+    ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                  &cur_input_image_size);
+    if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
+
     // Calculate how many bytes to read from current input image
-    if(cur_offset+count>
-         p_combine_handle->pp_input_images[cur_input_image]->size)
-    {
-      cur_count=
-        p_combine_handle->pp_input_images[cur_input_image]->size-cur_offset;
+    if(cur_offset+count>cur_input_image_size) {
+      cur_count=cur_input_image_size-cur_offset;
     } else {
       cur_count=count;
     }
 
+    LOG_DEBUG("Reading %zu bytes at offset %zu from input image %" PRIu64 "\n",
+              cur_count,
+              cur_offset,
+              cur_input_image);
+
     // Read bytes
-    ret=p_combine_handle->pp_input_images[cur_input_image]->
-          Read(p_combine_handle->pp_input_images[cur_input_image]->
-                 p_image_handle,
+    ret=p_combine_handle->p_input_functions->
+          Read(cur_input_image,
                p_buf,
                cur_offset,
                cur_count,
@@ -189,6 +223,7 @@ static int CombineRead(void *p_handle,
     count-=cur_count;
     cur_input_image++;
   }
+  if(count!=0) return COMBINE_CANNOT_READ_DATA;
 
   *p_read=count;
   return COMBINE_OK;
@@ -227,6 +262,12 @@ static const char* CombineGetErrorMessage(int err_num) {
   switch(err_num) {
     case COMBINE_MEMALLOC_FAILED:
       return "Unable to allocate memory";
+      break;
+    case COMBINE_CANNOT_GET_IMAGECOUNT:
+      return "Unable to get input image count";
+      break;
+    case COMBINE_CANNOT_GET_IMAGESIZE:
+      return "Unable to get input image size";
       break;
     case COMBINE_READ_BEYOND_END_OF_IMAGE:
       return "Unable to read data: Attempt to read past EOF";

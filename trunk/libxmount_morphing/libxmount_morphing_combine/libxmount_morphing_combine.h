@@ -18,19 +18,42 @@
 #ifndef LIBXMOUNT_MORPHING_COMBINE_H
 #define LIBXMOUNT_MORPHING_COMBINE_H
 
+#define LOG_ERROR(...) {                             \
+  LibXmount_Morphing_LogMessage("ERROR",             \
+                                (char*)__FUNCTION__, \
+                                __LINE__,            \
+                                __VA_ARGS__);        \
+}
+#define LOG_WARNING(...) {                           \
+  LibXmount_Morphing_LogMessage("WARNING",           \
+                                (char*)__FUNCTION__, \
+                                __LINE__,            \
+                                __VA_ARGS__);        \
+}
+#define LOG_DEBUG(...) {                               \
+  if(p_combine_handle->debug==1)                       \
+    LibXmount_Morphing_LogMessage("DEBUG",             \
+                                  (char*)__FUNCTION__, \
+                                  __LINE__,            \
+                                  __VA_ARGS__);        \
+}
+
 /*******************************************************************************
- * Error codes etc...
+ * Enums, type defs, etc...
  ******************************************************************************/
 enum {
   COMBINE_OK=0,
   COMBINE_MEMALLOC_FAILED,
+  COMBINE_CANNOT_GET_IMAGECOUNT,
+  COMBINE_CANNOT_GET_IMAGESIZE,
   COMBINE_READ_BEYOND_END_OF_IMAGE,
   COMBINE_CANNOT_READ_DATA
 };
 
 typedef struct s_CombineHandle {
+  uint8_t debug;
   uint64_t input_images_count;
-  const pts_LibXmountMorphingInputImage *pp_input_images;
+  pts_LibXmountMorphingInputFunctions p_input_functions;
   uint64_t morphed_image_size;
 } ts_CombineHandle, *pts_CombineHandle;
 
@@ -38,11 +61,11 @@ typedef struct s_CombineHandle {
  * Forward declarations
  ******************************************************************************/
 static int CombineCreateHandle(void **pp_handle,
-                               char *p_format);
+                               char *p_format,
+                               uint8_t debug);
 static int CombineDestroyHandle(void **pp_handle);
 static int CombineMorph(void *p_handle,
-                        uint64_t input_images,
-                        const pts_LibXmountMorphingInputImage *pp_input_images);
+                        pts_LibXmountMorphingInputFunctions p_input_functions);
 static int CombineSize(void *p_handle,
                        uint64_t *p_size);
 static int CombineRead(void *p_handle,

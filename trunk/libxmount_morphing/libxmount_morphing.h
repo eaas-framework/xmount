@@ -22,14 +22,47 @@
 
 #include <config.h>
 
+#include <stdio.h>  // For printf
 #include <stdint.h> // For int*_t and uint*_t
+#include <stdarg.h> // For va_*, vprintf
 #include <inttypes.h> // For PRI*
 
-typedef struct s_LibXmountMorphingInputImage {
-  void *p_image_handle;
-  uint64_t size;
-  int (*Read)(void *p_handle, char *p_buf, off_t offset, size_t count, size_t *p_read);
-} ts_LibXmountMorphingInputImage, *pts_LibXmountMorphingInputImage;
+/*******************************************************************************
+ * Type defs
+ ******************************************************************************/
+//! Struct containing pointers to input image functions
+typedef struct s_LibXmountMorphingInputFunctions {
+  //! Function to get the amount of input images
+  /*!
+   * \param p_count Count of input images
+   * \return 0 on success
+   */
+  int (*ImageCount)(uint64_t *p_count);
+
+  //! Function to get the size of the morphed data
+  /*!
+   * \param image Image number
+   * \param p_size Pointer to store input image's size to
+   * \return 0 on success
+   */
+  int (*Size)(uint64_t image,
+              uint64_t *p_size);
+
+  //! Function to read data from input image
+  /*!
+   * \param image Image number
+   * \param p_buf Buffer to store read data to
+   * \param offset Position at which to start reading
+   * \param count Amount of bytes to read
+   * \param p_read Number of read bytes on success
+   * \return 0 on success or negated error code on error
+   */
+  int (*Read)(uint64_t image,
+              char *p_buf,
+              off_t offset,
+              size_t count,
+              size_t *p_read);
+} ts_LibXmountMorphingInputFunctions, *pts_LibXmountMorphingInputFunctions;
 
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountMorphingFunctions {
@@ -45,9 +78,12 @@ typedef struct s_LibXmountMorphingFunctions {
    *
    * \param pp_handle Pointer to store handle to
    * \param p_type Morph type to use
+   * \param debug If set to 1, print debugging infos to stdout
    * \return 0 on success or error code
    */
-  int (*CreateHandle)(void **pp_handle, char *p_type);
+  int (*CreateHandle)(void **pp_handle,
+                      char *p_type,
+                      uint8_t debug);
 
   //! Function to destroy handle
   /*!
@@ -72,8 +108,7 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*Morph)(void *p_handle,
-               uint64_t input_images,
-               const pts_LibXmountMorphingInputImage *pp_input_images);
+               pts_LibXmountMorphingInputFunctions p_input_functions);
 
   //! Function to get the size of the morphed data
   /*!
@@ -165,6 +200,9 @@ typedef struct s_LibXmountMorphingFunctions {
   void (*FreeBuffer)(void *p_buf);
 } ts_LibXmountMorphingFunctions, *pts_LibXmountMorphingFunctions;
 
+/*******************************************************************************
+ * API functions
+ ******************************************************************************/
 //! Get library API version
 /*!
  * This function should return the value of LIBXMOUNT_MORPHING_API_VERSION
@@ -200,6 +238,32 @@ typedef const char* (*t_LibXmount_Morphing_GetSupportedTypes)();
 void LibXmount_Morphing_GetFunctions(pts_LibXmountMorphingFunctions p_functions);
 typedef void (*t_LibXmount_Morphing_GetFunctions)(pts_LibXmountMorphingFunctions);
 
+/*******************************************************************************
+ * Helper functions
+ ******************************************************************************/
+//! Print error and debug messages to stdout
+/*!
+ * \param p_msg_type "ERROR" or "DEBUG"
+ * \param p_calling_fun Name of calling function
+ * \param line Line number of call
+ * \param p_msg Message string
+ * \param ... Variable params with values to include in message string
+ */
+static inline void LibXmount_Morphing_LogMessage(char *p_msg_type,
+                                                 char *p_calling_fun,
+                                                 int line,
+                                                 char *p_msg,
+                                                 ...)
+{
+  va_list var_list;
+
+  // Print message "header"
+  printf("%s: %s.%s@%u : ",p_msg_type,p_calling_fun,XMOUNT_VERSION,line);
+  // Print message with variable parameters
+  va_start(var_list,p_msg);
+  vprintf(p_msg,var_list);
+  va_end(var_list);
+}
 
 #endif // LIBXMOUNT_MORPHING_H
 

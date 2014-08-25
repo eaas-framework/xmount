@@ -8,6 +8,8 @@ include(CheckIncludeFiles)
 #set(STATIC_EWF 1)
 #set(STATIC_AFF 1)
 
+add_definitions(-DXMOUNT_VERSION="0.7.0")
+
 if(APPLE)
   # On OSx, do not try to find frameworks but only std headers / libraries
   set(CMAKE_FIND_FRAMEWORK "NEVER")
