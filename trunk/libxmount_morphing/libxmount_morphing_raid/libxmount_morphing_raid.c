@@ -150,7 +150,8 @@ static int RaidMorph(void *p_handle,
 
   // Calculate total raid capacity based on smallest disk
   p_raid_handle->morphed_image_size=
-    p_raid_handle->chunks_per_image*p_raid_handle->chunk_size;
+    p_raid_handle->chunks_per_image*
+      p_raid_handle->chunk_size*p_raid_handle->input_images_count;
 
   LOG_DEBUG("Total raid capacity is %" PRIu64 " bytes\n",
             p_raid_handle->morphed_image_size);
