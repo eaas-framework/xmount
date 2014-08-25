@@ -22,8 +22,6 @@
 #include "../libxmount_morphing.h"
 #include "libxmount_morphing_combine.h"
 
-#define DEBUG
-
 /*******************************************************************************
  * LibXmount_Morphing API implementation
  ******************************************************************************/
@@ -70,8 +68,6 @@ static int CombineCreateHandle(void **pp_handle,
 {
   pts_CombineHandle p_combine_handle;
 
-  LOG_DEBUG("Creating new LibXmount_Morphing_Combine handle\n");
-
   // Alloc new handle
   p_combine_handle=malloc(sizeof(ts_CombineHandle));
   if(p_combine_handle==NULL) return COMBINE_MEMALLOC_FAILED;
@@ -81,6 +77,8 @@ static int CombineCreateHandle(void **pp_handle,
   p_combine_handle->input_images_count=0;
   p_combine_handle->p_input_functions=NULL;
   p_combine_handle->morphed_image_size=0;
+
+  LOG_DEBUG("Created new LibXmount_Morphing_Combine handle\n");
 
   // Return new handle
   *pp_handle=p_combine_handle;
@@ -93,7 +91,7 @@ static int CombineCreateHandle(void **pp_handle,
 static int CombineDestroyHandle(void **pp_handle) {
   pts_CombineHandle p_combine_handle=(pts_CombineHandle)*pp_handle;
 
-  LOG_DEBUG("Freeing LibXmount_Morphing_Combine handle\n");
+  LOG_DEBUG("Destroying LibXmount_Morphing_Combine handle\n");
 
   // Free handle
   free(p_combine_handle);
@@ -190,6 +188,9 @@ static int CombineRead(void *p_handle,
   }
   if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
 
+  // Init p_read
+  *p_read=0;
+
   // Read data
   while(cur_input_image<p_combine_handle->input_images_count && count!=0) {
     // Get current input image size
@@ -222,10 +223,10 @@ static int CombineRead(void *p_handle,
     cur_offset=0;
     count-=cur_count;
     cur_input_image++;
+    (*p_read)+=cur_count;
   }
   if(count!=0) return COMBINE_CANNOT_READ_DATA;
 
-  *p_read=count;
   return COMBINE_OK;
 }
 

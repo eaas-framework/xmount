@@ -60,18 +60,6 @@
 //! Struct that contains various runtime configuration options
 static ts_XmountData glob_xmount;
 
-//! Pointer to virtual info file
-static char *glob_p_info_file=NULL;
-
-//! Vars needed for virtual write access
-static FILE *glob_p_cache_file=NULL;
-static pts_CacheFileHeader glob_p_cache_header=NULL;
-static pts_CacheFileBlockIndex glob_p_cache_blkidx=NULL;
-
-//! Mutexes to control concurrent read & write access
-static pthread_mutex_t glob_mutex_image_rw;
-static pthread_mutex_t glob_mutex_info_read;
-
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
@@ -79,7 +67,7 @@ static pthread_mutex_t glob_mutex_info_read;
 static void LogMessage(char*, char*, int, char*, ...);
 static void PrintUsage(char*);
 static void CheckFuseSettings();
-static int ParseCmdLine(const int, char**, int*, char***, char**);
+static int ParseCmdLine(const int, char**);
 static int ExtractVirtFileNames(char*);
 static int GetMorphedImageSize(uint64_t*);
 static int GetVirtImageSize(uint64_t*);
@@ -348,25 +336,20 @@ static void CheckFuseSettings() {
 /*!
  * \param argc Number of cmdline params
  * \param pp_argv Array containing cmdline params
- * \param p_nargv Number of FUSE options is written to this var
- * \param ppp_nargv FUSE options are written to this array
- * \param pp_mountpoint Mountpoint is written to this var
  * \return TRUE on success, FALSE on error
  */
-static int ParseCmdLine(const int argc,
-                        char **pp_argv,
-                        int *p_nargv,
-                        char ***ppp_nargv,
-                        char **pp_mountpoint)
-{
-  int i=1,opts=0,FuseMinusOControl=TRUE,FuseAllowOther=TRUE,first;
+static int ParseCmdLine(const int argc, char **pp_argv) {
+  int i=1;
+  int FuseMinusOControl=TRUE;
+  int FuseAllowOther=TRUE;
+  int first;
   char *p_buf;
   pts_InputImage p_input_image;
 
-  // add pp_argv[0] to ppp_nargv
-  opts++;
-  XMOUNT_MALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-  XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[0])
+  // add pp_argv[0] to FUSE's argv
+  XMOUNT_MALLOC(glob_xmount.pp_fuse_argv,char**,sizeof(char*));
+  XMOUNT_STRSET(glob_xmount.pp_fuse_argv[0],pp_argv[0]);
+  glob_xmount.fuse_argc=1;
 
   // Parse options
   while(i<argc && *pp_argv[i]=='-') {
@@ -374,9 +357,12 @@ static int ParseCmdLine(const int argc,
       // Options beginning with one - are mostly FUSE specific
       if(strcmp(pp_argv[i],"-d")==0) {
         // Enable FUSE's and xmount's debug mode
-        opts++;
-        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
+        XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                       char**,
+                       (glob_xmount.fuse_argc+1)*sizeof(char*));
+        XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc],
+                      pp_argv[i])
+        glob_xmount.fuse_argc++;
         glob_xmount.debug=TRUE;
       } else if(strcmp(pp_argv[i],"-h")==0) {
         // Print help message
@@ -391,10 +377,14 @@ static int ParseCmdLine(const int argc,
           // to disable allow_other by passing a single "-o no_allow_other"
           // which won't be passed to FUSE as it is xmount specific.
           if(strcmp(pp_argv[i],"no_allow_other")!=0) {
-            opts+=2;
-            XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-            XMOUNT_STRSET((*ppp_nargv)[opts-2],pp_argv[i-1])
-            XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
+            glob_xmount.fuse_argc+=2;
+            XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                           char**,
+                           glob_xmount.fuse_argc*sizeof(char*));
+            XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-2],
+                          pp_argv[i-1]);
+            XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
+                          pp_argv[i]);
             FuseMinusOControl=FALSE;
           } else FuseAllowOther=FALSE;
         } else {
@@ -403,14 +393,20 @@ static int ParseCmdLine(const int argc,
         }
       } else if(strcmp(pp_argv[i],"-s")==0) {
         // Enable FUSE's single threaded mode
-        opts++;
-        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
+        XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                       char**,
+                       (glob_xmount.fuse_argc+1)*sizeof(char*));
+        XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc],
+                      pp_argv[i]);
+        glob_xmount.fuse_argc++;
       } else if(strcmp(pp_argv[i],"-V")==0) {
         // Display FUSE version info
-        opts++;
-        XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-        XMOUNT_STRSET((*ppp_nargv)[opts-1],pp_argv[i])
+        XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                       char**,
+                       (glob_xmount.fuse_argc+1)*sizeof(char*));
+        XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc],
+                      pp_argv[i]);
+        glob_xmount.fuse_argc++;
       } else {
         LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
         return FALSE;
@@ -422,14 +418,14 @@ static int ParseCmdLine(const int argc,
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount.p_cache_file,pp_argv[i])
+          XMOUNT_STRSET(glob_xmount.cache.p_cache_file,pp_argv[i])
           glob_xmount.output.writable=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file!\n")
           return FALSE;
         }
         LOG_DEBUG("Enabling virtual write support using cache file \"%s\"\n",
-                  glob_xmount.p_cache_file)
+                  glob_xmount.cache.p_cache_file)
       } else if(strcmp(pp_argv[i],"--in")==0) {
         // Specify input image type and source files
         if((argc+2)>i) {
@@ -485,6 +481,32 @@ static int ParseCmdLine(const int argc,
           LOG_ERROR("You must specify special options!\n");
           return FALSE;
         }
+      } else if(strcmp(pp_argv[i],"--morph")==0) {
+        if((argc+1)>i) {
+          i++;
+          if(glob_xmount.morphing.p_morph_type==NULL) {
+            XMOUNT_STRSET(glob_xmount.morphing.p_morph_type,pp_argv[i]);
+          } else {
+            LOG_ERROR("You can only specify --morph once!")
+            return FALSE;
+          }
+        } else {
+          LOG_ERROR("You must specify morphing type!\n");
+          return FALSE;
+        }
+      } else if(strcmp(pp_argv[i],"--morphopts")==0) {
+        if((argc+1)>i) {
+          i++;
+          if(glob_xmount.morphing.p_lib_params==NULL) {
+            XMOUNT_STRSET(glob_xmount.morphing.p_lib_params,pp_argv[i]);
+          } else {
+            LOG_ERROR("You can only specify --morphopts once!")
+            return FALSE;
+          }
+        } else {
+          LOG_ERROR("You must specify special morphing lib params!\n");
+          return FALSE;
+        }
       } else if(strcmp(pp_argv[i],"--out")==0) {
         // Specify output image type
         // Next parameter must be image type
@@ -521,15 +543,15 @@ static int ParseCmdLine(const int argc,
         // Next parameter must be cache file to read/write changes from/to
         if((argc+1)>i) {
           i++;
-          XMOUNT_STRSET(glob_xmount.p_cache_file,pp_argv[i])
+          XMOUNT_STRSET(glob_xmount.cache.p_cache_file,pp_argv[i])
           glob_xmount.output.writable=TRUE;
-          glob_xmount.overwrite_cache=TRUE;
+          glob_xmount.cache.overwrite_cache=TRUE;
         } else {
           LOG_ERROR("You must specify a cache file!\n")
           return FALSE;
         }
         LOG_DEBUG("Enabling virtual write support overwriting cache file %s\n",
-                  glob_xmount.p_cache_file)
+                  glob_xmount.cache.p_cache_file)
       } else if(strcmp(pp_argv[i],"--version")==0 ||
                 strcmp(pp_argv[i],"--info")==0)
       {
@@ -589,10 +611,13 @@ static int ParseCmdLine(const int argc,
 
   // Extract mountpoint
   if(i==(argc-1)) {
-    XMOUNT_STRSET(*pp_mountpoint,pp_argv[argc-1])
-    opts++;
-    XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*))
-    XMOUNT_STRSET((*ppp_nargv)[opts-1],*pp_mountpoint)
+    XMOUNT_STRSET(glob_xmount.p_mountpoint,pp_argv[argc-1])
+    XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                   char**,
+                   (glob_xmount.fuse_argc+1)*sizeof(char*));
+    XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc],
+                  glob_xmount.p_mountpoint);
+    glob_xmount.fuse_argc++;
   } else {
     LOG_ERROR("No mountpoint specified!\n")
     return FALSE;
@@ -600,25 +625,28 @@ static int ParseCmdLine(const int argc,
 
   if(FuseMinusOControl==TRUE) {
     // We control the -o flag, set subtype, fsname and allow_other options
-    opts+=2;
-    XMOUNT_REALLOC(*ppp_nargv,char**,opts*sizeof(char*));
-    XMOUNT_STRSET((*ppp_nargv)[opts-2],"-o");
-    XMOUNT_STRSET((*ppp_nargv)[opts-1],"subtype=xmount");
+    glob_xmount.fuse_argc+=2;
+    XMOUNT_REALLOC(glob_xmount.pp_fuse_argv,
+                   char**,
+                   glob_xmount.fuse_argc*sizeof(char*));
+    XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-2],"-o");
+    XMOUNT_STRSET(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
+                  "subtype=xmount");
     if(glob_xmount.input.images_count!=0) {
       // Set name of first source file as fsname
-      XMOUNT_STRAPP((*ppp_nargv)[opts-1],",fsname=");
-      XMOUNT_STRAPP((*ppp_nargv)[opts-1],
+      XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
+                    ",fsname=");
+      XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
                     glob_xmount.input.pp_images[0]->pp_files[0]);
     }
     if(FuseAllowOther==TRUE) {
       // Add "allow_other" option if allowed
       if(glob_xmount.may_set_fuse_allow_other) {
-        XMOUNT_STRAPP((*ppp_nargv)[opts-1],",allow_other")
+        XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
+                      ",allow_other");
       }
     }
   }
-
-  *p_nargv=opts;
 
   return TRUE;
 }
@@ -639,57 +667,57 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   tmp=strrchr(p_orig_name,'.');
 
   // Set leading '/'
-  XMOUNT_STRSET(glob_xmount.output.p_virtual_image_path,"/")
-  XMOUNT_STRSET(glob_xmount.p_virtual_info_path,"/")
+  XMOUNT_STRSET(glob_xmount.output.p_virtual_image_path,"/");
+  XMOUNT_STRSET(glob_xmount.output.p_info_path,"/");
   if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
      glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
   {
-    XMOUNT_STRSET(glob_xmount.output.vmdk.p_virtual_vmdk_path,"/")
+    XMOUNT_STRSET(glob_xmount.output.vmdk.p_virtual_vmdk_path,"/");
   }
 
   // Copy filename
   if(tmp==NULL) {
     // Input image filename has no extension
-    XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,p_orig_name)
-    XMOUNT_STRAPP(glob_xmount.p_virtual_info_path,p_orig_name)
+    XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,p_orig_name);
+    XMOUNT_STRAPP(glob_xmount.output.p_info_path,p_orig_name);
     if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
        glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
     {
-      XMOUNT_STRAPP(glob_xmount.output.vmdk.p_virtual_vmdk_path,p_orig_name)
+      XMOUNT_STRAPP(glob_xmount.output.vmdk.p_virtual_vmdk_path,p_orig_name);
     }
-    XMOUNT_STRAPP(glob_xmount.p_virtual_info_path,".info")
+    XMOUNT_STRAPP(glob_xmount.output.p_info_path,".info");
   } else {
     XMOUNT_STRNAPP(glob_xmount.output.p_virtual_image_path,p_orig_name,
-                   strlen(p_orig_name)-strlen(tmp))
-    XMOUNT_STRNAPP(glob_xmount.p_virtual_info_path,p_orig_name,
-                   strlen(p_orig_name)-strlen(tmp))
+                   strlen(p_orig_name)-strlen(tmp));
+    XMOUNT_STRNAPP(glob_xmount.output.p_info_path,p_orig_name,
+                   strlen(p_orig_name)-strlen(tmp));
     if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
        glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
     {
       XMOUNT_STRNAPP(glob_xmount.output.vmdk.p_virtual_vmdk_path,p_orig_name,
-                     strlen(p_orig_name)-strlen(tmp))
+                     strlen(p_orig_name)-strlen(tmp));
     }
-    XMOUNT_STRAPP(glob_xmount.p_virtual_info_path,".info")
+    XMOUNT_STRAPP(glob_xmount.output.p_info_path,".info");
   }
 
   // Add virtual file extensions
   switch(glob_xmount.output.VirtImageType) {
     case VirtImageType_DD:
-      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dd")
+      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dd");
       break;
     case VirtImageType_DMG:
-      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dmg")
+      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dmg");
       break;
     case VirtImageType_VDI:
-      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".vdi")
+      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".vdi");
       break;
     case VirtImageType_VHD:
-      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".vhd")
+      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".vhd");
       break;
     case VirtImageType_VMDK:
     case VirtImageType_VMDKS:
-      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dd")
-      XMOUNT_STRAPP(glob_xmount.output.vmdk.p_virtual_vmdk_path,".vmdk")
+      XMOUNT_STRAPP(glob_xmount.output.p_virtual_image_path,".dd");
+      XMOUNT_STRAPP(glob_xmount.output.vmdk.p_virtual_vmdk_path,".vmdk");
       break;
     default:
       LOG_ERROR("Unknown virtual image type!\n")
@@ -697,14 +725,14 @@ static int ExtractVirtFileNames(char *p_orig_name) {
   }
 
   LOG_DEBUG("Set virtual image name to \"%s\"\n",
-            glob_xmount.output.p_virtual_image_path)
+            glob_xmount.output.p_virtual_image_path);
   LOG_DEBUG("Set virtual image info name to \"%s\"\n",
-            glob_xmount.p_virtual_info_path)
+            glob_xmount.output.p_info_path);
   if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
      glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
   {
     LOG_DEBUG("Set virtual vmdk name to \"%s\"\n",
-              glob_xmount.output.vmdk.p_virtual_vmdk_path)
+              glob_xmount.output.vmdk.p_virtual_vmdk_path);
   }
   return TRUE;
 }
@@ -797,7 +825,7 @@ static int GetInputImageData(pts_InputImage p_image,
   int ret;
   size_t to_read=0;
 
-  LOG_DEBUG("Trying to read %zu bytes at offset %zu from input image '%s'\n",
+  LOG_DEBUG("Reading %zu bytes at offset %zu from input image '%s'\n",
             size,
             offset,
             p_image->pp_files[0]);
@@ -805,7 +833,7 @@ static int GetInputImageData(pts_InputImage p_image,
   // Make sure we aren't reading past EOF of image file
   if(offset>=p_image->size) {
     // Offset is beyond image size
-    LOG_DEBUG("Offset %zu is at / beyond size of input image '%s'.\n",
+    LOG_DEBUG("Offset %zu is at / beyond size of input image '%s'\n",
               offset,
               p_image->pp_files[0]);
     *p_read=0;
@@ -815,7 +843,7 @@ static int GetInputImageData(pts_InputImage p_image,
     // Attempt to read data past EOF of image file
     to_read=p_image->size-offset;
     LOG_DEBUG("Attempt to read data past EOF of input image '%s'. "
-                "Corrected size from %zu to %zu.\n",
+                "Correcting size from %zu to %zu\n",
               p_image->pp_files[0],
               size,
               to_read);
@@ -950,27 +978,30 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
           cur_to_read=to_read;
         }
         if(glob_xmount.output.writable==TRUE &&
-           glob_p_cache_header->VdiFileHeaderCached==TRUE)
+           glob_xmount.cache.p_cache_header->VdiFileHeaderCached==TRUE)
         {
           // VDI header was already cached
-          if(fseeko(glob_p_cache_file,
-                    glob_p_cache_header->pVdiFileHeader+file_off,
+          if(fseeko(glob_xmount.cache.h_cache_file,
+                    glob_xmount.cache.p_cache_header->pVdiFileHeader+file_off,
                     SEEK_SET)!=0)
           {
             LOG_ERROR("Couldn't seek to cached VDI header at offset %"
-                      PRIu64 "\n",glob_p_cache_header->pVdiFileHeader+file_off)
+                        PRIu64 "\n",
+                      glob_xmount.cache.p_cache_header->pVdiFileHeader+file_off)
             return -EIO;
           }
-          if(fread(p_buf,cur_to_read,1,glob_p_cache_file)!=1) {
+          if(fread(p_buf,cur_to_read,1,glob_xmount.cache.h_cache_file)!=1) {
             LOG_ERROR("Couldn't read %zu bytes from cache file at offset %"
-                      PRIu64 "\n",cur_to_read,
-                      glob_p_cache_header->pVdiFileHeader+file_off)
+                        PRIu64 "\n",
+                      cur_to_read,
+                      glob_xmount.cache.p_cache_header->pVdiFileHeader+file_off)
             return -EIO;
           }
           LOG_DEBUG("Read %zd bytes from cached VDI header at offset %"
-                    PRIu64 " at cache file offset %" PRIu64 "\n",
-                    cur_to_read,file_off,
-                    glob_p_cache_header->pVdiFileHeader+file_off)
+                      PRIu64 " at cache file offset %" PRIu64 "\n",
+                    cur_to_read,
+                    file_off,
+                    glob_xmount.cache.p_cache_header->pVdiFileHeader+file_off)
         } else {
           // VDI header isn't cached
           memcpy(p_buf,
@@ -1014,18 +1045,18 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
       cur_to_read=CACHE_BLOCK_SIZE-block_off;
     } else cur_to_read=to_read;
     if(glob_xmount.output.writable==TRUE &&
-       glob_p_cache_blkidx[cur_block].Assigned==TRUE)
+       glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==TRUE)
     {
       // Write support enabled and need to read altered data from cachefile
-      if(fseeko(glob_p_cache_file,
-                glob_p_cache_blkidx[cur_block].off_data+block_off,
+      if(fseeko(glob_xmount.cache.h_cache_file,
+                glob_xmount.cache.p_cache_blkidx[cur_block].off_data+block_off,
                 SEEK_SET)!=0)
       {
         LOG_ERROR("Couldn't seek to offset %" PRIu64
                   " in cache file\n")
         return -EIO;
       }
-      if(fread(p_buf,cur_to_read,1,glob_p_cache_file)!=1) {
+      if(fread(p_buf,cur_to_read,1,glob_xmount.cache.h_cache_file)!=1) {
         LOG_ERROR("Couldn't read data from cache file!\n")
         return -EIO;
       }
@@ -1061,31 +1092,33 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
       case VirtImageType_VHD:
         // Micro$oft has choosen to use a footer rather then a header.
         if(glob_xmount.output.writable==TRUE &&
-           glob_p_cache_header->VhdFileHeaderCached==TRUE)
+           glob_xmount.cache.p_cache_header->VhdFileHeaderCached==TRUE)
         {
           // VHD footer was already cached
-          if(fseeko(glob_p_cache_file,
-                    glob_p_cache_header->pVhdFileHeader+
+          if(fseeko(glob_xmount.cache.h_cache_file,
+                    glob_xmount.cache.p_cache_header->pVhdFileHeader+
                       (file_off-morphed_image_size),
                     SEEK_SET)!=0)
           {
             LOG_ERROR("Couldn't seek to cached VHD footer at offset %"
-                      PRIu64 "\n",
-                      glob_p_cache_header->pVhdFileHeader+
+                        PRIu64 "\n",
+                      glob_xmount.cache.p_cache_header->pVhdFileHeader+
                         (file_off-morphed_image_size))
             return -EIO;
           }
-          if(fread(p_buf,to_read_later,1,glob_p_cache_file)!=1) {
+          if(fread(p_buf,to_read_later,1,glob_xmount.cache.h_cache_file)!=1) {
             LOG_ERROR("Couldn't read %zu bytes from cache file at offset %"
-                      PRIu64 "\n",to_read_later,
-                      glob_p_cache_header->pVhdFileHeader+
+                        PRIu64 "\n",
+                      to_read_later,
+                      glob_xmount.cache.p_cache_header->pVhdFileHeader+
                         (file_off-morphed_image_size))
             return -EIO;
           }
           LOG_DEBUG("Read %zd bytes from cached VHD footer at offset %"
-                    PRIu64 " at cache file offset %" PRIu64 "\n",
-                    to_read_later,(file_off-morphed_image_size),
-                    glob_p_cache_header->pVhdFileHeader+
+                      PRIu64 " at cache file offset %" PRIu64 "\n",
+                    to_read_later,
+                    (file_off-morphed_image_size),
+                    glob_xmount.cache.p_cache_header->pVhdFileHeader+
                       (file_off-morphed_image_size))
         } else {
           // VHD header isn't cached
@@ -1094,7 +1127,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
                    (file_off-morphed_image_size),
                  to_read_later);
           LOG_DEBUG("Read %zd bytes at offset %" PRIu64
-                    " from virtual VHD header\n",
+                      " from virtual VHD header\n",
                     to_read_later,
                     (file_off-morphed_image_size))
         }
@@ -1122,37 +1155,38 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
             size,
             offset);
 
-  if(glob_p_cache_header->VdiFileHeaderCached==1) {
+  if(glob_xmount.cache.p_cache_header->VdiFileHeaderCached==1) {
     // Header was already cached
-    if(fseeko(glob_p_cache_file,
-              glob_p_cache_header->pVdiFileHeader+offset,
+    if(fseeko(glob_xmount.cache.h_cache_file,
+              glob_xmount.cache.p_cache_header->pVdiFileHeader+offset,
               SEEK_SET)!=0)
     {
       LOG_ERROR("Couldn't seek to cached VDI header at address %" PRIu64 "\n",
-                glob_p_cache_header->pVdiFileHeader+offset)
+                glob_xmount.cache.p_cache_header->pVdiFileHeader+offset)
       return -1;
     }
-    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_xmount.cache.h_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                   PRIu64 "\n",
                 size,
-                glob_p_cache_header->pVdiFileHeader+offset)
+                glob_xmount.cache.p_cache_header->pVdiFileHeader+offset)
       return -1;
     }
 
     LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64 " to cache file\n",
               size,
-              glob_p_cache_header->pVdiFileHeader+offset)
+              glob_xmount.cache.p_cache_header->pVdiFileHeader+offset)
   } else {
     // Header wasn't already cached.
-    if(fseeko(glob_p_cache_file,
+    if(fseeko(glob_xmount.cache.h_cache_file,
               0,
               SEEK_END)!=0)
     {
       LOG_ERROR("Couldn't seek to end of cache file!")
       return -1;
     }
-    glob_p_cache_header->pVdiFileHeader=ftello(glob_p_cache_file);
+    glob_xmount.cache.p_cache_header->pVdiFileHeader=
+      ftello(glob_xmount.cache.h_cache_file);
     LOG_DEBUG("Caching whole VDI header\n")
     if(offset>0) {
       // Changes do not begin at offset 0, need to prepend with data from
@@ -1160,57 +1194,59 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
       if(fwrite((char*)glob_xmount.output.vdi.p_vdi_header,
                 offset,
                 1,
-                glob_p_cache_file)!=1)
+                glob_xmount.cache.h_cache_file)!=1)
       {
         LOG_ERROR("Error while writing %" PRIu64 " bytes "
                     "to cache file at offset %" PRIu64 "!\n",
                   offset,
-                  glob_p_cache_header->pVdiFileHeader);
+                  glob_xmount.cache.p_cache_header->pVdiFileHeader);
         return -1;
       }
       LOG_DEBUG("Prepended changed data with %" PRIu64
                   " bytes at cache file offset %" PRIu64 "\n",
                 offset,
-                glob_p_cache_header->pVdiFileHeader)
+                glob_xmount.cache.p_cache_header->pVdiFileHeader)
     }
     // Cache changed data
-    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_xmount.cache.h_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
                   PRIu64 "\n",size,
-                glob_p_cache_header->pVdiFileHeader+offset)
+                glob_xmount.cache.p_cache_header->pVdiFileHeader+offset)
       return -1;
     }
     LOG_DEBUG("Wrote %zu bytes of changed data to cache file offset %"
                 PRIu64 "\n",
               size,
-              glob_p_cache_header->pVdiFileHeader+offset)
+              glob_xmount.cache.p_cache_header->pVdiFileHeader+offset)
     if(offset+size!=glob_xmount.output.vdi.vdi_header_size) {
       // Need to append data from VDI header to cache whole data struct
       if(fwrite(((char*)glob_xmount.output.vdi.p_vdi_header)+offset+size,
                 glob_xmount.output.vdi.vdi_header_size-(offset+size),
                 1,
-                glob_p_cache_file)!=1)
+                glob_xmount.cache.h_cache_file)!=1)
       {
         LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
-                  PRIu64 "\n",glob_xmount.output.vdi.vdi_header_size-(offset+size),
-                  (uint64_t)(glob_p_cache_header->pVdiFileHeader+offset+size))
+                    PRIu64 "\n",
+                  glob_xmount.output.vdi.vdi_header_size-(offset+size),
+                  (uint64_t)(glob_xmount.cache.p_cache_header->pVdiFileHeader+
+                    offset+size));
         return -1;
       }
       LOG_DEBUG("Appended %" PRIu32
-                " bytes to changed data at cache file offset %"
-                PRIu64 "\n",glob_xmount.output.vdi.vdi_header_size-(offset+size),
-                glob_p_cache_header->pVdiFileHeader+offset+size)
+                  " bytes to changed data at cache file offset %" PRIu64 "\n",
+                glob_xmount.output.vdi.vdi_header_size-(offset+size),
+                glob_xmount.cache.p_cache_header->pVdiFileHeader+offset+size)
     }
     // Mark header as cached and update header in cache file
-    glob_p_cache_header->VdiFileHeaderCached=1;
-    if(fseeko(glob_p_cache_file,0,SEEK_SET)!=0) {
+    glob_xmount.cache.p_cache_header->VdiFileHeaderCached=1;
+    if(fseeko(glob_xmount.cache.h_cache_file,0,SEEK_SET)!=0) {
       LOG_ERROR("Couldn't seek to offset 0 of cache file!\n")
       return -1;
     }
-    if(fwrite((char*)glob_p_cache_header,
+    if(fwrite((char*)glob_xmount.cache.p_cache_header,
               sizeof(ts_CacheFileHeader),
               1,
-              glob_p_cache_file)!=1)
+              glob_xmount.cache.h_cache_file)!=1)
     {
       LOG_ERROR("Couldn't write changed cache file header!\n")
       return -1;
@@ -1218,9 +1254,9 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
   }
   // All important data has been written, now flush all buffers to make
   // sure data is written to cache file
-  fflush(glob_p_cache_file);
+  fflush(glob_xmount.cache.h_cache_file);
 #ifndef __APPLE__
-  ioctl(fileno(glob_p_cache_file),BLKFLSBUF,0);
+  ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
 #endif
   return size;
 }
@@ -1235,34 +1271,37 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
 static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
             " from VHD footer\n",size,offset)
-  if(glob_p_cache_header->VhdFileHeaderCached==1) {
+  if(glob_xmount.cache.p_cache_header->VhdFileHeaderCached==1) {
     // Header has already been cached
-    if(fseeko(glob_p_cache_file,
-              glob_p_cache_header->pVhdFileHeader+offset,
+    if(fseeko(glob_xmount.cache.h_cache_file,
+              glob_xmount.cache.p_cache_header->pVhdFileHeader+offset,
               SEEK_SET)!=0)
     {
-      LOG_ERROR("Couldn't seek to cached VHD header at address %"
-                PRIu64 "\n",glob_p_cache_header->pVhdFileHeader+offset)
+      LOG_ERROR("Couldn't seek to cached VHD header at address %" PRIu64 "\n",
+                glob_xmount.cache.p_cache_header->pVhdFileHeader+offset);
       return -1;
     }
-    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_xmount.cache.h_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
-                PRIu64 "\n",size,
-                glob_p_cache_header->pVhdFileHeader+offset)
+                  PRIu64 "\n",
+                size,
+                glob_xmount.cache.p_cache_header->pVhdFileHeader+offset);
       return -1;
     }
     LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64 " to cache file\n",
-              size,glob_p_cache_header->pVhdFileHeader+offset)
+              size,
+              glob_xmount.cache.p_cache_header->pVhdFileHeader+offset);
   } else {
     // Header hasn't been cached yet.
-    if(fseeko(glob_p_cache_file,
+    if(fseeko(glob_xmount.cache.h_cache_file,
               0,
               SEEK_END)!=0)
     {
       LOG_ERROR("Couldn't seek to end of cache file!")
       return -1;
     }
-    glob_p_cache_header->pVhdFileHeader=ftello(glob_p_cache_file);
+    glob_xmount.cache.p_cache_header->pVhdFileHeader=
+      ftello(glob_xmount.cache.h_cache_file);
     LOG_DEBUG("Caching whole VHD header\n")
     if(offset>0) {
       // Changes do not begin at offset 0, need to prepend with data from
@@ -1270,55 +1309,60 @@ static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
       if(fwrite((char*)glob_xmount.output.vhd.p_vhd_header,
                 offset,
                 1,
-                glob_p_cache_file)!=1)
+                glob_xmount.cache.h_cache_file)!=1)
       {
         LOG_ERROR("Error while writing %" PRIu64 " bytes "
                   "to cache file at offset %" PRIu64 "!\n",
                   offset,
-                  glob_p_cache_header->pVhdFileHeader);
+                  glob_xmount.cache.p_cache_header->pVhdFileHeader);
         return -1;
       }
       LOG_DEBUG("Prepended changed data with %" PRIu64
-                " bytes at cache file offset %" PRIu64 "\n",
-                offset,glob_p_cache_header->pVhdFileHeader)
+                  " bytes at cache file offset %" PRIu64 "\n",
+                offset,
+                glob_xmount.cache.p_cache_header->pVhdFileHeader);
     }
     // Cache changed data
-    if(fwrite(p_buf,size,1,glob_p_cache_file)!=1) {
+    if(fwrite(p_buf,size,1,glob_xmount.cache.h_cache_file)!=1) {
       LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
-                PRIu64 "\n",size,
-                glob_p_cache_header->pVhdFileHeader+offset)
+                  PRIu64 "\n",
+                size,
+                glob_xmount.cache.p_cache_header->pVhdFileHeader+offset);
       return -1;
     }
     LOG_DEBUG("Wrote %zu bytes of changed data to cache file offset %"
-              PRIu64 "\n",size,
-              glob_p_cache_header->pVhdFileHeader+offset)
+                PRIu64 "\n",
+              size,
+              glob_xmount.cache.p_cache_header->pVhdFileHeader+offset);
     if(offset+size!=sizeof(ts_VhdFileHeader)) {
       // Need to append data from VHD header to cache whole data struct
       if(fwrite(((char*)glob_xmount.output.vhd.p_vhd_header)+offset+size,
                 sizeof(ts_VhdFileHeader)-(offset+size),
                 1,
-                glob_p_cache_file)!=1)
+                glob_xmount.cache.h_cache_file)!=1)
       {
         LOG_ERROR("Couldn't write %zu bytes to cache file at offset %"
-                  PRIu64 "\n",sizeof(ts_VhdFileHeader)-(offset+size),
-                  (uint64_t)(glob_p_cache_header->pVhdFileHeader+offset+size))
+                    PRIu64 "\n",
+                  sizeof(ts_VhdFileHeader)-(offset+size),
+                  (uint64_t)(glob_xmount.cache.p_cache_header->pVhdFileHeader+
+                    offset+size))
         return -1;
       }
       LOG_DEBUG("Appended %" PRIu32
-                " bytes to changed data at cache file offset %"
-                PRIu64 "\n",sizeof(ts_VhdFileHeader)-(offset+size),
-                glob_p_cache_header->pVhdFileHeader+offset+size)
+                  " bytes to changed data at cache file offset %" PRIu64 "\n",
+                sizeof(ts_VhdFileHeader)-(offset+size),
+                glob_xmount.cache.p_cache_header->pVhdFileHeader+offset+size);
     }
     // Mark header as cached and update header in cache file
-    glob_p_cache_header->VhdFileHeaderCached=1;
-    if(fseeko(glob_p_cache_file,0,SEEK_SET)!=0) {
+    glob_xmount.cache.p_cache_header->VhdFileHeaderCached=1;
+    if(fseeko(glob_xmount.cache.h_cache_file,0,SEEK_SET)!=0) {
       LOG_ERROR("Couldn't seek to offset 0 of cache file!\n")
       return -1;
     }
-    if(fwrite((char*)glob_p_cache_header,
+    if(fwrite((char*)glob_xmount.cache.p_cache_header,
               sizeof(ts_CacheFileHeader),
               1,
-              glob_p_cache_file)!=1)
+              glob_xmount.cache.h_cache_file)!=1)
     {
       LOG_ERROR("Couldn't write changed cache file header!\n")
       return -1;
@@ -1326,9 +1370,9 @@ static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   }
   // All important data has been written, now flush all buffers to make
   // sure data is written to cache file
-  fflush(glob_p_cache_file);
+  fflush(glob_xmount.cache.h_cache_file);
 #ifndef __APPLE__
-  ioctl(fileno(glob_p_cache_file),BLKFLSBUF,0);
+  ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
 #endif
   return size;
 }
@@ -1423,32 +1467,36 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
     if(block_offset+to_write>CACHE_BLOCK_SIZE) {
       to_write_now=CACHE_BLOCK_SIZE-block_offset;
     } else to_write_now=to_write;
-    if(glob_p_cache_blkidx[cur_block].Assigned==1) {
+    if(glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==1) {
       // Block was already cached
       // Seek to data offset in cache file
-      if(fseeko(glob_p_cache_file,
-             glob_p_cache_blkidx[cur_block].off_data+block_offset,
+      if(fseeko(glob_xmount.cache.h_cache_file,
+             glob_xmount.cache.p_cache_blkidx[cur_block].off_data+block_offset,
              SEEK_SET)!=0)
       {
         LOG_ERROR("Couldn't seek to cached block at address %" PRIu64 "\n",
-                  glob_p_cache_blkidx[cur_block].off_data+block_offset)
+                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                    block_offset);
         return -1;
       }
-      if(fwrite(p_write_buf,to_write_now,1,glob_p_cache_file)!=1) {
+      if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
         LOG_ERROR("Error while writing %zu bytes "
                   "to cache file at offset %" PRIu64 "!\n",
                   to_write_now,
-                  glob_p_cache_blkidx[cur_block].off_data+block_offset);
+                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                    block_offset);
         return -1;
       }
       LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64
-                " to cache file\n",to_write_now,
-                glob_p_cache_blkidx[cur_block].off_data+block_offset)
+                  " to cache file\n",to_write_now,
+                glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                  block_offset);
     } else {
       // Uncached block. Need to cache entire new block
       // Seek to end of cache file to append new cache block
-      fseeko(glob_p_cache_file,0,SEEK_END);
-      glob_p_cache_blkidx[cur_block].off_data=ftello(glob_p_cache_file);
+      fseeko(glob_xmount.cache.h_cache_file,0,SEEK_END);
+      glob_xmount.cache.p_cache_blkidx[cur_block].off_data=
+        ftello(glob_xmount.cache.h_cache_file);
       if(block_offset!=0) {
         // Changed data does not begin at block boundry. Need to prepend
         // with data from virtual image file
@@ -1461,11 +1509,11 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
           LOG_ERROR("Couldn't read data from morphed image!\n")
           return -1;
         }
-        if(fwrite(p_buf2,block_offset,1,glob_p_cache_file)!=1) {
+        if(fwrite(p_buf2,block_offset,1,glob_xmount.cache.h_cache_file)!=1) {
           LOG_ERROR("Couldn't writing %" PRIu64 " bytes "
                     "to cache file at offset %" PRIu64 "!\n",
                     block_offset,
-                    glob_p_cache_blkidx[cur_block].off_data);
+                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
           return -1;
         }
         LOG_DEBUG("Prepended changed data with %" PRIu64
@@ -1473,11 +1521,12 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
                   "\n",block_offset,file_offset-block_offset)
         free(p_buf2);
       }
-      if(fwrite(p_write_buf,to_write_now,1,glob_p_cache_file)!=1) {
+      if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
         LOG_ERROR("Error while writing %zd bytes "
-                  "to cache file at offset %" PRIu64 "!\n",
+                    "to cache file at offset %" PRIu64 "!\n",
                   to_write_now,
-                  glob_p_cache_blkidx[cur_block].off_data+block_offset);
+                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                    block_offset);
         return -1;
       }
       if(block_offset+to_write_now!=CACHE_BLOCK_SIZE) {
@@ -1509,12 +1558,12 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
         if(fwrite(p_buf2,
                   CACHE_BLOCK_SIZE-(block_offset+to_write_now),
                   1,
-                  glob_p_cache_file)!=1)
+                  glob_xmount.cache.h_cache_file)!=1)
         {
           LOG_ERROR("Error while writing %zd bytes "
-                    "to cache file at offset %" PRIu64 "!\n",
+                      "to cache file at offset %" PRIu64 "!\n",
                     CACHE_BLOCK_SIZE-(block_offset+to_write_now),
-                    glob_p_cache_blkidx[cur_block].off_data+
+                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
                       block_offset+to_write_now);
           return -1;
         }
@@ -1522,32 +1571,33 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
       }
       // All important data for this cache block has been written,
       // flush all buffers and mark cache block as assigned
-      fflush(glob_p_cache_file);
+      fflush(glob_xmount.cache.h_cache_file);
 #ifndef __APPLE__
-      ioctl(fileno(glob_p_cache_file),BLKFLSBUF,0);
+      ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
 #endif
-      glob_p_cache_blkidx[cur_block].Assigned=1;
+      glob_xmount.cache.p_cache_blkidx[cur_block].Assigned=1;
       // Update cache block index entry in cache file
-      fseeko(glob_p_cache_file,
+      fseeko(glob_xmount.cache.h_cache_file,
              sizeof(ts_CacheFileHeader)+
                (cur_block*sizeof(ts_CacheFileBlockIndex)),
              SEEK_SET);
-      if(fwrite(&(glob_p_cache_blkidx[cur_block]),
+      if(fwrite(&(glob_xmount.cache.p_cache_blkidx[cur_block]),
                 sizeof(ts_CacheFileBlockIndex),
                 1,
-                glob_p_cache_file)!=1)
+                glob_xmount.cache.h_cache_file)!=1)
       {
         LOG_ERROR("Couldn't update cache file block index!\n");
         return -1;
       }
       LOG_DEBUG("Updated cache file block index: Number=%" PRIu64
-                ", Data offset=%" PRIu64 "\n",cur_block,
-                glob_p_cache_blkidx[cur_block].off_data);
+                  ", Data offset=%" PRIu64 "\n",
+                cur_block,
+                glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
     }
     // Flush buffers
-    fflush(glob_p_cache_file);
+    fflush(glob_xmount.cache.h_cache_file);
 #ifndef __APPLE__
-    ioctl(fileno(glob_p_cache_file),BLKFLSBUF,0);
+    ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
 #endif
     block_offset=0;
     cur_block++;
@@ -1883,8 +1933,12 @@ static int InitVirtImageInfoFile() {
   //char *p_buf;
 
   // Add static header
-  XMOUNT_MALLOC(glob_p_info_file,char*,strlen(IMAGE_INFO_HEADER)+1)
-  strncpy(glob_p_info_file,IMAGE_INFO_HEADER,strlen(IMAGE_INFO_HEADER)+1);
+  XMOUNT_MALLOC(glob_xmount.output.p_info_file,
+                char*,
+                strlen(IMAGE_INFO_HEADER)+1);
+  strncpy(glob_xmount.output.p_info_file,
+          IMAGE_INFO_HEADER,
+          strlen(IMAGE_INFO_HEADER)+1);
 
   // Get infos from input lib
   // TODO
@@ -1897,7 +1951,7 @@ static int InitVirtImageInfoFile() {
   }
 
   // Add infos to main buffer and free p_buf
-  XMOUNT_STRAPP(glob_p_info_file,p_buf);
+  XMOUNT_STRAPP(glob_xmount.output.p_info_file,p_buf);
   glob_p_input_functions->FreeBuffer(p_buf);
 */
 
@@ -1916,28 +1970,31 @@ static int InitCacheFile() {
   uint32_t needed_blocks=0;
   uint64_t buf;
 
-  if(!glob_xmount.overwrite_cache) {
+  if(!glob_xmount.cache.overwrite_cache) {
     // Try to open an existing cache file or create a new one
-    glob_p_cache_file=(FILE*)FOPEN(glob_xmount.p_cache_file,"rb+");
-    if(glob_p_cache_file==NULL) {
+    glob_xmount.cache.h_cache_file=(FILE*)FOPEN(glob_xmount.cache.p_cache_file,
+                                                "rb+");
+    if(glob_xmount.cache.h_cache_file==NULL) {
       // As the c lib seems to have no possibility to open a file rw wether it
       // exists or not (w+ does not work because it truncates an existing file),
       // when r+ returns NULL the file could simply not exist
       LOG_DEBUG("Cache file does not exist. Creating new one\n")
-      glob_p_cache_file=(FILE*)FOPEN(glob_xmount.p_cache_file,"wb+");
-      if(glob_p_cache_file==NULL) {
+      glob_xmount.cache.h_cache_file=
+        (FILE*)FOPEN(glob_xmount.cache.p_cache_file,"wb+");
+      if(glob_xmount.cache.h_cache_file==NULL) {
         // There is really a problem opening the file
         LOG_ERROR("Couldn't open cache file \"%s\"!\n",
-                  glob_xmount.p_cache_file)
+                  glob_xmount.cache.p_cache_file)
         return FALSE;
       }
     }
   } else {
     // Overwrite existing cache file or create a new one
-    glob_p_cache_file=(FILE*)FOPEN(glob_xmount.p_cache_file,"wb+");
-    if(glob_p_cache_file==NULL) {
+    glob_xmount.cache.h_cache_file=(FILE*)FOPEN(glob_xmount.cache.p_cache_file,
+                                                "wb+");
+    if(glob_xmount.cache.h_cache_file==NULL) {
       LOG_ERROR("Couldn't open cache file \"%s\"!\n",
-                glob_xmount.p_cache_file)
+                glob_xmount.cache.p_cache_file)
       return FALSE;
     }
   }
@@ -1962,30 +2019,30 @@ static int InitCacheFile() {
 
   // Get cache file size
   // fseeko64 had massive problems!
-  if(fseeko(glob_p_cache_file,0,SEEK_END)!=0) {
+  if(fseeko(glob_xmount.cache.h_cache_file,0,SEEK_END)!=0) {
     LOG_ERROR("Couldn't seek to end of cache file!\n")
     return FALSE;
   }
   // Same here, ftello64 didn't work at all and returned 0 all the times
-  cachefile_size=ftello(glob_p_cache_file);
+  cachefile_size=ftello(glob_xmount.cache.h_cache_file);
   LOG_DEBUG("Cache file has %zd bytes\n",cachefile_size)
 
   if(cachefile_size>0) {
     // Cache file isn't empty, parse block header
     LOG_DEBUG("Cache file not empty. Parsing block header\n")
-    if(fseeko(glob_p_cache_file,0,SEEK_SET)!=0) {
+    if(fseeko(glob_xmount.cache.h_cache_file,0,SEEK_SET)!=0) {
       LOG_ERROR("Couldn't seek to beginning of cache file!\n")
       return FALSE;
     }
     // Read and check file signature
-    if(fread(&buf,8,1,glob_p_cache_file)!=1 || buf!=CACHE_FILE_SIGNATURE) {
-      free(glob_p_cache_header);
+    if(fread(&buf,8,1,glob_xmount.cache.h_cache_file)!=1 ||
+       buf!=CACHE_FILE_SIGNATURE)
+    {
       LOG_ERROR("Not an xmount cache file or cache file corrupt!\n")
       return FALSE;
     }
     // Now get cache file version (Has only 32bit!)
-    if(fread(&buf,4,1,glob_p_cache_file)!=1) {
-      free(glob_p_cache_header);
+    if(fread(&buf,4,1,glob_xmount.cache.h_cache_file)!=1) {
       LOG_ERROR("Not an xmount cache file or cache file corrupt!\n")
       return FALSE;
     }
@@ -1997,23 +2054,22 @@ static int InitCacheFile() {
         return FALSE;
       case CUR_CACHE_FILE_VERSION:
         // Current version
-        if(fseeko(glob_p_cache_file,0,SEEK_SET)!=0) {
+        if(fseeko(glob_xmount.cache.h_cache_file,0,SEEK_SET)!=0) {
           LOG_ERROR("Couldn't seek to beginning of cache file!\n")
           return FALSE;
         }
         // Alloc memory for header and block index
-        XMOUNT_MALLOC(glob_p_cache_header,
+        XMOUNT_MALLOC(glob_xmount.cache.p_cache_header,
                       pts_CacheFileHeader,
                       cachefile_header_size);
-        memset(glob_p_cache_header,0,cachefile_header_size);
+        memset(glob_xmount.cache.p_cache_header,0,cachefile_header_size);
         // Read header and block index from file
-        if(fread(glob_p_cache_header,
+        if(fread(glob_xmount.cache.p_cache_header,
                  cachefile_header_size,
                  1,
-                 glob_p_cache_file)!=1)
+                 glob_xmount.cache.h_cache_file)!=1)
         {
           // Cache file isn't big enough
-          free(glob_p_cache_header);
           LOG_ERROR("Cache file corrupt!\n")
           return FALSE;
         }
@@ -2023,42 +2079,45 @@ static int InitCacheFile() {
         return FALSE;
     }
     // Check if cache file has same block size as we do
-    if(glob_p_cache_header->BlockSize!=CACHE_BLOCK_SIZE) {
+    if(glob_xmount.cache.p_cache_header->BlockSize!=CACHE_BLOCK_SIZE) {
       LOG_ERROR("Cache file does not use default cache block size!\n")
       return FALSE;
     }
     // Set pointer to block index
-    glob_p_cache_blkidx=(pts_CacheFileBlockIndex)((void*)glob_p_cache_header+
-                          glob_p_cache_header->pBlockIndex);
+    glob_xmount.cache.p_cache_blkidx=
+      (pts_CacheFileBlockIndex)((void*)glob_xmount.cache.p_cache_header+
+        glob_xmount.cache.p_cache_header->pBlockIndex);
   } else {
     // New cache file, generate a new block header
     LOG_DEBUG("Cache file is empty. Generating new block header\n");
     // Alloc memory for header and block index
-    XMOUNT_MALLOC(glob_p_cache_header,pts_CacheFileHeader,cachefile_header_size)
-    memset(glob_p_cache_header,0,cachefile_header_size);
-    glob_p_cache_header->FileSignature=CACHE_FILE_SIGNATURE;
-    glob_p_cache_header->CacheFileVersion=CUR_CACHE_FILE_VERSION;
-    glob_p_cache_header->BlockSize=CACHE_BLOCK_SIZE;
-    glob_p_cache_header->BlockCount=needed_blocks;
-    //glob_p_cache_header->UsedBlocks=0;
+    XMOUNT_MALLOC(glob_xmount.cache.p_cache_header,
+                  pts_CacheFileHeader,
+                  cachefile_header_size)
+    memset(glob_xmount.cache.p_cache_header,0,cachefile_header_size);
+    glob_xmount.cache.p_cache_header->FileSignature=CACHE_FILE_SIGNATURE;
+    glob_xmount.cache.p_cache_header->CacheFileVersion=CUR_CACHE_FILE_VERSION;
+    glob_xmount.cache.p_cache_header->BlockSize=CACHE_BLOCK_SIZE;
+    glob_xmount.cache.p_cache_header->BlockCount=needed_blocks;
+    //glob_xmount.cache.p_cache_header->UsedBlocks=0;
     // The following pointer is only usuable when reading data from cache file
-    glob_p_cache_header->pBlockIndex=sizeof(ts_CacheFileHeader);
-    glob_p_cache_blkidx=(pts_CacheFileBlockIndex)((void*)glob_p_cache_header+
-                         sizeof(ts_CacheFileHeader));
-    glob_p_cache_header->VdiFileHeaderCached=FALSE;
-    glob_p_cache_header->pVdiFileHeader=0;
-    glob_p_cache_header->VmdkFileCached=FALSE;
-    glob_p_cache_header->VmdkFileSize=0;
-    glob_p_cache_header->pVmdkFile=0;
-    glob_p_cache_header->VhdFileHeaderCached=FALSE;
-    glob_p_cache_header->pVhdFileHeader=0;
+    glob_xmount.cache.p_cache_header->pBlockIndex=sizeof(ts_CacheFileHeader);
+    glob_xmount.cache.p_cache_blkidx=
+      (pts_CacheFileBlockIndex)((void*)glob_xmount.cache.p_cache_header+
+        sizeof(ts_CacheFileHeader));
+    glob_xmount.cache.p_cache_header->VdiFileHeaderCached=FALSE;
+    glob_xmount.cache.p_cache_header->pVdiFileHeader=0;
+    glob_xmount.cache.p_cache_header->VmdkFileCached=FALSE;
+    glob_xmount.cache.p_cache_header->VmdkFileSize=0;
+    glob_xmount.cache.p_cache_header->pVmdkFile=0;
+    glob_xmount.cache.p_cache_header->VhdFileHeaderCached=FALSE;
+    glob_xmount.cache.p_cache_header->pVhdFileHeader=0;
     // Write header to file
-    if(fwrite(glob_p_cache_header,
+    if(fwrite(glob_xmount.cache.p_cache_header,
               cachefile_header_size,
               1,
-              glob_p_cache_file)!=1)
+              glob_xmount.cache.h_cache_file)!=1)
     {
-      free(glob_p_cache_header);
       LOG_ERROR("Couldn't write cache file header to file!\n");
       return FALSE;
     }
@@ -2401,17 +2460,26 @@ static void InitResources() {
   glob_xmount.input.image_offset=0;
   glob_xmount.input.image_hash_lo=0;
   glob_xmount.input.image_hash_hi=0;
+
   // Morphing
   glob_xmount.morphing.libs_count=0;
   glob_xmount.morphing.pp_libs=NULL;
   glob_xmount.morphing.p_morph_type=NULL;
-  glob_xmount.morphing.pp_lib_params=NULL;
+  glob_xmount.morphing.p_lib_params=NULL;
   glob_xmount.morphing.p_handle=NULL;
   glob_xmount.morphing.p_functions=NULL;
   glob_xmount.morphing.input_image_functions.ImageCount=
     &LibXmount_Morphing_ImageCount;
   glob_xmount.morphing.input_image_functions.Size=&LibXmount_Morphing_Size;
   glob_xmount.morphing.input_image_functions.Read=&LibXmount_Morphing_Read;
+
+  // Cache
+  glob_xmount.cache.p_cache_file=NULL;
+  glob_xmount.cache.h_cache_file=NULL;
+  glob_xmount.cache.p_cache_header=NULL;
+  glob_xmount.cache.p_cache_blkidx=NULL;
+  glob_xmount.cache.overwrite_cache=FALSE;
+
   // Output
 #ifndef __APPLE__
   glob_xmount.output.VirtImageType=VirtImageType_DD;
@@ -2421,6 +2489,8 @@ static void InitResources() {
   glob_xmount.output.image_size=0;
   glob_xmount.output.writable=FALSE;
   glob_xmount.output.p_virtual_image_path=NULL;
+  glob_xmount.output.p_info_path=NULL;
+  glob_xmount.output.p_info_file=NULL;
   glob_xmount.output.vdi.vdi_header_size=0;
   glob_xmount.output.vdi.p_vdi_header=NULL;
   glob_xmount.output.vdi.vdi_block_map_size=0;
@@ -2434,12 +2504,13 @@ static void InitResources() {
   glob_xmount.output.vmdk.p_vmdk_lockfile_data=NULL;
   glob_xmount.output.vmdk.vmdk_lockfile_size=0;
   glob_xmount.output.vmdk.p_vmdk_lockfile_name=NULL;
+
   // Misc data
   glob_xmount.debug=FALSE;
-  glob_xmount.p_virtual_info_path=NULL;
-  glob_xmount.overwrite_cache=FALSE;
-  glob_xmount.p_cache_file=NULL;
   glob_xmount.may_set_fuse_allow_other=FALSE;
+  glob_xmount.fuse_argc=0;
+  glob_xmount.pp_fuse_argv=NULL;
+  glob_xmount.p_mountpoint=NULL;
 }
 
 /*
@@ -2450,11 +2521,12 @@ static void FreeResources() {
 
   LOG_DEBUG("Freeing all resources\n");
 
-  // Misc data
-  if(glob_xmount.p_cache_file!=NULL)
-    free(glob_xmount.p_cache_file);
-  if(glob_xmount.p_virtual_info_path!=NULL)
-    free(glob_xmount.p_virtual_info_path);
+  // Misc
+  if(glob_xmount.pp_fuse_argv!=NULL) {
+    for(int i=0;i<glob_xmount.fuse_argc;i++) free(glob_xmount.pp_fuse_argv[i]);
+    free(glob_xmount.pp_fuse_argv);
+  }
+  if(glob_xmount.p_mountpoint!=NULL) free(glob_xmount.p_mountpoint);
 
   // Output
   if(glob_xmount.output.vmdk.p_vmdk_lockfile_name!=NULL)
@@ -2469,6 +2541,10 @@ static void FreeResources() {
     free(glob_xmount.output.vmdk.p_vmdk_file);
   if(glob_xmount.output.vmdk.p_virtual_vmdk_path!=NULL)
     free(glob_xmount.output.vmdk.p_virtual_vmdk_path);
+  if(glob_xmount.output.p_info_path!=NULL)
+    free(glob_xmount.output.p_info_path);
+  if(glob_xmount.output.p_info_file!=NULL)
+    free(glob_xmount.output.p_info_file);
   if(glob_xmount.output.vhd.p_vhd_header!=NULL)
     free(glob_xmount.output.vhd.p_vhd_header);
   if(glob_xmount.output.vdi.p_vdi_block_map!=NULL)
@@ -2477,6 +2553,15 @@ static void FreeResources() {
     free(glob_xmount.output.vdi.p_vdi_header);
   if(glob_xmount.output.p_virtual_image_path!=NULL)
     free(glob_xmount.output.p_virtual_image_path);
+
+  // Cache
+  if(glob_xmount.cache.h_cache_file!=NULL)
+    fclose(glob_xmount.cache.h_cache_file);
+  if(glob_xmount.cache.p_cache_header!=NULL)
+    free(glob_xmount.cache.p_cache_header);
+  // glob_xmount.cache.p_cache_blkidx is freed by the above call
+  if(glob_xmount.cache.p_cache_file!=NULL)
+    free(glob_xmount.cache.p_cache_file);
 
   // Morphing
   if(glob_xmount.morphing.p_functions!=NULL) {
@@ -2490,9 +2575,8 @@ static void FreeResources() {
       }
     }
   }
-  if(glob_xmount.morphing.pp_lib_params!=NULL)
-    // TODO: Free if array
-    free(glob_xmount.morphing.pp_lib_params);
+  if(glob_xmount.morphing.p_lib_params!=NULL)
+    free(glob_xmount.morphing.p_lib_params);
   if(glob_xmount.morphing.p_morph_type!=NULL)
     free(glob_xmount.morphing.p_morph_type);
   if(glob_xmount.morphing.pp_libs!=NULL) {
@@ -2665,13 +2749,13 @@ static int FuseGetAttr(const char *p_path, struct stat *p_stat) {
       p_stat->st_blocks=p_stat->st_size/512;
       if(p_stat->st_size%512!=0) p_stat->st_blocks++;
     }
-  } else if(strcmp(p_path,glob_xmount.p_virtual_info_path)==0) {
+  } else if(strcmp(p_path,glob_xmount.output.p_info_path)==0) {
     // Attributes of virtual image info file
     p_stat->st_mode=S_IFREG | 0444;
     p_stat->st_nlink=1;
     // Get virtual image info file size
-    if(glob_p_info_file!=NULL) {
-      p_stat->st_size=strlen(glob_p_info_file);
+    if(glob_xmount.output.p_info_file!=NULL) {
+      p_stat->st_size=strlen(glob_xmount.output.p_info_file);
     } else p_stat->st_size=0;
   } else if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
             glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
@@ -2806,7 +2890,7 @@ static int FuseReadDir(const char *p_path,
     filler(p_buf,"..",NULL,0);
     // Add our virtual files (p+1 to ignore starting "/")
     filler(p_buf,glob_xmount.output.p_virtual_image_path+1,NULL,0);
-    filler(p_buf,glob_xmount.p_virtual_info_path+1,NULL,0);
+    filler(p_buf,glob_xmount.output.p_info_path+1,NULL,0);
     if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
        glob_xmount.output.VirtImageType==VirtImageType_VMDKS)
     {
@@ -2862,7 +2946,7 @@ static int FuseOpen(const char *p_path, struct fuse_file_info *p_fi) {
 }
 
   if(strcmp(p_path,glob_xmount.output.p_virtual_image_path)==0 ||
-     strcmp(p_path,glob_xmount.p_virtual_info_path)==0)
+     strcmp(p_path,glob_xmount.output.p_info_path)==0)
   {
     CHECK_OPEN_PERMS();
   } else if(glob_xmount.output.VirtImageType==VirtImageType_VMDK ||
@@ -2925,25 +3009,25 @@ static int FuseRead(const char *p_path,
   if(strcmp(p_path,glob_xmount.output.p_virtual_image_path)==0) {
     // Read data from virtual output file
     // Wait for other threads to end reading/writing data
-    pthread_mutex_lock(&glob_mutex_image_rw);
+    pthread_mutex_lock(&(glob_xmount.mutex_image_rw));
     // Get requested data
     if((ret=GetVirtImageData(p_buf,offset,size))<0) {
       LOG_ERROR("Couldn't read data from virtual image file!\n")
     }
     // Allow other threads to read/write data again
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount.p_virtual_info_path)==0) {
+    pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
+  } else if(strcmp(p_path,glob_xmount.output.p_info_path)==0) {
     // Read data from virtual info file
-    READ_MEM_FILE(glob_p_info_file,
-                  strlen(glob_p_info_file),
+    READ_MEM_FILE(glob_xmount.output.p_info_file,
+                  strlen(glob_xmount.output.p_info_file),
                   "info",
-                  glob_mutex_info_read);
+                  glob_xmount.mutex_info_read);
   } else if(strcmp(p_path,glob_xmount.output.vmdk.p_virtual_vmdk_path)==0) {
     // Read data from virtual vmdk file
     READ_MEM_FILE(glob_xmount.output.vmdk.p_vmdk_file,
                   glob_xmount.output.vmdk.vmdk_file_size,
                   "vmdk",
-                  glob_mutex_image_rw);
+                  glob_xmount.mutex_image_rw);
   } else if(glob_xmount.output.vmdk.p_vmdk_lockfile_name!=NULL &&
             strcmp(p_path,glob_xmount.output.vmdk.p_vmdk_lockfile_name)==0)
   {
@@ -2951,7 +3035,7 @@ static int FuseRead(const char *p_path,
     READ_MEM_FILE(glob_xmount.output.vmdk.p_vmdk_lockfile_data,
                   glob_xmount.output.vmdk.vmdk_lockfile_size,
                   "vmdk lock",
-                  glob_mutex_image_rw);
+                  glob_xmount.mutex_image_rw);
   } else {
     // Attempt to read non existant file
     LOG_DEBUG("Attempt to read from non existant file \"%s\"\n",p_path)
@@ -3096,31 +3180,31 @@ static int FuseWrite(const char *p_path,
 
   if(strcmp(p_path,glob_xmount.output.p_virtual_image_path)==0) {
     // Wait for other threads to end reading/writing data
-    pthread_mutex_lock(&glob_mutex_image_rw);
+    pthread_mutex_lock(&(glob_xmount.mutex_image_rw));
 
     // Get virtual image file size
     if(!GetVirtImageSize(&len)) {
       LOG_ERROR("Couldn't get virtual image size!\n")
-      pthread_mutex_unlock(&glob_mutex_image_rw);
+      pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
       return 0;
     }
     if(offset<len) {
       if(offset+size>len) size=len-offset;
       if(SetVirtImageData(p_buf,offset,size)!=size) {
         LOG_ERROR("Couldn't write data to virtual image file!\n")
-        pthread_mutex_unlock(&glob_mutex_image_rw);
+        pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
         return 0;
       }
     } else {
       LOG_DEBUG("Attempt to write past EOF of virtual image file\n")
-      pthread_mutex_unlock(&glob_mutex_image_rw);
+      pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
       return 0;
     }
 
     // Allow other threads to read/write data again
-    pthread_mutex_unlock(&glob_mutex_image_rw);
+    pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
   } else if(strcmp(p_path,glob_xmount.output.vmdk.p_virtual_vmdk_path)==0) {
-    pthread_mutex_lock(&glob_mutex_image_rw);
+    pthread_mutex_lock(&(glob_xmount.mutex_image_rw));
     len=glob_xmount.output.vmdk.vmdk_file_size;
     if((offset+size)>len) {
       // Enlarge or create buffer if needed
@@ -3139,11 +3223,11 @@ static int FuseWrite(const char *p_path,
     }
     // Copy data to buffer
     memcpy(glob_xmount.output.vmdk.p_vmdk_file+offset,p_buf,size);
-    pthread_mutex_unlock(&glob_mutex_image_rw);
+    pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
   } else if(glob_xmount.output.vmdk.p_vmdk_lockfile_name!=NULL &&
             strcmp(p_path,glob_xmount.output.vmdk.p_vmdk_lockfile_name)==0)
   {
-    pthread_mutex_lock(&glob_mutex_image_rw);
+    pthread_mutex_lock(&(glob_xmount.mutex_image_rw));
     if((offset+size)>glob_xmount.output.vmdk.vmdk_lockfile_size) {
       // Enlarge or create buffer if needed
       if(glob_xmount.output.vmdk.vmdk_lockfile_size==0) {
@@ -3158,8 +3242,8 @@ static int FuseWrite(const char *p_path,
     }
     // Copy data to buffer
     memcpy(glob_xmount.output.vmdk.p_vmdk_lockfile_data+offset,p_buf,size);
-    pthread_mutex_unlock(&glob_mutex_image_rw);
-  } else if(strcmp(p_path,glob_xmount.p_virtual_info_path)==0) {
+    pthread_mutex_unlock(&(glob_xmount.mutex_image_rw));
+  } else if(strcmp(p_path,glob_xmount.output.p_info_path)==0) {
     // Attempt to write data to read only image info file
     LOG_DEBUG("Attempt to write data to virtual info file\n");
     return -ENOENT;
@@ -3176,9 +3260,6 @@ static int FuseWrite(const char *p_path,
  * Main
  ******************************************************************************/
 int main(int argc, char *argv[]) {
-  int nargc=0;
-  char **pp_nargv=NULL;
-  char *p_mountpoint=NULL;
   struct stat file_stat;
   int ret;
   int fuse_ret;
@@ -3217,12 +3298,7 @@ int main(int argc, char *argv[]) {
   CheckFuseSettings();
 
   // Parse command line options
-  if(!ParseCmdLine(argc,
-                   argv,
-                   &nargc,
-                   &pp_nargv,
-                   &p_mountpoint))
-  {
+  if(ParseCmdLine(argc,argv)!=TRUE) {
     PrintUsage(argv[0]);
     FreeResources();
     return 1;
@@ -3235,7 +3311,7 @@ int main(int argc, char *argv[]) {
     FreeResources();
     return 1;
   }
-  if(nargc<2) {
+  if(glob_xmount.fuse_argc<2) {
     LOG_ERROR("Couldn't parse command line options!\n")
     PrintUsage(argv[0]);
     FreeResources();
@@ -3246,14 +3322,15 @@ int main(int argc, char *argv[]) {
   }
 
   // Check if mountpoint is a valid dir
-  if(stat(p_mountpoint,&file_stat)!=0) {
-    LOG_ERROR("Unable to stat mount point '%s'!\n",p_mountpoint);
+  if(stat(glob_xmount.p_mountpoint,&file_stat)!=0) {
+    LOG_ERROR("Unable to stat mount point '%s'!\n",glob_xmount.p_mountpoint);
     PrintUsage(argv[0]);
     FreeResources();
     return 1;
   }
   if(!S_ISDIR(file_stat.st_mode)) {
-    LOG_ERROR("Mount point '%s' is not a directory!\n",p_mountpoint);
+    LOG_ERROR("Mount point '%s' is not a directory!\n",
+              glob_xmount.p_mountpoint);
     PrintUsage(argv[0]);
     FreeResources();
     return 1;
@@ -3261,9 +3338,15 @@ int main(int argc, char *argv[]) {
 
   if(glob_xmount.debug==TRUE) {
     LOG_DEBUG("Options passed to FUSE: ")
-    for(int i=0;i<nargc;i++) { printf("%s ",pp_nargv[i]); }
+    for(int i=0;i<glob_xmount.fuse_argc;i++) {
+      printf("%s ",glob_xmount.pp_fuse_argv[i]);
+    }
     printf("\n");
   }
+
+  // Init mutexes
+  pthread_mutex_init(&(glob_xmount.mutex_image_rw),NULL);
+  pthread_mutex_init(&(glob_xmount.mutex_info_read),NULL);
 
   // Load input images
   for(uint64_t i=0;i<glob_xmount.input.images_count;i++) {
@@ -3407,10 +3490,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // Init mutexes
-  pthread_mutex_init(&glob_mutex_image_rw,NULL);
-  pthread_mutex_init(&glob_mutex_info_read,NULL);
-
   // Init random generator
   srand(time(NULL));
 
@@ -3491,31 +3570,16 @@ int main(int argc, char *argv[]) {
   }
 
   // Call fuse_main to do the fuse magic
-  fuse_ret=fuse_main(nargc,pp_nargv,&xmount_operations,NULL);
+  fuse_ret=fuse_main(glob_xmount.fuse_argc,
+                     glob_xmount.pp_fuse_argv,
+                     &xmount_operations,
+                     NULL);
 
   // Destroy mutexes
-  pthread_mutex_destroy(&glob_mutex_image_rw);
-  pthread_mutex_destroy(&glob_mutex_info_read);
-
-  // Close cache file if write support was enabled
-  if(glob_xmount.output.writable) {
-    fclose(glob_p_cache_file);
-    free(glob_p_cache_header);
-  }
+  pthread_mutex_destroy(&(glob_xmount.mutex_image_rw));
+  pthread_mutex_destroy(&(glob_xmount.mutex_info_read));
 
   // Free allocated memory
-  // Free info file content
-  if(glob_p_info_file!=NULL) free(glob_p_info_file);
-
-  // Free constructed argv
-  if(pp_nargv!=NULL) {
-    for(int i=0;i<nargc;i++) free(pp_nargv[i]);
-    free(pp_nargv);
-  }
-
-  // Free mountpoint
-  if(p_mountpoint!=NULL) free(p_mountpoint);
-
   FreeResources();
   return fuse_ret;
 }
@@ -3711,30 +3775,41 @@ int main(int argc, char *argv[]) {
   20140803: * Added correct return code handling when calling input lib
               functions including getting error messages using GetErrorMessage.
             * Added input lib specific option parsing.
-            * Re-implemented InitVirtImageInfoFile using input lib's
-              GetInfofileContent function.
+            * Re-implemented InitVirtImageInfoFile() using input lib's
+              GetInfofileContent() function.
             * Further code cleanups.
   20140807: * Further code cleanups.
-            * Renamed GetVirtFileAttr to FuseGetAttr
-            * Renamed CreateVirtDir to FuseMkDir
-            * Renamed CreateVirtDir to FuseMkNod
-            * Renamed OpenVirtFile to FuseOpen
-            * Renamed GetVirtFiles to FuseReadDir
-            * Renamed ReadVirtFile to FuseRead
-            * Renamed RenameVirtFile to FuseRename
-            * Renamed DeleteVirtDir to FuseRmDir
-            * Renamed DeleteVirtFile to FuseUnlink
-            * Renamed WriteVirtFile to FuseWrite
-            * Fixed bug in CalculateInputImageHash where always HASH_AMOUNT
+            * Renamed GetVirtFileAttr() to FuseGetAttr()
+            * Renamed CreateVirtDir() to FuseMkDir()
+            * Renamed CreateVirtDir() to FuseMkNod()
+            * Renamed OpenVirtFile() to FuseOpen()
+            * Renamed GetVirtFiles() to FuseReadDir()
+            * Renamed ReadVirtFile() to FuseRead()
+            * Renamed RenameVirtFile() to FuseRename()
+            * Renamed DeleteVirtDir() to FuseRmDir()
+            * Renamed DeleteVirtFile() to FuseUnlink()
+            * Renamed WriteVirtFile() to FuseWrite()
+            * Fixed bug in CalculateInputImageHash() where always HASH_AMOUNT
               bytes were hased even if input image is smaller.
-            * Fixed a newly introduced bug in FuseRead and GetVirtImageData
+            * Fixed a newly introduced bug in FuseRead() and GetVirtImageData()
               returning -EIO when trying to read behind EOF. The correct return
               value is 0.
-  20140811: * Renamed CheckFuseAllowOther to CheckFuseSettings and added a
+  20140811: * Renamed CheckFuseAllowOther() to CheckFuseSettings() and added a
               check to see if user is part of the fuse group.
-  20140814: * Replaced cuserid() with getpwuid(geteuid()) in CheckFuseSettings
+  20140814: * Replaced cuserid() with getpwuid(geteuid()) in CheckFuseSettings()
               as it is deprecated on Linux and not available on OSx.
-            * Only build fuse group checks from CheckFuseSettings on Linux.
+            * Only build fuse group checks from CheckFuseSettings() on Linux.
+  20140820: * Added libxmount_morphing handling.
+            * Renamed LoadInputLibs() to LoadLibs() and added code to find and
+              load morphing libs.
+            * Added FindMorphingLib() function.
+  20140821: * Changed command line syntax to support specification of multiple
+              input images of different types.
+            * Added code in main() to initialize and open multiple input images.
+            * Added GetMorphedImageSize() and GetMorphedImageData().
+  20140822: * Removed GetInputImageSize() as it isn't needed anymore.
+            * Quick test showed morphing using libxmount_morphing_combine seems
+              to work.
   20140825: * Added InitResources() and FreeResources() functions.
 */
 

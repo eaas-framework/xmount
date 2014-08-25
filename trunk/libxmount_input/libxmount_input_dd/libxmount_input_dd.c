@@ -159,9 +159,6 @@ static int DdOpen(void **pp_handle,
   pdd->TotalSize = 0;
   for (uint64_t i=0; i < pdd->Pieces; i++) 
   {
-  
-  printf("Opening %s\n",pp_filename_arr[i]);
-  
     pPiece = &pdd->pPieceArr[i];
     pPiece->pFilename = strdup (pp_filename_arr[i]);
     if (pPiece->pFilename == NULL)
@@ -261,13 +258,16 @@ static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
  * DdGetInfofileContent
  */
 static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
-  asprintf(pp_info_buf,
-           "DD image assembled of %" PRIu64 " pieces\n"
-             "%" PRIu64 " bytes in total (%0.3f GiB)\n",
-           ((t_pdd)p_handle)->Pieces,
-           ((t_pdd)p_handle)->TotalSize,
-           ((t_pdd)p_handle)->TotalSize/(1024.0*1024.0*1024.0));
-  if(*pp_info_buf==NULL) return DD_MEMALLOC_FAILED;
+  int ret;
+
+  ret=asprintf(pp_info_buf,
+               "DD image assembled of %" PRIu64 " pieces\n"
+                 "%" PRIu64 " bytes in total (%0.3f GiB)\n",
+               ((t_pdd)p_handle)->Pieces,
+               ((t_pdd)p_handle)->TotalSize,
+               ((t_pdd)p_handle)->TotalSize/(1024.0*1024.0*1024.0));
+  if(ret<0 || *pp_info_buf==NULL) return DD_MEMALLOC_FAILED;
+
   return DD_OK;
 }
 

@@ -330,7 +330,7 @@ typedef struct s_MorphingData {
   //! Specified morphing type (--morph)
   char *p_morph_type;
   //! Specified morphing lib params (--morphopts)
-  char **pp_lib_params;
+  char *p_lib_params;
   //! Handle to initialized morphing lib
   void *p_handle;
   //! Morphing functions of initialized lib
@@ -339,16 +339,35 @@ typedef struct s_MorphingData {
   ts_LibXmountMorphingInputFunctions input_image_functions;
 } ts_MorphingData;
 
+//! Structures and vars needed for write access
+typedef struct s_CacheData {
+  //! Cache file to save changes to
+  char *p_cache_file;
+  //! Handle to cache file
+  FILE *h_cache_file;
+  //! Overwrite existing cache
+  uint8_t overwrite_cache;
+  //! Cache header
+  pts_CacheFileHeader p_cache_header;
+  //! Cache block index
+  pts_CacheFileBlockIndex p_cache_blkidx;
+} ts_CacheData;
+
 //! Structures and vars needed for VDI support
 typedef struct s_OutputImageVdiData {
+  //! VDI header size
   uint32_t vdi_header_size;
+  //! VDI header
   pts_VdiFileHeader p_vdi_header;
+  //! VDI blockmap size
   uint32_t vdi_block_map_size;
+  //! VDI block map
   char *p_vdi_block_map;
 } ts_OutputImageVdiData;
 
 //! Structures and vars needed for VHD support
 typedef struct s_OutputImageVhdData {
+  //! VHD header
   ts_VhdFileHeader *p_vhd_header;
 } ts_OutputImageVhdData;
 
@@ -356,12 +375,19 @@ typedef struct s_OutputImageVhdData {
 typedef struct s_OutputImageVmdkData {
   //! Path of virtual VMDK file
   char *p_virtual_vmdk_path;
+  //! VMDK content
   char *p_vmdk_file;
+  //! VMDK content size
   int vmdk_file_size;
+  //! Path of 1st lockdir
   char *p_vmdk_lockdir1;
+  //! Path of 2nd lockdir
   char *p_vmdk_lockdir2;
+  //! Lockfile content
   char *p_vmdk_lockfile_data;
+  //! Lockfile content size
   int vmdk_lockfile_size;
+  //! Path of lockfile
   char *p_vmdk_lockfile_name;
 } ts_OutputImageVmdkData;
 
@@ -375,6 +401,10 @@ typedef struct s_OutputData {
   uint8_t writable;
   //! Path of virtual image file
   char *p_virtual_image_path;
+  //! Path of virtual image info file
+  char *p_info_path;
+  //! Pointer to virtual info file
+  char *p_info_file;
   //! VDI related data
   ts_OutputImageVdiData vdi;
   //! VHD related data
@@ -389,18 +419,24 @@ typedef struct s_XmountData {
   ts_InputData input;
   //! Morphing related data
   ts_MorphingData morphing;
+  //! Cache file related data
+  ts_CacheData cache;
   //! Output image related data
   ts_OutputData output;
-  //! Path of virtual image info file
-  char *p_virtual_info_path;
   //! Enable debug output
   uint8_t debug;
-  //! Overwrite existing cache
-  uint8_t overwrite_cache;
-  //! Cache file to save changes to
-  char *p_cache_file;
   //! Set if we are allowed to set fuse's allow_other option
   uint8_t may_set_fuse_allow_other;
+  //! Argv for FUSE
+  int fuse_argc;
+  //! Argv for FUSE
+  char **pp_fuse_argv;
+  //! Mount point
+  char *p_mountpoint;
+  //! Mutex to control concurrent read & write access on output image
+  pthread_mutex_t mutex_image_rw;
+  //! Mutex to control concurrent read access on info file
+  pthread_mutex_t mutex_info_read;
 } ts_XmountData;
 
 /*
@@ -434,5 +470,11 @@ typedef struct s_XmountData {
   20120511: * Added endianness conversation macros
   20140809: * Moved endianness macros to separate file
   20140810: * Moved convenience macros to separate file
+  20140726: * Added ts_InputLib
+  20140821: * Added ts_InputImage and ts_InputData
+            * Moved data from various places to the above structs.
+  20140825: * Added ts_MorphingLib, ts_CacheData, ts_OutputImageVdiData,
+              ts_OutputImageVhdData, ts_OutputImageVmdkData and ts_OutputData.
+            * Moved data from various places to the above structs.
 */
 
