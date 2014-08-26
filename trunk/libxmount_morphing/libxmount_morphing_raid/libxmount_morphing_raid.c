@@ -246,17 +246,48 @@ static int RaidRead(void *p_handle,
  * RaidOptionsHelp
  */
 static const char* RaidOptionsHelp() {
-  return RAID_OK;
+  return "      raid_chunksize : Specify the chunk size to use in bytes. "
+           "Defaults to 524288 (512k).\n";
 }
 
 /*
  * RaidOptionsParse
  */
 static int RaidOptionsParse(void *p_handle,
-                            char *p_options,
+                            uint32_t options_count,
+                            pts_LibXmountOptions *pp_options,
                             char **pp_error)
 {
-  *pp_error=NULL;
+  pts_RaidHandle p_raid_handle=(pts_RaidHandle)p_handle;
+  int ok;
+  uint32_t uint32value;
+
+  for(uint32_t i=0;i<options_count;i++) {
+    if(strcmp(pp_options[i]->p_key,"raid_chunksize")) {
+      // Convert value to uint32
+      uint32value=LibXmountOptions_ValueToUint32(pp_options[i]->p_value,&ok);
+      if(ok==0 || uint32value==0) {
+        // Conversion failed, generate error message and return
+        ok=asprintf(pp_error,
+                    "Unable to parse value '%s' of '%s' as valid 32bit number",
+                    pp_options[i]->p_value,
+                    pp_options[i]->p_key);
+        if(ok<0 || *pp_error==NULL) {
+          *pp_error=NULL;
+          return RAID_MEMALLOC_FAILED;
+        }
+        return RAID_CANNOT_PARSE_OPTION;
+      }
+
+      LOG_DEBUG("Setting chunk size to %" PRIu32 " bytes\n",uint32value);
+
+      // Conversion ok, save value and mark option as valid
+      p_raid_handle->chunk_size=uint32value;
+      pp_options[i]->valid=1;
+      continue;
+    }
+  }
+
   return RAID_OK;
 }
 
@@ -287,6 +318,9 @@ static const char* RaidGetErrorMessage(int err_num) {
       break;
     case RAID_CANNOT_READ_DATA:
       return "Unable to read data";
+      break;
+    case RAID_CANNOT_PARSE_OPTION:
+      return "Unable to parse library option";
       break;
     default:
       return "Unknown error";

@@ -234,17 +234,17 @@ static int CombineRead(void *p_handle,
  * CombineOptionsHelp
  */
 static const char* CombineOptionsHelp() {
-  return COMBINE_OK;
+  return NULL;
 }
 
 /*
  * CombineOptionsParse
  */
 static int CombineOptionsParse(void *p_handle,
-                               char *p_options,
+                               uint32_t options_count,
+                               pts_LibXmountOptions *pp_options,
                                char **pp_error)
 {
-  *pp_error=NULL;
   return COMBINE_OK;
 }
 

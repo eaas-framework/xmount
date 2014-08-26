@@ -27,6 +27,8 @@
 #include <stdarg.h> // For va_*, vprintf
 #include <inttypes.h> // For PRI*
 
+#include "../libxmount/libxmount.h"
+
 /*******************************************************************************
  * Type defs
  ******************************************************************************/
@@ -165,7 +167,8 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code and error message
    */
   int (*OptionsParse)(void *p_handle,
-                      char *p_options,
+                      uint32_t options_count,
+                      pts_LibXmountOptions *pp_options,
                       char **pp_error);
 
   //! Function to get content to add to the info file

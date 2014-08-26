@@ -75,7 +75,8 @@ static int CombineRead(void *p_handle,
                        size_t *p_read);
 static const char* CombineOptionsHelp();
 static int CombineOptionsParse(void *p_handle,
-                               char *p_options,
+                               uint32_t options_count,
+                               pts_LibXmountOptions *pp_options,
                                char **pp_error);
 static int CombineGetInfofileContent(void *p_handle,
                                      char **pp_info_buf);

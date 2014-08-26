@@ -223,18 +223,25 @@ static void PrintUsage(char *p_prog_name) {
   printf("  * For VMDK emulation, you have to uncomment \"user_allow_other\" "
            "in /etc/fuse.conf or run xmount as root.\n");
   printf("\n");
-  printf("Input library specific options:\n");
-  printf("  Some input libraries might support an own set of options to "
-           "configure / tune their behaviour.\n");
-  printf("  Input libraries supporting this feature (if any) and and their "
+  printf("Input / Morphing library specific options:\n");
+  printf("  Some input / morphing libraries might support an own set of "
+           "options to configure / tune their behaviour.\n");
+  printf("  Libraries supporting this feature (if any) and and their "
            "options are listed below.\n");
   printf("\n");
 
-  // List input lib options
+  // List input / morphing lib options
   for(uint32_t i=0;i<glob_xmount.input.libs_count;i++) {
     p_buf=(char*)(glob_xmount.input.pp_libs[i]->lib_functions.OptionsHelp());
     if(p_buf==NULL) continue;
     printf("    - %s\n",glob_xmount.input.pp_libs[i]->p_name);
+    printf("%s\n",p_buf);
+    printf("\n");
+  }
+  for(uint32_t i=0;i<glob_xmount.morphing.libs_count;i++) {
+    p_buf=(char*)(glob_xmount.morphing.pp_libs[i]->lib_functions.OptionsHelp());
+    if(p_buf==NULL) continue;
+    printf("    - %s\n",glob_xmount.morphing.pp_libs[i]->p_name);
     printf("%s\n",p_buf);
     printf("\n");
   }
@@ -3044,6 +3051,7 @@ static int FuseRead(const char *p_path,
 
 #undef READ_MEM_FILE
 
+  // TODO: Return size of read data!!!!!
   return ret;
 }
 
