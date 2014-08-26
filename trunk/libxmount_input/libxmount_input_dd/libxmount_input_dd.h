@@ -103,7 +103,8 @@ static int DdRead(void *p_handle,
                   uint32_t count);
 static const char* DdOptionsHelp();
 static int DdOptionsParse(void *p_handle,
-                          char *p_options,
+                          uint32_t options_count,
+                          pts_LibXmountOptions *pp_options,
                           char **pp_error);
 static int DdGetInfofileContent(void *p_handle,
                                 char **pp_info_buf);

@@ -50,7 +50,8 @@ static int AffRead(void *p_handle,
                    uint32_t count);
 static const char* AffOptionsHelp();
 static int AffOptionsParse(void *p_handle,
-                           char *p_options,
+                           uint32_t options_count,
+                           pts_LibXmountOptions *pp_options,
                            char **pp_error);
 static int AffGetInfofileContent(void *p_handle,
                                  char **pp_info_buf);

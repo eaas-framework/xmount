@@ -246,8 +246,8 @@ static int RaidRead(void *p_handle,
  * RaidOptionsHelp
  */
 static const char* RaidOptionsHelp() {
-  return "      raid_chunksize : Specify the chunk size to use in bytes. "
-           "Defaults to 524288 (512k).\n";
+  return "    raid_chunksize : Specify the chunk size to use in bytes. "
+           "Defaults to 524288 (512k).";
 }
 
 /*
@@ -295,7 +295,21 @@ static int RaidOptionsParse(void *p_handle,
  * RaidGetInfofileContent
  */
 static int RaidGetInfofileContent(void *p_handle, char **pp_info_buf) {
-  *pp_info_buf=NULL;
+  pts_RaidHandle p_raid_handle=(pts_RaidHandle)p_handle;
+  int ret;
+
+  ret=asprintf(pp_info_buf,
+               "Simulating RAID level 0 over %" PRIu64 " disks.\n"
+                 "Chunk size: %" PRIu32 " bytes\n"
+                 "Chunks per disk: %" PRIu64 "\n"
+                 "Total capacity: %" PRIu64 " bytes (%0.3f GiB)\n",
+               p_raid_handle->input_images_count,
+               p_raid_handle->chunk_size,
+               p_raid_handle->chunks_per_image,
+               p_raid_handle->morphed_image_size,
+               p_raid_handle->morphed_image_size/(1024.0*1024.0*1024.0));
+  if(ret<0 || *pp_info_buf==NULL) return RAID_MEMALLOC_FAILED;
+
   return RAID_OK;
 }
 

@@ -29,8 +29,10 @@
 /*
  * Constants
  */
-#define IMAGE_INFO_HEADER "The following values have been extracted from " \
-                          "the mounted image file:\n\n"
+#define IMAGE_INFO_INPUT_HEADER \
+  "The following values are supplied by the used input library(ies):\n"
+#define IMAGE_INFO_MORPHING_HEADER \
+  "\nThe following values are supplied by the used morphing library:\n\n"
 
 /*******************************************************************************
  * Structures of output images
@@ -295,8 +297,10 @@ typedef struct s_InputData {
   uint32_t libs_count;
   //! Array containing infos about loaded input libs
   pts_InputLib *pp_libs;
+  //! Amount of input lib params (--inopts)
+  uint32_t lib_params_count;
   //! Input lib params (--inopts)
-  char *p_lib_params;
+  pts_LibXmountOptions *pp_lib_params;
   //! Input image count
   uint64_t images_count;
   //! Input images
@@ -329,8 +333,10 @@ typedef struct s_MorphingData {
   pts_MorphingLib *pp_libs;
   //! Specified morphing type (--morph)
   char *p_morph_type;
+  //! Amount of specified morphing lib params (--morphopts)
+  uint32_t lib_params_count;
   //! Specified morphing lib params (--morphopts)
-  char *p_lib_params;
+  pts_LibXmountOptions *pp_lib_params;
   //! Handle to initialized morphing lib
   void *p_handle;
   //! Morphing functions of initialized lib

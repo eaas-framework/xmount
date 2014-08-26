@@ -25,6 +25,8 @@
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
 
+#include "../libxmount/libxmount.h"
+
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountInputFunctions {
   //! Function to initialize handle
@@ -127,17 +129,20 @@ typedef struct s_LibXmountInputFunctions {
   //! Function to parse any lib-specific options
   /*!
    * This function is called with the options given with the --inopts parameter.
-   * All contained options are for the lib. If errors or unknown options are
-   * found, this function should fail and return an error message in pp_error.
-   * pp_error will be freed by the caller by using FreeBuffer.
+   * For all options that are valid for the lib, the option's valid member
+   * must be set to 1. If errors are encountered, this function should fail and
+   * return an error message in pp_error. pp_error will be freed by the caller
+   * by using FreeBuffer.
    *
    * \param p_handle Handle
-   * \param p_options String with specified options
+   * \param options_count Count of elements in pp_options
+   * \param pp_options Input library options
    * \param pp_error Pointer to a string with error message
-   * \return 0 on success or error code and error message
+   * \return 0 on success or error code and error message on error
    */
   int (*OptionsParse)(void *p_handle,
-                      char *p_options,
+                      uint32_t options_count,
+                      pts_LibXmountOptions *pp_options,
                       char **pp_error);
 
   //! Function to get content to add to the info file

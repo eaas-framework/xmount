@@ -88,6 +88,7 @@ static int FindInputLib(pts_InputImage);
 static int FindMorphingLib();
 static void InitResources();
 static void FreeResources();
+static int SplitLibraryParameters(char*, uint32_t*, pts_LibXmountOptions**);
 // Functions exported to LibXmount_Morphing
 static int LibXmount_Morphing_ImageCount(uint64_t*);
 static int LibXmount_Morphing_Size(uint64_t, uint64_t*);
@@ -146,11 +147,11 @@ static void LogMessage(char *p_msg_type,
  */
 static void PrintUsage(char *p_prog_name) {
   char *p_buf;
-  int first=1;
+  int first;
 
   printf("\n" XMOUNT_COPYRIGHT_NOTICE "\n",XMOUNT_VERSION);
   printf("\nUsage:\n");
-  printf("  %s [fopts] --in <itype> <ifile> [<mopts>] <mntp>\n\n",p_prog_name);
+  printf("  %s [fopts] <xopts> <mntp>\n\n",p_prog_name);
   printf("Options:\n");
   printf("  fopts:\n");
   printf("    -d : Enable FUSE's and xmount's debug mode.\n");
@@ -158,10 +159,10 @@ static void PrintUsage(char *p_prog_name) {
   printf("    -s : Run single threaded.\n");
   printf("    -o no_allow_other : Disable automatic addition of FUSE's "
            "allow_other option.\n");
-  printf("    -o <fmopts> : Specify fuse mount options. Will also disable "
+  printf("    -o <fopts> : Specify fuse mount options. Will also disable "
            "automatic addition of FUSE's allow_other option!\n");
   printf("\n");
-  printf("  mopts:\n");
+  printf("  xopts:\n");
   printf("    --cache <cfile> : Enable virtual write support.\n");
   printf("      <cfile> specifies the cache file to use.\n");
   printf("    --in <itype> <ifile> : Input image format and source file(s). "
@@ -169,6 +170,7 @@ static void PrintUsage(char *p_prog_name) {
   printf("      <itype> can be ");
 
   // List supported input formats
+  first=1;
   for(uint32_t i=0;i<glob_xmount.input.libs_count;i++) {
     p_buf=glob_xmount.input.pp_libs[i]->p_supported_input_types;
     while(*p_buf!='\0') {
@@ -185,15 +187,30 @@ static void PrintUsage(char *p_prog_name) {
            "multiple files, you have to specify them all!\n");
   printf("    --inopts <iopts> : Specify input library specific options.\n");
   printf("      <iopts> specifies a comma separated list of key=value options. "
-           "See below for possible values.\n");
+           "See below for details.\n");
   printf("    --info : Print out infos about used compiler and libraries.\n");
   printf("    --morph <mtype> : Morphing function to apply to input image(s). "
            "If not specified, defaults to \"combine\".\n");
   printf("      <mtype> can be ");
 
-  // TODO: List supported morphing functions
+  // List supported morphing functions
+  first=1;
+  for(uint32_t i=0;i<glob_xmount.morphing.libs_count;i++) {
+    p_buf=glob_xmount.morphing.pp_libs[i]->p_supported_morphing_types;
+    while(*p_buf!='\0') {
+      if(first==1) {
+        printf("\"%s\"",p_buf);
+        first=0;
+      } else printf(", \"%s\"",p_buf);
+      p_buf+=(strlen(p_buf)+1);
+    }
+  }
   printf(".\n");
 
+  printf("    --morphopts <mopts> : Specify morphing library specific "
+           "options.\n");
+  printf("      <mopts> specifies a comma separated list of key=value options. "
+           "See below for details.\n");
   printf("    --offset <off> : Move the output image data start <off> bytes "
            "into the input image(s).\n");
   printf("    --out <otype> : Output image format. If not specified, "
@@ -213,35 +230,35 @@ static void PrintUsage(char *p_prog_name) {
   printf("    --version : Same as --info.\n");
   printf("\n");
   printf("  mntp:\n");
-  printf("    Mount point where virtual files should be located.\n");
+  printf("    Mount point where output image should be located.\n");
   printf("\n");
   printf("Infos:\n");
-  printf("  * The --in option is mandatory!\n");
-  printf("  * If you specify --in multiple times, all images are morphed "
-           "using the specified morphing function before they are converted to "
-           "the specified output format.\n");
+  printf("  * One --in option and a mount point are mandatory!\n");
+  printf("  * If you specify --in multiple times, data from all images is "
+           "morphed into one output image using the specified morphing "
+           "function.\n");
   printf("  * For VMDK emulation, you have to uncomment \"user_allow_other\" "
            "in /etc/fuse.conf or run xmount as root.\n");
   printf("\n");
   printf("Input / Morphing library specific options:\n");
-  printf("  Some input / morphing libraries might support an own set of "
+  printf("  Input / Morphing libraries might support an own set of "
            "options to configure / tune their behaviour.\n");
   printf("  Libraries supporting this feature (if any) and and their "
            "options are listed below.\n");
   printf("\n");
 
-  // List input / morphing lib options
+  // List input and morphing lib options
   for(uint32_t i=0;i<glob_xmount.input.libs_count;i++) {
     p_buf=(char*)(glob_xmount.input.pp_libs[i]->lib_functions.OptionsHelp());
     if(p_buf==NULL) continue;
-    printf("    - %s\n",glob_xmount.input.pp_libs[i]->p_name);
+    printf("  - %s\n",glob_xmount.input.pp_libs[i]->p_name);
     printf("%s\n",p_buf);
     printf("\n");
   }
   for(uint32_t i=0;i<glob_xmount.morphing.libs_count;i++) {
     p_buf=(char*)(glob_xmount.morphing.pp_libs[i]->lib_functions.OptionsHelp());
     if(p_buf==NULL) continue;
-    printf("    - %s\n",glob_xmount.morphing.pp_libs[i]->p_name);
+    printf("  - %s\n",glob_xmount.morphing.pp_libs[i]->p_name);
     printf("%s\n",p_buf);
     printf("\n");
   }
@@ -478,8 +495,16 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
       } else if(strcmp(pp_argv[i],"--inopts")==0) {
         if((argc+1)>i) {
           i++;
-          if(glob_xmount.input.p_lib_params==NULL) {
-            XMOUNT_STRSET(glob_xmount.input.p_lib_params,pp_argv[i]);
+          if(glob_xmount.input.pp_lib_params==NULL) {
+            if(SplitLibraryParameters(pp_argv[i],
+                                      &(glob_xmount.input.lib_params_count),
+                                      &(glob_xmount.input.pp_lib_params)
+                                     )==FALSE)
+            {
+              LOG_ERROR("Unable to parse input library options '%s'!\n",
+                        pp_argv[i]);
+              return FALSE;
+            }
           } else {
             LOG_ERROR("You can only specify --inopts once!")
             return FALSE;
@@ -504,8 +529,16 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
       } else if(strcmp(pp_argv[i],"--morphopts")==0) {
         if((argc+1)>i) {
           i++;
-          if(glob_xmount.morphing.p_lib_params==NULL) {
-            XMOUNT_STRSET(glob_xmount.morphing.p_lib_params,pp_argv[i]);
+          if(glob_xmount.morphing.pp_lib_params==NULL) {
+            if(SplitLibraryParameters(pp_argv[i],
+                                      &(glob_xmount.morphing.lib_params_count),
+                                      &(glob_xmount.morphing.pp_lib_params)
+                                     )==FALSE)
+            {
+              LOG_ERROR("Unable to parse morphing library options '%s'!\n",
+                        pp_argv[i]);
+              return FALSE;
+            }
           } else {
             LOG_ERROR("You can only specify --morphopts once!")
             return FALSE;
@@ -1936,31 +1969,58 @@ static int InitVirtualVmdkFile() {
  * \return TRUE on success, FALSE on error
  */
 static int InitVirtImageInfoFile() {
-  //int ret;
-  //char *p_buf;
+  int ret;
+  char *p_buf;
 
-  // Add static header
+  // Start with static input header
   XMOUNT_MALLOC(glob_xmount.output.p_info_file,
                 char*,
-                strlen(IMAGE_INFO_HEADER)+1);
+                strlen(IMAGE_INFO_INPUT_HEADER)+1);
   strncpy(glob_xmount.output.p_info_file,
-          IMAGE_INFO_HEADER,
-          strlen(IMAGE_INFO_HEADER)+1);
+          IMAGE_INFO_INPUT_HEADER,
+          strlen(IMAGE_INFO_INPUT_HEADER)+1);
 
-  // Get infos from input lib
-  // TODO
-/*
-  ret=glob_p_input_functions->GetInfofileContent(glob_p_input_image,&p_buf);
-  if(ret!=0) {
-    LOG_ERROR("Unable to get info file content: %s!\n",
-              glob_p_input_functions->GetErrorMessage(ret));
-    return FALSE;
+  // Get and add infos from input lib(s)
+  for(uint64_t i=0;i<glob_xmount.input.images_count;i++) {
+    ret=glob_xmount.input.pp_images[i]->p_functions->
+          GetInfofileContent(glob_xmount.input.pp_images[i],&p_buf);
+    if(ret!=0) {
+      LOG_ERROR("Unable to get info file content for image '%s': %s!\n",
+                glob_xmount.input.pp_images[i]->pp_files[0],
+                glob_xmount.input.pp_images[i]->p_functions->
+                  GetErrorMessage(ret));
+      return FALSE;
+    }
+    // Add infos to main buffer and free p_buf
+    XMOUNT_STRAPP(glob_xmount.output.p_info_file,"\n--> ");
+    XMOUNT_STRAPP(glob_xmount.output.p_info_file,
+                  glob_xmount.input.pp_images[i]->pp_files[0]);
+    XMOUNT_STRAPP(glob_xmount.output.p_info_file," <--\n");
+    if(p_buf!=NULL) {
+      XMOUNT_STRAPP(glob_xmount.output.p_info_file,p_buf);
+      glob_xmount.input.pp_images[i]->p_functions->FreeBuffer(p_buf);
+    } else {
+      XMOUNT_STRAPP(glob_xmount.output.p_info_file,"None");
+    }
   }
 
-  // Add infos to main buffer and free p_buf
-  XMOUNT_STRAPP(glob_xmount.output.p_info_file,p_buf);
-  glob_p_input_functions->FreeBuffer(p_buf);
-*/
+  // Add static morphing header
+  XMOUNT_STRAPP(glob_xmount.output.p_info_file,IMAGE_INFO_MORPHING_HEADER);
+
+  // Get and add infos from morphing lib
+  ret=glob_xmount.morphing.p_functions->
+        GetInfofileContent(glob_xmount.morphing.p_handle,&p_buf);
+  if(ret!=0) {
+    LOG_ERROR("Unable to get info file content from morphing lib: %s!\n",
+              glob_xmount.morphing.p_functions->GetErrorMessage(ret));
+    return FALSE;
+  }
+  if(p_buf!=NULL) {
+    XMOUNT_STRAPP(glob_xmount.output.p_info_file,p_buf);
+    glob_xmount.morphing.p_functions->FreeBuffer(p_buf);
+  } else {
+    XMOUNT_STRAPP(glob_xmount.output.p_info_file,"None\n");
+  }
 
   return TRUE;
 }
@@ -2461,7 +2521,8 @@ static void InitResources() {
   // Input
   glob_xmount.input.libs_count=0;
   glob_xmount.input.pp_libs=NULL;
-  glob_xmount.input.p_lib_params=NULL;
+  glob_xmount.input.lib_params_count=0;
+  glob_xmount.input.pp_lib_params=NULL;
   glob_xmount.input.images_count=0;
   glob_xmount.input.pp_images=NULL;
   glob_xmount.input.image_offset=0;
@@ -2472,7 +2533,8 @@ static void InitResources() {
   glob_xmount.morphing.libs_count=0;
   glob_xmount.morphing.pp_libs=NULL;
   glob_xmount.morphing.p_morph_type=NULL;
-  glob_xmount.morphing.p_lib_params=NULL;
+  glob_xmount.morphing.lib_params_count=0;
+  glob_xmount.morphing.pp_lib_params=NULL;
   glob_xmount.morphing.p_handle=NULL;
   glob_xmount.morphing.p_functions=NULL;
   glob_xmount.morphing.input_image_functions.ImageCount=
@@ -2582,8 +2644,11 @@ static void FreeResources() {
       }
     }
   }
-  if(glob_xmount.morphing.p_lib_params!=NULL)
-    free(glob_xmount.morphing.p_lib_params);
+  if(glob_xmount.morphing.pp_lib_params!=NULL) {
+    for(uint32_t i=0;i<glob_xmount.morphing.lib_params_count;i++)
+      free(glob_xmount.morphing.pp_lib_params[i]);
+    free(glob_xmount.morphing.pp_lib_params);
+  }
   if(glob_xmount.morphing.p_morph_type!=NULL)
     free(glob_xmount.morphing.p_morph_type);
   if(glob_xmount.morphing.pp_libs!=NULL) {
@@ -2637,7 +2702,11 @@ static void FreeResources() {
     }
     free(glob_xmount.input.pp_images);
   }
-  if(glob_xmount.input.p_lib_params!=NULL) free(glob_xmount.input.p_lib_params);
+  if(glob_xmount.input.pp_lib_params!=NULL) {
+    for(uint32_t i=0;i<glob_xmount.input.lib_params_count;i++)
+      free(glob_xmount.input.pp_lib_params[i]);
+    free(glob_xmount.input.pp_lib_params);
+  }
   if(glob_xmount.input.pp_libs!=NULL) {
     // Unload all input libs
     for(uint32_t i=0;i<glob_xmount.input.libs_count;i++) {
@@ -2655,6 +2724,96 @@ static void FreeResources() {
   // Before we return, initialize everything in case ReleaseResources would be
   // called again.
   InitResources();
+}
+
+//! Function to split given library options
+static int SplitLibraryParameters(char *p_params,
+                                  uint32_t *p_ret_opts_count,
+                                  pts_LibXmountOptions **ppp_ret_opt)
+{
+  pts_LibXmountOptions p_opts=NULL;
+  pts_LibXmountOptions *pp_opts=NULL;
+  uint32_t params_len;
+  uint32_t opts_count=0;
+  uint32_t sep_pos=0;
+  char *p_buf=p_params;
+
+  if(p_params==NULL) return FALSE;
+
+  // Get params length
+  params_len=strlen(p_params);
+
+  // Return if no params specified
+  if(params_len==0) {
+    *ppp_ret_opt=NULL;
+    p_ret_opts_count=0;
+    return TRUE;
+  }
+
+  // Split params
+  while(*p_buf!='\0') {
+    XMOUNT_MALLOC(p_opts,pts_LibXmountOptions,sizeof(ts_LibXmountOptions));
+    p_opts->valid=0;
+
+#define FREE_PP_OPTS() {                                 \
+  if(pp_opts!=NULL) {                                    \
+    for(uint32_t i=0;i<opts_count;i++) free(pp_opts[i]); \
+    free(pp_opts);                                       \
+  }                                                      \
+}
+
+    // Search next assignment operator
+    sep_pos=0;
+    while(p_buf[sep_pos]!='\0' &&  p_buf[sep_pos]!='=') sep_pos++;
+    if(sep_pos==0 || p_buf[sep_pos]=='\0') {
+      LOG_ERROR("Library parameter '%s' is missing an assignment operator!\n",
+                p_buf);
+      free(p_opts);
+      FREE_PP_OPTS();
+      return FALSE;
+    }
+
+    // Save option key
+    XMOUNT_STRNSET(p_opts->p_key,p_buf,sep_pos);
+    p_buf+=(sep_pos+1);
+
+    // Search next separator
+    sep_pos=0;
+    while(p_buf[sep_pos]!='\0' &&  p_buf[sep_pos]!=',') sep_pos++;
+    if(sep_pos==0) {
+      LOG_ERROR("Library parameter '%s' is not of format key=value!\n",
+                p_opts->p_key);
+      free(p_opts->p_key);
+      free(p_opts);
+      FREE_PP_OPTS();
+      return FALSE;
+    }
+
+    // Save option value
+    XMOUNT_STRNSET(p_opts->p_value,p_buf,sep_pos);
+    p_buf+=sep_pos;
+
+    LOG_DEBUG("Extracted library option: '%s' = '%s'\n",
+              p_opts->p_key,
+              p_opts->p_value);
+
+#undef FREE_PP_OPTS
+
+    // Add current option to return array
+    XMOUNT_REALLOC(pp_opts,
+                   pts_LibXmountOptions*,
+                   sizeof(pts_LibXmountOptions)*(opts_count+1));
+    pp_opts[opts_count++]=p_opts;
+
+    // If we're not at the end of p_params, skip over separator for next run
+    if(*p_buf!='\0') p_buf++;
+  }
+
+  LOG_DEBUG("Extracted a total of %" PRIu32 " library options\n",opts_count);
+
+  *p_ret_opts_count=opts_count;
+  *ppp_ret_opt=pp_opts;
+  return TRUE;
 }
 
 /*******************************************************************************
@@ -3394,10 +3553,11 @@ int main(int argc, char *argv[]) {
     }
 
     // Parse input lib specific options
-    if(glob_xmount.input.p_lib_params!=NULL) {
+    if(glob_xmount.input.pp_lib_params!=NULL) {
       ret=glob_xmount.input.pp_images[i]->p_functions->
             OptionsParse(glob_xmount.input.pp_images[i]->p_handle,
-                         glob_xmount.input.p_lib_params,
+                         glob_xmount.input.lib_params_count,
+                         glob_xmount.input.pp_lib_params,
                          &p_err_msg);
       if(ret!=0) {
         if(p_err_msg!=NULL) {

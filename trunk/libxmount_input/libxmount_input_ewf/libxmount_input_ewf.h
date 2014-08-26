@@ -53,7 +53,8 @@ static int EwfRead(void *p_handle,
 static int EwfClose(void **pp_handle);
 static const char* EwfOptionsHelp();
 static int EwfOptionsParse(void *p_handle,
-                           char *p_options,
+                           uint32_t options_count,
+                           pts_LibXmountOptions *pp_options,
                            char **pp_error);
 static int EwfGetInfofileContent(void *p_handle,
                                  char **pp_info_buf);

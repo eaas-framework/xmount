@@ -210,7 +210,9 @@ static int DdClose(void **pp_handle) {
  * DdSize
  */
 static int DdSize(void *p_handle, uint64_t *p_size) {
-  *p_size=((t_pdd)p_handle)->TotalSize;
+  t_pdd p_dd_handle=(t_pdd)p_handle;
+
+  *p_size=p_dd_handle->TotalSize;
   return DD_OK;
 }
 
@@ -222,16 +224,17 @@ static int DdRead(void *p_handle,
                   char *p_buf,
                   uint32_t count)
 {
+  t_pdd p_dd_handle=(t_pdd)p_handle;
   uint32_t remaining=count;
   uint32_t read;
 
-  if((seek+count)>((t_pdd)p_handle)->TotalSize) {
+  if((seek+count)>p_dd_handle->TotalSize) {
     return DD_READ_BEYOND_END_OF_IMAGE;
   }
 
   do {
     read=remaining;
-    CHK(DdRead0((t_pdd)p_handle,seek,p_buf,&read))
+    CHK(DdRead0(p_dd_handle,seek,p_buf,&read))
     remaining-=read;
     p_buf+=read;
     seek+=read;
@@ -250,7 +253,11 @@ static const char* DdOptionsHelp() {
 /*
  * DdOptionsParse
  */
-static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
+static int DdOptionsParse(void *p_handle,
+                          uint32_t options_count,
+                          pts_LibXmountOptions *pp_options,
+                          char **pp_error)
+{
   return DD_OK;
 }
 
@@ -258,14 +265,16 @@ static int DdOptionsParse(void *p_handle, char *p_options, char **pp_error) {
  * DdGetInfofileContent
  */
 static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
+  t_pdd p_dd_handle=(t_pdd)p_handle;
   int ret;
 
+  // TODO: TotalSize seems to be incorrect here???
   ret=asprintf(pp_info_buf,
-               "DD image assembled of %" PRIu64 " pieces\n"
+               "DD image assembled of %" PRIu64 " piece(s)\n"
                  "%" PRIu64 " bytes in total (%0.3f GiB)\n",
-               ((t_pdd)p_handle)->Pieces,
-               ((t_pdd)p_handle)->TotalSize,
-               ((t_pdd)p_handle)->TotalSize/(1024.0*1024.0*1024.0));
+               p_dd_handle->Pieces,
+               p_dd_handle->TotalSize,
+               p_dd_handle->TotalSize/(1024.0*1024.0*1024.0));
   if(ret<0 || *pp_info_buf==NULL) return DD_MEMALLOC_FAILED;
 
   return DD_OK;
