@@ -98,9 +98,10 @@ static int DdClose(void **pp_handle);
 static int DdSize(void *p_handle,
                   uint64_t *p_size);
 static int DdRead(void *p_handle,
-                  uint64_t seek,
                   char *p_buf,
-                  uint32_t count);
+                  off_t seek,
+                  size_t count,
+                  size_t *p_read);
 static const char* DdOptionsHelp();
 static int DdOptionsParse(void *p_handle,
                           uint32_t options_count,

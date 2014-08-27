@@ -80,7 +80,7 @@ static inline int DdSetCurrentSeekPos (t_pPiece pPiece,
   return DD_OK;
 }
 
-static int DdRead0 (t_pdd pdd, uint64_t Seek, char *pBuffer, uint32_t *pCount)
+static int DdRead0 (t_pdd pdd, char *pBuffer, uint64_t Seek, uint32_t *pCount)
 {
   t_pPiece pPiece;
   uint64_t  i;
@@ -220,26 +220,28 @@ static int DdSize(void *p_handle, uint64_t *p_size) {
  * DdRead
  */
 static int DdRead(void *p_handle,
-                  uint64_t seek,
                   char *p_buf,
-                  uint32_t count)
+                  off_t seek,
+                  size_t count,
+                  size_t *p_read)
 {
   t_pdd p_dd_handle=(t_pdd)p_handle;
   uint32_t remaining=count;
-  uint32_t read;
+  uint32_t to_read;
 
   if((seek+count)>p_dd_handle->TotalSize) {
     return DD_READ_BEYOND_END_OF_IMAGE;
   }
 
   do {
-    read=remaining;
-    CHK(DdRead0(p_dd_handle,seek,p_buf,&read))
-    remaining-=read;
-    p_buf+=read;
-    seek+=read;
+    to_read=remaining;
+    CHK(DdRead0(p_dd_handle,p_buf,seek,&to_read))
+    remaining-=to_read;
+    p_buf+=to_read;
+    seek+=to_read;
   } while(remaining);
 
+  *p_read=count;
   return DD_OK;
 }
 

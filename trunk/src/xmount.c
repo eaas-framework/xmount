@@ -891,9 +891,10 @@ static int GetInputImageData(pts_InputImage p_image,
 
   // Read data from image file (adding input image offset if one was specified)
   ret=p_image->p_functions->Read(p_image->p_handle,
-                                 offset+glob_xmount.input.image_offset,
                                  p_buf,
-                                 to_read);
+                                 offset+glob_xmount.input.image_offset,
+                                 to_read,
+                                 p_read);
   if(ret!=0) {
     LOG_ERROR("Couldn't read %zu bytes at offset %zu from input image "
                 "'%s': %s!\n",
@@ -904,7 +905,6 @@ static int GetInputImageData(pts_InputImage p_image,
     return -EIO;
   }
 
-  *p_read=to_read;
   return 0;
 }
 
@@ -1983,7 +1983,7 @@ static int InitVirtImageInfoFile() {
   // Get and add infos from input lib(s)
   for(uint64_t i=0;i<glob_xmount.input.images_count;i++) {
     ret=glob_xmount.input.pp_images[i]->p_functions->
-          GetInfofileContent(glob_xmount.input.pp_images[i],&p_buf);
+          GetInfofileContent(glob_xmount.input.pp_images[i]->p_handle,&p_buf);
     if(ret!=0) {
       LOG_ERROR("Unable to get info file content for image '%s': %s!\n",
                 glob_xmount.input.pp_images[i]->pp_files[0],
@@ -2000,7 +2000,7 @@ static int InitVirtImageInfoFile() {
       XMOUNT_STRAPP(glob_xmount.output.p_info_file,p_buf);
       glob_xmount.input.pp_images[i]->p_functions->FreeBuffer(p_buf);
     } else {
-      XMOUNT_STRAPP(glob_xmount.output.p_info_file,"None");
+      XMOUNT_STRAPP(glob_xmount.output.p_info_file,"None\n");
     }
   }
 
@@ -2396,29 +2396,25 @@ static int LoadLibs() {
 
       // Get, set and check lib_functions
       pfun_morphing_GetFunctions(&(p_morphing_lib->lib_functions));
-/*
-      // TODO
-      if(p_input_lib->lib_functions.CreateHandle==NULL ||
-         p_input_lib->lib_functions.DestroyHandle==NULL ||
-         p_input_lib->lib_functions.Open==NULL ||
-         p_input_lib->lib_functions.Close==NULL ||
-         p_input_lib->lib_functions.Size==NULL ||
-         p_input_lib->lib_functions.Read==NULL ||
-         p_input_lib->lib_functions.OptionsHelp==NULL ||
-         p_input_lib->lib_functions.OptionsParse==NULL ||
-         p_input_lib->lib_functions.GetInfofileContent==NULL ||
-         p_input_lib->lib_functions.GetErrorMessage==NULL ||
-         p_input_lib->lib_functions.FreeBuffer==NULL)
+      if(p_morphing_lib->lib_functions.CreateHandle==NULL ||
+         p_morphing_lib->lib_functions.DestroyHandle==NULL ||
+         p_morphing_lib->lib_functions.Morph==NULL ||
+         p_morphing_lib->lib_functions.Size==NULL ||
+         p_morphing_lib->lib_functions.Read==NULL ||
+         p_morphing_lib->lib_functions.OptionsHelp==NULL ||
+         p_morphing_lib->lib_functions.OptionsParse==NULL ||
+         p_morphing_lib->lib_functions.GetInfofileContent==NULL ||
+         p_morphing_lib->lib_functions.GetErrorMessage==NULL ||
+         p_morphing_lib->lib_functions.FreeBuffer==NULL)
       {
         LOG_DEBUG("Missing implemention of one or more functions in lib %s!\n",
                   p_dirent->d_name);
-        free(p_input_lib->p_supported_input_types);
-        free(p_input_lib->p_name);
-        free(p_input_lib);
+        free(p_morphing_lib->p_supported_morphing_types);
+        free(p_morphing_lib->p_name);
+        free(p_morphing_lib);
         dlclose(p_libxmount);
         continue;
       }
-*/
 
       // Add entry to the input library list
       XMOUNT_REALLOC(glob_xmount.morphing.pp_libs,

@@ -136,16 +136,24 @@ static int AffSize(void *p_handle, uint64_t *p_size) {
  * AffRead
  */
 static int AffRead(void *p_handle,
-                   uint64_t offset,
                    char *p_buf,
-                   uint32_t count)
+                   off_t offset,
+                   size_t count,
+                   size_t *p_read)
 {
+  size_t bytes_read;
+
+  // Seek to requested position
   if(af_seek((AFFILE*)p_handle,offset,SEEK_SET)!=offset) {
     return AFF_SEEK_FAILED;
   }
-  if(af_read((AFFILE*)p_handle,(unsigned char*)p_buf,count)!=count) {
-    return AFF_READ_FAILED;
-  }
+
+  // Read data
+  // TODO: Check for errors
+  bytes_read=af_read((AFFILE*)p_handle,(unsigned char*)p_buf,count);
+  if(bytes_read!=count) return AFF_READ_FAILED;
+
+  *p_read=bytes_read;
   return AFF_OK;
 }
 

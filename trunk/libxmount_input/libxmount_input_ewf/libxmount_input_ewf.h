@@ -47,9 +47,10 @@ static int EwfOpen(void **pp_handle,
 static int EwfSize(void *p_handle,
                    uint64_t *p_size);
 static int EwfRead(void *p_handle,
-                   uint64_t seek,
                    char *p_buf,
-                   uint32_t count);
+                   off_t seek,
+                   size_t count,
+                   size_t *p_read);
 static int EwfClose(void **pp_handle);
 static const char* EwfOptionsHelp();
 static int EwfOptionsParse(void *p_handle,

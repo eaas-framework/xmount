@@ -187,10 +187,13 @@ static int EwfSize(void *p_handle, uint64_t *p_size) {
  * EwfRead
  */
 static int EwfRead(void *p_handle,
-                   uint64_t offset,
                    char *p_buf,
-                   uint32_t count)
+                   off_t offset,
+                   size_t count,
+                   size_t *p_read)
 {
+  size_t bytes_read;
+
 #ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_seek_offset((libewf_handle_t*)p_handle,
                                offset,
@@ -201,20 +204,19 @@ static int EwfRead(void *p_handle,
 #endif
   {
 #ifdef HAVE_LIBEWF_V2_API
-    if(libewf_handle_read_buffer((libewf_handle_t*)p_handle,
-                                 p_buf,
-                                 count,
-                                 NULL)!=count)
+    bytes_read=libewf_handle_read_buffer((libewf_handle_t*)p_handle,
+                                         p_buf,
+                                         count,
+                                         NULL);
 #else
-  
-    if(libewf_read_buffer((LIBEWF_HANDLE*)p_handle,p_buf,count)!=count)
+    bytes_read=libewf_read_buffer((LIBEWF_HANDLE*)p_handle,p_buf,count);
 #endif
-    {
-      return EWF_READ_FAILED;
-    }
+    if(bytes_read!=count) return EWF_READ_FAILED;
   } else {
     return EWF_SEEK_FAILED;
   }
+
+  *p_read=bytes_read;
   return EWF_OK;
 }
 
@@ -240,118 +242,154 @@ static int EwfOptionsParse(void *p_handle,
  * EwfGetInfofileContent
  */
 static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
+  char *p_infobuf=NULL;
   int ret;
   char buf[512];
+  uint8_t uint8value;
+  uint32_t uint32value;
+  uint64_t uint64value;
 #ifdef HAVE_LIBEWF_V2_API
   libewf_handle_t *p_ewf=(libewf_handle_t*)p_handle;
 #else
   LIBEWF_HANDLE *p_ewf=(LIBEWF_HANDLE*)p_handle;
 #endif
-  *pp_info_buf=NULL;
 
-#define M_SAVE_VALUE(desc) {                                          \
-  if(ret==1) {                                                        \
-    if(*pp_info_buf!=NULL) {                                          \
-      *pp_info_buf=(char*)realloc(*pp_info_buf,                       \
-                                  strlen(*pp_info_buf)+strlen(desc)+  \
-                                    strlen(buf)+2);                   \
-      if(*pp_info_buf==NULL) return EWF_MEMALLOC_FAILED;              \
-      strncpy(*pp_info_buf+strlen(*pp_info_buf),desc,strlen(desc)+1); \
-    } else {                                                          \
-      *pp_info_buf=(char*)malloc(strlen(desc)+strlen(buf)+2);         \
-      if(*pp_info_buf==NULL) return EWF_MEMALLOC_FAILED;              \
-      strncpy(*pp_info_buf,desc,strlen(desc)+1);                      \
-    }                                                                 \
-    strncpy(*pp_info_buf+strlen(*pp_info_buf),buf,strlen(buf)+1);     \
-    strncpy(*pp_info_buf+strlen(*pp_info_buf),"\n",2);                \
-  }                                                                   \
+#define EWF_INFOBUF_REALLOC(size) {               \
+  p_infobuf=(char*)realloc(p_infobuf,size);       \
+  if(p_infobuf==NULL) return EWF_MEMALLOC_FAILED; \
+}
+#define EWF_INFOBUF_APPEND_STR(str) {                     \
+  if(p_infobuf!=NULL) {                                   \
+    EWF_INFOBUF_REALLOC(strlen(p_infobuf)+strlen(str)+1); \
+    strcpy(p_infobuf+strlen(p_infobuf),str);              \
+  } else {                                                \
+    EWF_INFOBUF_REALLOC(strlen(str)+1);                   \
+    strcpy(p_infobuf,str);                                \
+  }                                                       \
+}
+#define EWF_INFOBUF_APPEND_VALUE(desc) { \
+  if(ret==1) {                           \
+    EWF_INFOBUF_APPEND_STR(desc);        \
+    EWF_INFOBUF_APPEND_STR(buf);         \
+    EWF_INFOBUF_APPEND_STR("\n");        \
+  }                                      \
 }
 
+  EWF_INFOBUF_APPEND_STR("_Acquiry information_\n");
+
 #ifdef HAVE_LIBEWF_V2_API
-  ret=libewf_handle_get_utf8_header_value_case_number(p_ewf,
-                                                      (uint8_t*)buf,
-                                                      sizeof(buf),
-                                                      NULL);
-  M_SAVE_VALUE("Case number: ");
-  ret=libewf_handle_get_utf8_header_value_description(p_ewf,
-                                                      (uint8_t*)buf,
-                                                      sizeof(buf),
-                                                      NULL);
-  M_SAVE_VALUE("Description: ");
-  ret=libewf_handle_get_utf8_header_value_examiner_name(p_ewf,
-                                                        (uint8_t*)buf,
-                                                        sizeof(buf),
-                                                        NULL);
-  M_SAVE_VALUE("Examiner: ");
-  ret=libewf_handle_get_utf8_header_value_evidence_number(p_ewf,
-                                                          (uint8_t*)buf,
-                                                          sizeof(buf),
-                                                          NULL);
-  M_SAVE_VALUE("Evidence number: ");
-  ret=libewf_handle_get_utf8_header_value_notes(p_ewf,
-                                                (uint8_t*)buf,
-                                                sizeof(buf),
-                                                NULL);
-  M_SAVE_VALUE("Notes: ");
-  ret=libewf_handle_get_utf8_header_value_acquiry_date(p_ewf,
-                                                       (uint8_t*)buf,
-                                                       sizeof(buf),
-                                                       NULL);
-  M_SAVE_VALUE("Acquiry date: ");
-  ret=libewf_handle_get_utf8_header_value_system_date(p_ewf,
-                                                      (uint8_t*)buf,
-                                                      sizeof(buf),
-                                                      NULL);
-  M_SAVE_VALUE("System date: ");
-  ret=
-    libewf_handle_get_utf8_header_value_acquiry_operating_system(p_ewf,
-                                                                 (uint8_t*)buf,
-                                                                 sizeof(buf),
-                                                                 NULL);
-  M_SAVE_VALUE("Acquiry os: ");
-  ret=
-    libewf_handle_get_utf8_header_value_acquiry_software_version(p_ewf,
-                                                                 (uint8_t*)buf,
-                                                                 sizeof(buf),
-                                                                 NULL);
-  M_SAVE_VALUE("Acquiry sw version: ");
-  ret=libewf_handle_get_utf8_hash_value_md5(p_ewf,
-                                            (uint8_t*)buf,
-                                            sizeof(buf),
-                                            NULL);
-  M_SAVE_VALUE("MD5 hash: ");
-  ret=libewf_handle_get_utf8_hash_value_sha1(p_ewf,
-                                             (uint8_t*)buf,
-                                             sizeof(buf),
-                                             NULL);
-  M_SAVE_VALUE("SHA1 hash: ");
+  #define EWF_GET_HEADER_VALUE(fun) {              \
+    ret=fun(p_ewf,(uint8_t*)buf,sizeof(buf),NULL); \
+  }
+
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_case_number);
+  EWF_INFOBUF_APPEND_VALUE("Case number: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_description);
+  EWF_INFOBUF_APPEND_VALUE("Description: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_examiner_name);
+  EWF_INFOBUF_APPEND_VALUE("Examiner: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_evidence_number);
+  EWF_INFOBUF_APPEND_VALUE("Evidence number: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_notes);
+  EWF_INFOBUF_APPEND_VALUE("Notes: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_acquiry_date);
+  EWF_INFOBUF_APPEND_VALUE("Acquiry date: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_system_date);
+  EWF_INFOBUF_APPEND_VALUE("System date: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_acquiry_operating_system);
+  EWF_INFOBUF_APPEND_VALUE("Acquiry os: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_acquiry_software_version);
+  EWF_INFOBUF_APPEND_VALUE("Acquiry sw version: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_model);
+  EWF_INFOBUF_APPEND_VALUE("Model: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_serial_number);
+  EWF_INFOBUF_APPEND_VALUE("Serial number: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_hash_value_md5);
+  EWF_INFOBUF_APPEND_VALUE("MD5 hash: ");
+  EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_hash_value_sha1);
+  EWF_INFOBUF_APPEND_VALUE("SHA1 hash: ");
+
+  #undef EWF_GET_HEADER_VALUE
 #else
   ret=libewf_get_header_value_case_number(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Case number: ");
+  EWF_INFOBUF_APPEND_VALUE("Case number: ");
   ret=libewf_get_header_value_description(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Description: ");
+  EWF_INFOBUF_APPEND_VALUE("Description: ");
   ret=libewf_get_header_value_examiner_name(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Examiner: ");
+  EWF_INFOBUF_APPEND_VALUE("Examiner: ");
   ret=libewf_get_header_value_evidence_number(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Evidence number: ");
+  EWF_INFOBUF_APPEND_VALUE("Evidence number: ");
   ret=libewf_get_header_value_notes(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Notes: ");
+  EWF_INFOBUF_APPEND_VALUE("Notes: ");
   ret=libewf_get_header_value_acquiry_date(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Acquiry date: ");
+  EWF_INFOBUF_APPEND_VALUE("Acquiry date: ");
   ret=libewf_get_header_value_system_date(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("System date: ");
+  EWF_INFOBUF_APPEND_VALUE("System date: ");
   ret=libewf_get_header_value_acquiry_operating_system(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Acquiry os: ");
+  EWF_INFOBUF_APPEND_VALUE("Acquiry os: ");
   ret=libewf_get_header_value_acquiry_software_version(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("Acquiry sw version: ");
+  EWF_INFOBUF_APPEND_VALUE("Acquiry sw version: ");
+  ret=libewf_get_header_value_model(p_ewf,buf,sizeof(buf));
+  EWF_INFOBUF_APPEND_VALUE("Model: ");
+  ret=libewf_get_header_value_serial_number(p_ewf,buf,sizeof(buf));
+  EWF_INFOBUF_APPEND_VALUE("Serial number: ");
   ret=libewf_get_hash_value_md5(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("MD5 hash: ");
+  EWF_INFOBUF_APPEND_VALUE("MD5 hash: ");
   ret=libewf_get_hash_value_sha1(p_ewf,buf,sizeof(buf));
-  M_SAVE_VALUE("SHA1 hash: ");
+  EWF_INFOBUF_APPEND_VALUE("SHA1 hash: ");
 #endif
 
-#undef M_SAVE_VALUE
+  EWF_INFOBUF_APPEND_STR("\n_Media information_\n");
 
+#ifdef HAVE_LIBEWF_V2_API
+  ret=libewf_handle_get_media_type(p_ewf,&uint8value,NULL);
+#else
+  ret=libewf_get_media_type(p_ewf,&uint8value);
+#endif
+  if(ret==1) {
+    EWF_INFOBUF_APPEND_STR("Media type: ");
+    switch(uint8value) {
+      case LIBEWF_MEDIA_TYPE_REMOVABLE:
+        EWF_INFOBUF_APPEND_STR("removable disk\n");
+        break;
+      case LIBEWF_MEDIA_TYPE_FIXED:
+        EWF_INFOBUF_APPEND_STR("fixed disk\n");
+        break;
+      case LIBEWF_MEDIA_TYPE_OPTICAL:
+        EWF_INFOBUF_APPEND_STR("optical\n");
+        break;
+      case LIBEWF_MEDIA_TYPE_SINGLE_FILES:
+        EWF_INFOBUF_APPEND_STR("single files\n");
+        break;
+      case LIBEWF_MEDIA_TYPE_MEMORY:
+        EWF_INFOBUF_APPEND_STR("memory\n");
+        break;
+      default:
+        EWF_INFOBUF_APPEND_STR("unknown\n");
+    }
+  }
+
+#ifdef HAVE_LIBEWF_V2_API
+  ret=libewf_handle_get_bytes_per_sector(p_ewf,&uint32value,NULL);
+  sprintf(buf,"%" PRIu32,uint32value);
+  EWF_INFOBUF_APPEND_VALUE("Bytes per sector: ");
+  ret=libewf_handle_get_number_of_sectors(p_ewf,&uint64value,NULL);
+  sprintf(buf,"%" PRIu64,uint64value);
+  EWF_INFOBUF_APPEND_VALUE("Number of sectors: ");
+#else
+  ret=libewf_get_bytes_per_sector(p_ewf,&uint32value);
+  sprintf(buf,"%" PRIu32,uint32value);
+  EWF_INFOBUF_APPEND_VALUE("Bytes per sector: ");
+  ret=libewf_handle_get_amount_of_sectors(p_ewf,&uint64value);
+  sprintf(buf,"%" PRIu64,uint64value);
+  EWF_INFOBUF_APPEND_VALUE("Number of sectors: ");
+#endif
+
+#undef EWF_INFOBUF_APPEND_VALUE
+#undef EWF_INFOBUF_APPEND_STR
+#undef EWF_INFOBUF_REALLOC
+
+  *pp_info_buf=p_infobuf;
   return EWF_OK;
 }
 

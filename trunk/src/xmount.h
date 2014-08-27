@@ -30,9 +30,11 @@
  * Constants
  */
 #define IMAGE_INFO_INPUT_HEADER \
-  "The following values are supplied by the used input library(ies):\n"
+  "------> The following values are supplied by the used input library(ies) " \
+    "<------\n"
 #define IMAGE_INFO_MORPHING_HEADER \
-  "\nThe following values are supplied by the used morphing library:\n\n"
+  "\n------> The following values are supplied by the used morphing library " \
+    "<------\n\n"
 
 /*******************************************************************************
  * Structures of output images
