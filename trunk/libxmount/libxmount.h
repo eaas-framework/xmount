@@ -28,10 +28,10 @@ typedef struct s_LibXmountOptions {
   uint8_t valid;
 } ts_LibXmountOptions, *pts_LibXmountOptions;
 
-int32_t LibXmountOptions_ValueToInt32(char *p_value, int *p_ok);
-uint32_t LibXmountOptions_ValueToUint32(char *p_value, int *p_ok);
-int64_t LibXmountOptions_ValueToInt64(char *p_value, int *p_ok);
-uint64_t LibXmountOptions_ValueToUint64(char *p_value, int *p_ok);
+int32_t StrToInt32(const char *p_value, int *p_ok);
+uint32_t StrToUint32(const char *p_value, int *p_ok);
+int64_t StrToInt64(const char *p_value, int *p_ok);
+uint64_t StrToUint64(const char *p_value, int *p_ok);
 
 #endif // LIBXMOUNT_H
 

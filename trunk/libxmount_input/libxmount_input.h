@@ -42,7 +42,8 @@ typedef struct s_LibXmountInputFunctions {
    * \param p_format Input image format
    * \return 0 on success or error code
    */
-  int (*CreateHandle)(void **pp_handle, char *p_format);
+  int (*CreateHandle)(void **pp_handle,
+                      const char *p_format);
 
   //! Function to destroy handle
   /*!
@@ -62,12 +63,12 @@ typedef struct s_LibXmountInputFunctions {
   /*!
    * Opens the specified image for reading.
    *
-   * \param pp_handle Pointer to handle
+   * \param p_handle Handle
    * \param pp_filename_arr Array containing all specified input images
    * \param filename_arr_len Length of pp_filename_arr
    * \return 0 on success or error code
    */
-  int (*Open)(void **pp_handle,
+  int (*Open)(void *p_handle,
               const char **pp_filename_arr,
               uint64_t filename_arr_len);
 
@@ -77,10 +78,10 @@ typedef struct s_LibXmountInputFunctions {
    * not invalidate the main handle. Further calls to for ex. Open() must still
    * be possible without first calling CreateHandle again!
    *
-   * \param pp_handle Pointer to the handle of the opened image
+   * \param p_handle Handle
    * \return 0 on success or error code
    */
-  int (*Close)(void **pp_handle);
+  int (*Close)(void *p_handle);
 
   //! Function to get the input image's size
   /*!
@@ -144,7 +145,7 @@ typedef struct s_LibXmountInputFunctions {
    */
   int (*OptionsParse)(void *p_handle,
                       uint32_t options_count,
-                      pts_LibXmountOptions *pp_options,
+                      const pts_LibXmountOptions *pp_options,
                       char **pp_error);
 
   //! Function to get content to add to the info file

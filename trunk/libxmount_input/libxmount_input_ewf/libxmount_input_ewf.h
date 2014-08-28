@@ -19,8 +19,9 @@
 #define LIBXMOUNT_INPUT_EWF_H
 
 /*******************************************************************************
- * Error codes
+ * Enums, Typedefs, etc...
  ******************************************************************************/
+//! Possible error return codes
 enum {
   EWF_OK=0,
   EWF_MEMALLOC_FAILED,
@@ -36,14 +37,27 @@ enum {
   EWF_READ_FAILED
 };
 
+//! Library handle
+typedef struct s_EwfHandle {
+#ifdef HAVE_LIBEWF_V2_API
+  //! EWF handle
+  libewf_handle_t *h_ewf;
+#else
+  //! EWF handle
+  LIBEWF_HANDLE *h_ewf;
+#endif
+} ts_EwfHandle, *pts_EwfHandle;
+
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int EwfCreateHandle(void **pp_handle, char *p_format);
+static int EwfCreateHandle(void **pp_handle,
+                           const char *p_format);
 static int EwfDestroyHandle(void **pp_handle);
-static int EwfOpen(void **pp_handle,
+static int EwfOpen(void *p_handle,
                    const char **pp_filename_arr,
                    uint64_t filename_arr_len);
+static int EwfClose(void *p_handle);
 static int EwfSize(void *p_handle,
                    uint64_t *p_size);
 static int EwfRead(void *p_handle,
@@ -51,11 +65,10 @@ static int EwfRead(void *p_handle,
                    off_t seek,
                    size_t count,
                    size_t *p_read);
-static int EwfClose(void **pp_handle);
 static const char* EwfOptionsHelp();
 static int EwfOptionsParse(void *p_handle,
                            uint32_t options_count,
-                           pts_LibXmountOptions *pp_options,
+                           const pts_LibXmountOptions *pp_options,
                            char **pp_error);
 static int EwfGetInfofileContent(void *p_handle,
                                  char **pp_info_buf);

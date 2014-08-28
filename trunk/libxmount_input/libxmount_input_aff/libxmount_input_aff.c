@@ -69,10 +69,18 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*
  * AffCreateHandle
  */
-static int AffCreateHandle(void **pp_handle, char *p_format) {
+static int AffCreateHandle(void **pp_handle, const char *p_format) {
   (void)p_format;
+  pts_AffHandle p_aff_handle;
 
-  *pp_handle=NULL;
+  // Alloc new lib handle
+  p_aff_handle=(pts_AffHandle)malloc(sizeof(ts_AffHandle));
+  if(p_aff_handle==NULL) return AFF_MEMALLOC_FAILED;
+
+  // Init lib handle  
+  p_aff_handle->h_aff=NULL;
+
+  *pp_handle=p_aff_handle;
   return AFF_OK;
 }
 
@@ -80,6 +88,11 @@ static int AffCreateHandle(void **pp_handle, char *p_format) {
  * AffDestroyHandle
  */
 static int AffDestroyHandle(void **pp_handle) {
+  pts_AffHandle p_aff_handle=(pts_AffHandle)*pp_handle;
+
+  // Free lib handle
+  if(p_aff_handle!=NULL) free(p_aff_handle);
+
   *pp_handle=NULL;
   return AFF_OK;
 }
@@ -87,28 +100,27 @@ static int AffDestroyHandle(void **pp_handle) {
 /*
  * AffOpen
  */
-static int AffOpen(void **pp_handle,
+static int AffOpen(void *p_handle,
                    const char **pp_filename_arr,
                    uint64_t filename_arr_len)
 {
-  AFFILE* p_aff=NULL;
+  pts_AffHandle p_aff_handle=(pts_AffHandle)p_handle;
 
   // We need exactly one file
   if(filename_arr_len==0) return AFF_NO_INPUT_FILES;
   if(filename_arr_len>1) return AFF_TOO_MANY_INPUT_FILES;
 
   // Open AFF file
-  p_aff=af_open(pp_filename_arr[0],O_RDONLY,0);
-  if(p_aff==NULL) {
+  p_aff_handle->h_aff=af_open(pp_filename_arr[0],O_RDONLY,0);
+  if(p_aff_handle->h_aff==NULL) {
     // LOG_ERROR("Couldn't open AFF file!\n")
     return AFF_OPEN_FAILED;
   }
 
-  *pp_handle=p_aff;
-
   // Encrypted images aren't supported for now
-  if(af_cannot_decrypt(p_aff)) {
-    AffClose(pp_handle);
+  // TODO: Add support trough lib params, f. ex. aff_password=xxxx
+  if(af_cannot_decrypt(p_aff_handle->h_aff)) {
+    af_close(p_aff_handle->h_aff);
     return AFF_ENCRYPTION_UNSUPPORTED;
   }
 
@@ -118,8 +130,12 @@ static int AffOpen(void **pp_handle,
 /*
  * AffClose
  */
-static int AffClose(void **pp_handle) {
-  if(af_close((AFFILE*)*pp_handle)!=0) return AFF_CLOSE_FAILED;
+static int AffClose(void *p_handle) {
+  pts_AffHandle p_aff_handle=(pts_AffHandle)p_handle;
+
+  // Close AFF handle
+  if(af_close(p_aff_handle->h_aff)!=0) return AFF_CLOSE_FAILED;
+
   return AFF_OK;
 }
 
@@ -127,8 +143,11 @@ static int AffClose(void **pp_handle) {
  * AffSize
  */
 static int AffSize(void *p_handle, uint64_t *p_size) {
-  *p_size=af_seek((AFFILE*)p_handle,0,SEEK_END);
-  // TODO: Check for error. Unfortunately, I don't know how :(.
+  pts_AffHandle p_aff_handle=(pts_AffHandle)p_handle;
+
+  // TODO: Check for error. Unfortunately, I don't know how :(
+  *p_size=af_seek(p_aff_handle->h_aff,0,SEEK_END);
+
   return AFF_OK;
 }
 
@@ -141,16 +160,17 @@ static int AffRead(void *p_handle,
                    size_t count,
                    size_t *p_read)
 {
+  pts_AffHandle p_aff_handle=(pts_AffHandle)p_handle;
   size_t bytes_read;
 
   // Seek to requested position
-  if(af_seek((AFFILE*)p_handle,offset,SEEK_SET)!=offset) {
+  if(af_seek(p_aff_handle->h_aff,offset,SEEK_SET)!=offset) {
     return AFF_SEEK_FAILED;
   }
 
   // Read data
   // TODO: Check for errors
-  bytes_read=af_read((AFFILE*)p_handle,(unsigned char*)p_buf,count);
+  bytes_read=af_read(p_aff_handle->h_aff,(unsigned char*)p_buf,count);
   if(bytes_read!=count) return AFF_READ_FAILED;
 
   *p_read=bytes_read;
@@ -169,7 +189,7 @@ static const char* AffOptionsHelp() {
  */
 static int AffOptionsParse(void *p_handle,
                            uint32_t options_count,
-                           pts_LibXmountOptions *pp_options,
+                           const pts_LibXmountOptions *pp_options,
                            char **pp_error)
 {
   return AFF_OK;

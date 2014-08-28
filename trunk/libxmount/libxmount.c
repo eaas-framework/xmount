@@ -21,7 +21,10 @@
 
 #include "libxmount.h"
 
-int32_t LibXmountOptions_ValueToInt32(char *p_value, int *p_ok) {
+/*
+ * StrToInt32
+ */
+int32_t StrToInt32(const char *p_value, int *p_ok) {
   long int num;
   char *p_tail;
 
@@ -36,7 +39,10 @@ int32_t LibXmountOptions_ValueToInt32(char *p_value, int *p_ok) {
   return (int32_t)num;
 }
 
-uint32_t LibXmountOptions_ValueToUint32(char *p_value, int *p_ok) {
+/*
+ * StrToUint32
+ */
+uint32_t StrToUint32(const char *p_value, int *p_ok) {
   unsigned long int num;
   char *p_tail;
 
@@ -51,7 +57,10 @@ uint32_t LibXmountOptions_ValueToUint32(char *p_value, int *p_ok) {
   return (uint32_t)num;
 }
 
-int64_t LibXmountOptions_ValueToInt64(char *p_value, int *p_ok) {
+/*
+ * StrToInt64
+ */
+int64_t StrToInt64(const char *p_value, int *p_ok) {
   long long int num;
   char *p_tail;
 
@@ -66,7 +75,10 @@ int64_t LibXmountOptions_ValueToInt64(char *p_value, int *p_ok) {
   return (int64_t)num;
 }
 
-uint64_t LibXmountOptions_ValueToUint64(char *p_value, int *p_ok) {
+/*
+ * StrToUint64
+ */
+uint64_t StrToUint64(const char *p_value, int *p_ok) {
   unsigned long long int num;
   char *p_tail;
 

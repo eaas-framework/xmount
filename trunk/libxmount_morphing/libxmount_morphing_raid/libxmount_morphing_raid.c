@@ -265,7 +265,7 @@ static int RaidOptionsParse(void *p_handle,
   for(uint32_t i=0;i<options_count;i++) {
     if(strcmp(pp_options[i]->p_key,"raid_chunksize")) {
       // Convert value to uint32
-      uint32value=LibXmountOptions_ValueToUint32(pp_options[i]->p_value,&ok);
+      uint32value=StrToUint32(pp_options[i]->p_value,&ok);
       if(ok==0 || uint32value==0) {
         // Conversion failed, generate error message and return
         ok=asprintf(pp_error,

@@ -19,8 +19,9 @@
 #define LIBXMOUNT_INPUT_AFF_H
 
 /*******************************************************************************
- * Error codes
+ * Enums, Typedefs, etc...
  ******************************************************************************/
+//! Possible error return codes
 enum {
   AFF_OK=0,
   AFF_MEMALLOC_FAILED,
@@ -33,15 +34,22 @@ enum {
   AFF_READ_FAILED
 };
 
+//! Library handle
+typedef struct s_AffHandle {
+  //! AFF handle
+  AFFILE *h_aff;
+} ts_AffHandle, *pts_AffHandle;
+
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int AffCreateHandle(void **pp_handle, char *p_format);
+static int AffCreateHandle(void **pp_handle,
+                           const char *p_format);
 static int AffDestroyHandle(void **pp_handle);
-static int AffOpen(void **pp_handle,
+static int AffOpen(void *p_handle,
                    const char **pp_filename_arr,
                    uint64_t filename_arr_len);
-static int AffClose(void **pp_handle);
+static int AffClose(void *p_handle);
 static int AffSize(void *p_handle,
                    uint64_t *p_size);
 static int AffRead(void *p_handle,
@@ -52,7 +60,7 @@ static int AffRead(void *p_handle,
 static const char* AffOptionsHelp();
 static int AffOptionsParse(void *p_handle,
                            uint32_t options_count,
-                           pts_LibXmountOptions *pp_options,
+                           const pts_LibXmountOptions *pp_options,
                            char **pp_error);
 static int AffGetInfofileContent(void *p_handle,
                                  char **pp_info_buf);

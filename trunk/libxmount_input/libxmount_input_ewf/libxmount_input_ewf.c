@@ -26,12 +26,12 @@
   #include "libewf/include/libewf.h"
 #endif
 
-#include "libxmount_input_ewf.h"
-
 #ifndef LIBEWF_HANDLE
   // libewf version 2 no longer defines LIBEWF_HANDLE
   #define HAVE_LIBEWF_V2_API
 #endif
+
+#include "libxmount_input_ewf.h"
 
 /*******************************************************************************
  * LibXmount_Input API implementation
@@ -73,16 +73,24 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
 /*
  * EwfCreateHandle
  */
-static int EwfCreateHandle(void **pp_handle, char *p_format) {
+static int EwfCreateHandle(void **pp_handle, const char *p_format) {
   (void)p_format;
-  *pp_handle=NULL;
+  pts_EwfHandle p_ewf_handle;
 
+  // Alloc new lib handle
+  p_ewf_handle=(pts_EwfHandle)malloc(sizeof(ts_EwfHandle));
+  if(p_ewf_handle==NULL) return EWF_MEMALLOC_FAILED;
+
+  // Init lib handle  
 #ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_initialize((libewf_handle_t**)pp_handle,NULL)!=1) {
+  if(libewf_handle_initialize(&(p_ewf_handle->h_ewf),NULL)!=1) {
     return EWF_HANDLE_CREATION_FAILED;
   }
+#else
+  p_ewf_handle->h_ewf=NULL;
 #endif
 
+  *pp_handle=p_ewf_handle;
   return EWF_OK;
 }
 
@@ -90,24 +98,34 @@ static int EwfCreateHandle(void **pp_handle, char *p_format) {
  * EwfDestroyHandle
  */
 static int EwfDestroyHandle(void **pp_handle) {
-#ifdef HAVE_LIBEWF_V2_API
-  // Free EWF handle
-  if(libewf_handle_free((libewf_handle_t**)pp_handle,NULL)!=1) {
-    return EWF_HANDLE_DESTRUCTION_FAILED;
-  }
-#endif
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)*pp_handle;
+  int ret=EWF_OK;
 
-  *pp_handle=NULL;
-  return EWF_OK;
+  if(p_ewf_handle!=NULL) {
+    // Free EWF handle
+#ifdef HAVE_LIBEWF_V2_API
+    if(libewf_handle_free(&(p_ewf_handle->h_ewf),NULL)!=1) {
+      ret=EWF_HANDLE_DESTRUCTION_FAILED;
+    }
+#endif
+    // Free lib handle
+    free(p_ewf_handle);
+    p_ewf_handle=NULL;
+  }
+
+  *pp_handle=p_ewf_handle;
+  return ret;
 }
 
 /*
  * EwfOpen
  */
-static int EwfOpen(void **pp_handle,
+static int EwfOpen(void *p_handle,
                    const char **pp_filename_arr,
                    uint64_t filename_arr_len)
 {
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
+
   // We need at least one file
   if(filename_arr_len==0) return EWF_NO_INPUT_FILES;
 
@@ -125,16 +143,16 @@ static int EwfOpen(void **pp_handle,
 
   // Open EWF file
 #ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_open((libewf_handle_t*)*pp_handle,
+  if(libewf_handle_open(p_ewf_handle->h_ewf,
                         (char* const*)pp_filename_arr,
                         filename_arr_len,
                         libewf_get_access_flags_read(),
                         NULL)!=1)
 #else
-  *pp_handle=(void*)libewf_open((char* const*)pp_filename_arr,
-                                filename_arr_len,
-                                libewf_get_flags_read());
-  if(*pp_handle==NULL)
+  p_ewf_handle->h_ewf=libewf_open((char* const*)pp_filename_arr,
+                                  filename_arr_len,
+                                  libewf_get_flags_read());
+  if(p_ewf_handle->h_ewf==NULL)
 #endif
   {
     return EWF_OPEN_FAILED;
@@ -142,7 +160,7 @@ static int EwfOpen(void **pp_handle,
 
 #ifndef HAVE_LIBEWF_V2_API
   // Parse EWF header
-  if(libewf_parse_header_values((LIBEWF_HANDLE*)*pp_handle,
+  if(libewf_parse_header_values(p_ewf_handle->h_ewf,
                                 LIBEWF_DATE_FORMAT_ISO8601)!=1)
   {
     return EWF_HEADER_PARSING_FAILED;
@@ -155,12 +173,14 @@ static int EwfOpen(void **pp_handle,
 /*
  * EwfClose
  */
-static int EwfClose(void **pp_handle) {
+static int EwfClose(void *p_handle) {
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
+
   // Close EWF handle
 #ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_close((libewf_handle_t*)*pp_handle,NULL)!=0)
+  if(libewf_handle_close(p_ewf_handle->h_ewf,NULL)!=0)
 #else
-  if(libewf_close((LIBEWF_HANDLE*)*pp_handle)!=0)
+  if(libewf_close(p_ewf_handle->h_ewf)!=0)
 #endif
   {
     return EWF_CLOSE_FAILED;
@@ -173,13 +193,16 @@ static int EwfClose(void **pp_handle) {
  * EwfSize
  */
 static int EwfSize(void *p_handle, uint64_t *p_size) {
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
+
 #ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_get_media_size((libewf_handle_t*)p_handle,p_size,NULL)!=1) {
+  if(libewf_handle_get_media_size(p_ewf_handle->h_ewf,p_size,NULL)!=1) {
 #else
-  if(libewf_get_media_size((LIBEWF_HANDLE*)p_handle,p_size)!=1) {
+  if(libewf_get_media_size(p_ewf_handle->h_ewf,p_size)!=1) {
 #endif
     return EWF_GET_SIZE_FAILED;
   }
+
   return EWF_OK;
 }
 
@@ -192,24 +215,25 @@ static int EwfRead(void *p_handle,
                    size_t count,
                    size_t *p_read)
 {
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
   size_t bytes_read;
 
 #ifdef HAVE_LIBEWF_V2_API
-  if(libewf_handle_seek_offset((libewf_handle_t*)p_handle,
+  if(libewf_handle_seek_offset(p_ewf_handle->h_ewf,
                                offset,
                                SEEK_SET,
                                NULL)!=-1)
 #else
-  if(libewf_seek_offset((LIBEWF_HANDLE*)p_handle,offset)!=-1)
+  if(libewf_seek_offset(p_ewf_handle->h_ewf,offset)!=-1)
 #endif
   {
 #ifdef HAVE_LIBEWF_V2_API
-    bytes_read=libewf_handle_read_buffer((libewf_handle_t*)p_handle,
+    bytes_read=libewf_handle_read_buffer(p_ewf_handle->h_ewf,
                                          p_buf,
                                          count,
                                          NULL);
 #else
-    bytes_read=libewf_read_buffer((LIBEWF_HANDLE*)p_handle,p_buf,count);
+    bytes_read=libewf_read_buffer(p_ewf_handle->h_ewf,p_buf,count);
 #endif
     if(bytes_read!=count) return EWF_READ_FAILED;
   } else {
@@ -232,7 +256,7 @@ static const char* EwfOptionsHelp() {
  */
 static int EwfOptionsParse(void *p_handle,
                            uint32_t options_count,
-                           pts_LibXmountOptions *pp_options,
+                           const pts_LibXmountOptions *pp_options,
                            char **pp_error)
 {
   return EWF_OK;
@@ -242,17 +266,13 @@ static int EwfOptionsParse(void *p_handle,
  * EwfGetInfofileContent
  */
 static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
+  pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
   char *p_infobuf=NULL;
   int ret;
   char buf[512];
   uint8_t uint8value;
   uint32_t uint32value;
   uint64_t uint64value;
-#ifdef HAVE_LIBEWF_V2_API
-  libewf_handle_t *p_ewf=(libewf_handle_t*)p_handle;
-#else
-  LIBEWF_HANDLE *p_ewf=(LIBEWF_HANDLE*)p_handle;
-#endif
 
 #define EWF_INFOBUF_REALLOC(size) {               \
   p_infobuf=(char*)realloc(p_infobuf,size);       \
@@ -278,8 +298,8 @@ static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
   EWF_INFOBUF_APPEND_STR("_Acquiry information_\n");
 
 #ifdef HAVE_LIBEWF_V2_API
-  #define EWF_GET_HEADER_VALUE(fun) {              \
-    ret=fun(p_ewf,(uint8_t*)buf,sizeof(buf),NULL); \
+  #define EWF_GET_HEADER_VALUE(fun) {                            \
+    ret=fun(p_ewf_handle->h_ewf,(uint8_t*)buf,sizeof(buf),NULL); \
   }
 
   EWF_GET_HEADER_VALUE(libewf_handle_get_utf8_header_value_case_number);
@@ -311,40 +331,46 @@ static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
 
   #undef EWF_GET_HEADER_VALUE
 #else
-  ret=libewf_get_header_value_case_number(p_ewf,buf,sizeof(buf));
+  #define EWF_GET_HEADER_VALUE(fun) {             \
+    ret=fun(p_ewf_handle->h_ewf,buf,sizeof(buf)); \
+  }
+
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_case_number);
   EWF_INFOBUF_APPEND_VALUE("Case number: ");
-  ret=libewf_get_header_value_description(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_description);
   EWF_INFOBUF_APPEND_VALUE("Description: ");
-  ret=libewf_get_header_value_examiner_name(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_examiner_name);
   EWF_INFOBUF_APPEND_VALUE("Examiner: ");
-  ret=libewf_get_header_value_evidence_number(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_evidence_number);
   EWF_INFOBUF_APPEND_VALUE("Evidence number: ");
-  ret=libewf_get_header_value_notes(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_notes);
   EWF_INFOBUF_APPEND_VALUE("Notes: ");
-  ret=libewf_get_header_value_acquiry_date(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_acquiry_date);
   EWF_INFOBUF_APPEND_VALUE("Acquiry date: ");
-  ret=libewf_get_header_value_system_date(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_system_date);
   EWF_INFOBUF_APPEND_VALUE("System date: ");
-  ret=libewf_get_header_value_acquiry_operating_system(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_acquiry_operating_system);
   EWF_INFOBUF_APPEND_VALUE("Acquiry os: ");
-  ret=libewf_get_header_value_acquiry_software_version(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_acquiry_software_version);
   EWF_INFOBUF_APPEND_VALUE("Acquiry sw version: ");
-  ret=libewf_get_header_value_model(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_model);
   EWF_INFOBUF_APPEND_VALUE("Model: ");
-  ret=libewf_get_header_value_serial_number(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_header_value_serial_number);
   EWF_INFOBUF_APPEND_VALUE("Serial number: ");
-  ret=libewf_get_hash_value_md5(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_hash_value_md5);
   EWF_INFOBUF_APPEND_VALUE("MD5 hash: ");
-  ret=libewf_get_hash_value_sha1(p_ewf,buf,sizeof(buf));
+  EWF_GET_HEADER_VALUE(libewf_get_hash_value_sha1);
   EWF_INFOBUF_APPEND_VALUE("SHA1 hash: ");
+
+  #undef EWF_GET_HEADER_VALUE
 #endif
 
   EWF_INFOBUF_APPEND_STR("\n_Media information_\n");
 
 #ifdef HAVE_LIBEWF_V2_API
-  ret=libewf_handle_get_media_type(p_ewf,&uint8value,NULL);
+  ret=libewf_handle_get_media_type(p_ewf_handle->h_ewf,&uint8value,NULL);
 #else
-  ret=libewf_get_media_type(p_ewf,&uint8value);
+  ret=libewf_get_media_type(p_ewf_handle->h_ewf,&uint8value);
 #endif
   if(ret==1) {
     EWF_INFOBUF_APPEND_STR("Media type: ");
@@ -370,17 +396,17 @@ static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
   }
 
 #ifdef HAVE_LIBEWF_V2_API
-  ret=libewf_handle_get_bytes_per_sector(p_ewf,&uint32value,NULL);
+  ret=libewf_handle_get_bytes_per_sector(p_ewf_handle->h_ewf,&uint32value,NULL);
   sprintf(buf,"%" PRIu32,uint32value);
   EWF_INFOBUF_APPEND_VALUE("Bytes per sector: ");
-  ret=libewf_handle_get_number_of_sectors(p_ewf,&uint64value,NULL);
+  ret=libewf_handle_get_number_of_sectors(p_ewf_handle->h_ewf,&uint64value,NULL);
   sprintf(buf,"%" PRIu64,uint64value);
   EWF_INFOBUF_APPEND_VALUE("Number of sectors: ");
 #else
-  ret=libewf_get_bytes_per_sector(p_ewf,&uint32value);
+  ret=libewf_get_bytes_per_sector(p_ewf_handle->h_ewf,&uint32value);
   sprintf(buf,"%" PRIu32,uint32value);
   EWF_INFOBUF_APPEND_VALUE("Bytes per sector: ");
-  ret=libewf_handle_get_amount_of_sectors(p_ewf,&uint64value);
+  ret=libewf_handle_get_amount_of_sectors(p_ewf_handle->h_ewf,&uint64value);
   sprintf(buf,"%" PRIu64,uint64value);
   EWF_INFOBUF_APPEND_VALUE("Number of sectors: ");
 #endif

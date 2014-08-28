@@ -2670,7 +2670,7 @@ static void FreeResources() {
       if(glob_xmount.input.pp_images[i]->p_functions!=NULL) {
         if(glob_xmount.input.pp_images[i]->p_handle!=NULL) {
           ret=glob_xmount.input.pp_images[i]->p_functions->
-                Close(&(glob_xmount.input.pp_images[i]->p_handle));
+                Close(glob_xmount.input.pp_images[i]->p_handle);
           if(ret!=0) {
             LOG_ERROR("Unable to close input image: %s\n",
                       glob_xmount.input.pp_images[i]->p_functions->
@@ -3582,7 +3582,7 @@ int main(int argc, char *argv[]) {
     ret=
       glob_xmount.input.pp_images[i]->
         p_functions->
-          Open(&glob_xmount.input.pp_images[i]->p_handle,
+          Open(glob_xmount.input.pp_images[i]->p_handle,
                (const char**)(glob_xmount.input.pp_images[i]->pp_files),
                glob_xmount.input.pp_images[i]->files_count);
     if(ret!=0) {
