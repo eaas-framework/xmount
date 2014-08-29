@@ -148,6 +148,7 @@ static void LogMessage(char *p_msg_type,
 static void PrintUsage(char *p_prog_name) {
   char *p_buf;
   int first;
+  int ret;
 
   printf("\n" XMOUNT_COPYRIGHT_NOTICE "\n",XMOUNT_VERSION);
   printf("\nUsage:\n");
@@ -249,11 +250,25 @@ static void PrintUsage(char *p_prog_name) {
 
   // List input and morphing lib options
   for(uint32_t i=0;i<glob_xmount.input.libs_count;i++) {
-    p_buf=(char*)(glob_xmount.input.pp_libs[i]->lib_functions.OptionsHelp());
+    ret=glob_xmount.input.pp_libs[i]->
+          lib_functions.OptionsHelp((const char**)&p_buf);
+    if(ret!=0) {
+      LOG_ERROR("Unable to get options help for library '%s': %s!\n",
+                glob_xmount.input.pp_libs[i]->p_name,
+                glob_xmount.input.pp_libs[i]->
+                  lib_functions.GetErrorMessage(ret));
+    }
     if(p_buf==NULL) continue;
     printf("  - %s\n",glob_xmount.input.pp_libs[i]->p_name);
     printf("%s\n",p_buf);
     printf("\n");
+    ret=glob_xmount.input.pp_libs[i]->lib_functions.FreeBuffer(p_buf);
+    if(ret!=0) {
+      LOG_ERROR("Unable to free options help text from library '%s': %s!\n",
+                glob_xmount.input.pp_libs[i]->p_name,
+                glob_xmount.input.pp_libs[i]->
+                  lib_functions.GetErrorMessage(ret));
+    }
   }
   for(uint32_t i=0;i<glob_xmount.morphing.libs_count;i++) {
     p_buf=(char*)(glob_xmount.morphing.pp_libs[i]->lib_functions.OptionsHelp());
@@ -1983,7 +1998,7 @@ static int InitVirtImageInfoFile() {
   // Get and add infos from input lib(s)
   for(uint64_t i=0;i<glob_xmount.input.images_count;i++) {
     ret=glob_xmount.input.pp_images[i]->p_functions->
-          GetInfofileContent(glob_xmount.input.pp_images[i]->p_handle,&p_buf);
+          GetInfofileContent(glob_xmount.input.pp_images[i]->p_handle,(const char**)&p_buf);
     if(ret!=0) {
       LOG_ERROR("Unable to get info file content for image '%s': %s!\n",
                 glob_xmount.input.pp_images[i]->pp_files[0],
@@ -3554,7 +3569,7 @@ int main(int argc, char *argv[]) {
             OptionsParse(glob_xmount.input.pp_images[i]->p_handle,
                          glob_xmount.input.lib_params_count,
                          glob_xmount.input.pp_lib_params,
-                         &p_err_msg);
+                         (const char**)&p_err_msg);
       if(ret!=0) {
         if(p_err_msg!=NULL) {
           LOG_ERROR("Unable to parse input library specific options for image "

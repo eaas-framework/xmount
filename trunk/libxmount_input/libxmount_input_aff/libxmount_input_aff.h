@@ -57,15 +57,15 @@ static int AffRead(void *p_handle,
                    off_t seek,
                    size_t count,
                    size_t *p_read);
-static const char* AffOptionsHelp();
+static int AffOptionsHelp(const char **pp_help);
 static int AffOptionsParse(void *p_handle,
                            uint32_t options_count,
                            const pts_LibXmountOptions *pp_options,
-                           char **pp_error);
+                           const char **pp_error);
 static int AffGetInfofileContent(void *p_handle,
-                                 char **pp_info_buf);
+                                 const char **pp_info_buf);
 static const char* AffGetErrorMessage(int err_num);
-static void AffFreeBuffer(void *p_buf);
+static int AffFreeBuffer(void *p_buf);
 
 #endif // LIBXMOUNT_INPUT_AFF_H
 

@@ -248,8 +248,9 @@ static int DdRead(void *p_handle,
 /*
  * DdOptionsHelp
  */
-static const char* DdOptionsHelp() {
-  return NULL;
+static int DdOptionsHelp(const char **pp_help) {
+  *pp_help=NULL;
+  return DD_OK;
 }
 
 /*
@@ -258,7 +259,7 @@ static const char* DdOptionsHelp() {
 static int DdOptionsParse(void *p_handle,
                           uint32_t options_count,
                           const pts_LibXmountOptions *pp_options,
-                          char **pp_error)
+                          const char **pp_error)
 {
   return DD_OK;
 }
@@ -266,12 +267,13 @@ static int DdOptionsParse(void *p_handle,
 /*
  * DdGetInfofileContent
  */
-static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int DdGetInfofileContent(void *p_handle, const char **pp_info_buf) {
   t_pdd p_dd_handle=(t_pdd)p_handle;
   int ret;
+  char *p_info_buf;
 
   // TODO: TotalSize seems to be incorrect here???
-  ret=asprintf(pp_info_buf,
+  ret=asprintf(&p_info_buf,
                "DD image assembled of %" PRIu64 " piece(s)\n"
                  "%" PRIu64 " bytes in total (%0.3f GiB)\n",
                p_dd_handle->Pieces,
@@ -279,6 +281,7 @@ static int DdGetInfofileContent(void *p_handle, char **pp_info_buf) {
                p_dd_handle->TotalSize/(1024.0*1024.0*1024.0));
   if(ret<0 || *pp_info_buf==NULL) return DD_MEMALLOC_FAILED;
 
+  *pp_info_buf=p_info_buf;
   return DD_OK;
 }
 
@@ -313,8 +316,9 @@ static const char* DdGetErrorMessage(int err_num) {
 /*
  * DdFreeBuffer
  */
-static void DdFreeBuffer(void *p_buf) {
+static int DdFreeBuffer(void *p_buf) {
   free(p_buf);
+  return DD_OK;
 }
 
 // -----------------------------------------------------

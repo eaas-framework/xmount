@@ -118,16 +118,18 @@ typedef struct s_LibXmountInputFunctions {
   //! Function to get a help message for any supported lib-specific options
   /*!
    * Calling this function should return a string containing help messages for
-   * any supported lib-specific options. Every line of this text must be
-   * prepended with 6 spaces.
+   * any supported lib-specific options. Lines should be formated as follows:
    *
-   * Returned string must be constant. It won't be freed!
+   * "    option : description\n"
    *
-   * If there is no help text, this function must return NULL.
+   * Returned string will be freed by the caller using FreeBuffer().
    *
-   * \return Pointer to a null-terminated string containing the help text
+   * If there is no help text, this function must return NULL in pp_help.
+   *
+   * \param Pointer to a string to return help text
+   * \return 0 on success or error code on error
    */
-  const char* (*OptionsHelp)();
+  int (*OptionsHelp)(const char **pp_help);
 
   //! Function to parse any lib-specific options
   /*!
@@ -146,20 +148,20 @@ typedef struct s_LibXmountInputFunctions {
   int (*OptionsParse)(void *p_handle,
                       uint32_t options_count,
                       const pts_LibXmountOptions *pp_options,
-                      char **pp_error);
+                      const char **pp_error);
 
   //! Function to get content to add to the info file
   /*!
    * The returned string is added to xmount's info file. This function is only
    * called once when the info file is generated. The returned string is then
-   * freed with a call to FreeBuffer.
+   * freed with a call to FreeBuffer().
    *
    * \param p_handle Handle
    * \param pp_info_buf Pointer to store the null-terminated content
    * \return 0 on success or error code
    */
   int (*GetInfofileContent)(void *p_handle,
-                            char **pp_info_buf);
+                            const char **pp_info_buf);
 
   //! Function to get an error message
   /*!
@@ -176,8 +178,9 @@ typedef struct s_LibXmountInputFunctions {
   //! Function to free buffers that were allocated by lib
   /*!
    * \param p_buf Buffer to free
+   * \return 0 on success or error code
    */
-  void (*FreeBuffer)(void *p_buf);
+  int (*FreeBuffer)(void *p_buf);
 } ts_LibXmountInputFunctions, *pts_LibXmountInputFunctions;
 
 //! Get library API version

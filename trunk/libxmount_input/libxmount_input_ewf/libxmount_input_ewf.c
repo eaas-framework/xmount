@@ -247,8 +247,9 @@ static int EwfRead(void *p_handle,
 /*
  * EwfOptionsHelp
  */
-static const char* EwfOptionsHelp() {
-  return NULL;
+static int EwfOptionsHelp(const char **pp_help) {
+  *pp_help=NULL;
+  return EWF_OK;
 }
 
 /*
@@ -257,7 +258,7 @@ static const char* EwfOptionsHelp() {
 static int EwfOptionsParse(void *p_handle,
                            uint32_t options_count,
                            const pts_LibXmountOptions *pp_options,
-                           char **pp_error)
+                           const char **pp_error)
 {
   return EWF_OK;
 }
@@ -265,7 +266,7 @@ static int EwfOptionsParse(void *p_handle,
 /*
  * EwfGetInfofileContent
  */
-static int EwfGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int EwfGetInfofileContent(void *p_handle, const char **pp_info_buf) {
   pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
   char *p_infobuf=NULL;
   int ret;
@@ -465,8 +466,9 @@ static const char* EwfGetErrorMessage(int err_num) {
 /*
  * EwfFreeBuffer
  */
-static void EwfFreeBuffer(void *p_buf) {
+static int EwfFreeBuffer(void *p_buf) {
   free(p_buf);
+  return EWF_OK;
 }
 
 /*

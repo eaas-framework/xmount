@@ -65,15 +65,15 @@ static int EwfRead(void *p_handle,
                    off_t seek,
                    size_t count,
                    size_t *p_read);
-static const char* EwfOptionsHelp();
+static int EwfOptionsHelp(const char **pp_help);
 static int EwfOptionsParse(void *p_handle,
                            uint32_t options_count,
                            const pts_LibXmountOptions *pp_options,
-                           char **pp_error);
+                           const char **pp_error);
 static int EwfGetInfofileContent(void *p_handle,
-                                 char **pp_info_buf);
+                                 const char **pp_info_buf);
 static const char* EwfGetErrorMessage(int err_num);
-static void EwfFreeBuffer(void *p_buf);
+static int EwfFreeBuffer(void *p_buf);
 
 #endif // LIBXMOUNT_INPUT_EWF_H
 

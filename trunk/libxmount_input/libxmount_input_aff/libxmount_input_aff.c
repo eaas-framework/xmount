@@ -180,8 +180,9 @@ static int AffRead(void *p_handle,
 /*
  * AffOptionsHelp
  */
-static const char* AffOptionsHelp() {
-  return NULL;
+static int AffOptionsHelp(const char **pp_help) {
+  *pp_help=NULL;
+  return AFF_OK;
 }
 
 /*
@@ -190,7 +191,7 @@ static const char* AffOptionsHelp() {
 static int AffOptionsParse(void *p_handle,
                            uint32_t options_count,
                            const pts_LibXmountOptions *pp_options,
-                           char **pp_error)
+                           const char **pp_error)
 {
   return AFF_OK;
 }
@@ -198,7 +199,7 @@ static int AffOptionsParse(void *p_handle,
 /*
  * AffGetInfofileContent
  */
-static int AffGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int AffGetInfofileContent(void *p_handle, const char **pp_info_buf) {
   // TODO
   *pp_info_buf=NULL;
   return AFF_OK;
@@ -241,8 +242,9 @@ static const char* AffGetErrorMessage(int err_num) {
 /*
  * AffFreeBuffer
  */
-static void AffFreeBuffer(void *p_buf) {
+static int AffFreeBuffer(void *p_buf) {
   free(p_buf);
+  return AFF_OK;
 }
 
 /*
