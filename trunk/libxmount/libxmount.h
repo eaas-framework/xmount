@@ -18,6 +18,8 @@
 #ifndef LIBXMOUNT_H
 #define LIBXMOUNT_H
 
+#include "../src/endianness.h"
+
 //! Struct containing lib options
 typedef struct s_LibXmountOptions {
   //! Option name
