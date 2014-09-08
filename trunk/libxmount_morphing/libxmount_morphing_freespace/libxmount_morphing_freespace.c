@@ -279,24 +279,33 @@ static int FreespaceOptionsParse(void *p_handle,
  * FreespaceGetInfofileContent
  */
 static int FreespaceGetInfofileContent(void *p_handle, char **pp_info_buf) {
-  //pts_FreespaceHandle p_freespace_handle=(pts_FreespaceHandle)p_handle;
-  //int ret;
+  pts_FreespaceHandle p_freespace_handle=(pts_FreespaceHandle)p_handle;
+  pts_FreespaceHfsPlusData p_hfs_data=&(p_freespace_handle->hfsplus);
+  int ret;
 
-  *pp_info_buf=NULL;
-  // TODO
-/*
   ret=asprintf(pp_info_buf,
-               "Simulating RAID level 0 over %" PRIu64 " disks.\n"
-                 "Chunk size: %" PRIu32 " bytes\n"
-                 "Chunks per disk: %" PRIu64 "\n"
-                 "Total capacity: %" PRIu64 " bytes (%0.3f GiB)\n",
-               p_raid_handle->input_images_count,
-               p_raid_handle->chunk_size,
-               p_raid_handle->chunks_per_image,
-               p_raid_handle->morphed_image_size,
-               p_raid_handle->morphed_image_size/(1024.0*1024.0*1024.0));
-  if(ret<0 || *pp_info_buf==NULL) return RAID_MEMALLOC_FAILED;
-*/
+               "HFS+ VH signature: 0x%04X\n"
+                 "HFS+ VH version: %" PRIu16 "\n"
+                 "HFS+ block size: %" PRIu32 " bytes\n"
+                 "HFS+ total blocks: %" PRIu32 "\n"
+                 "HFS+ free blocks: %" PRIu32 "\n"
+                 "HFS+ allocation file size: %" PRIu64 " bytes\n"
+                 "HFS+ allocation file blocks: %" PRIu32 "\n"
+                 "Discovered free blocks: %" PRIu64 "\n"
+                 "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
+               p_hfs_data->p_vh->signature,
+               p_hfs_data->p_vh->version,
+               p_hfs_data->p_vh->block_size,
+               p_hfs_data->p_vh->total_blocks,
+               p_hfs_data->p_vh->free_blocks,
+               p_hfs_data->p_vh->alloc_file_size,
+               p_hfs_data->p_vh->alloc_file_total_blocks,
+               (uint64_t)(p_hfs_data->free_block_map_size*
+                 p_hfs_data->p_vh->block_size),
+               (p_hfs_data->free_block_map_size*p_hfs_data->p_vh->block_size)/
+                 (1024.0*1024.0*1024.0));
+  if(ret<0 || *pp_info_buf==NULL) return FREESPACE_MEMALLOC_FAILED;
+
   return FREESPACE_OK;
 }
 
@@ -522,10 +531,15 @@ static int FreespaceBuildHfsPlusBlockMap(pts_FreespaceHandle p_freespace_handle)
     }
   }
 
-  LOG_DEBUG("According to VH, there should be %" PRIu64 " unallocated blocks\n",
-            p_hfs_data->p_vh->free_blocks);
   LOG_DEBUG("Found %" PRIu64 " unallocated HFS+ blocks\n",
             p_hfs_data->free_block_map_size);
+
+  if(p_hfs_data->p_vh->free_blocks!=p_hfs_data->free_block_map_size) {
+      LOG_WARNING("According to VH, there should be %" PRIu64
+                    " unallocated blocks but I found %" PRIu64 "\n",
+                  p_hfs_data->p_vh->free_blocks,
+                  p_hfs_data->free_block_map_size);
+  }
 
   return FREESPACE_OK;
 }
