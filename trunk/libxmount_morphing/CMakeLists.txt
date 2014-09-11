@@ -1,4 +1,4 @@
 add_subdirectory(libxmount_morphing_combine)
 add_subdirectory(libxmount_morphing_raid)
-add_subdirectory(libxmount_morphing_freespace)
+add_subdirectory(libxmount_morphing_unallocated)
 

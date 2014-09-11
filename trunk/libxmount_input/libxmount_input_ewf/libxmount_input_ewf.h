@@ -52,7 +52,8 @@ typedef struct s_EwfHandle {
  * Forward declarations
  ******************************************************************************/
 static int EwfCreateHandle(void **pp_handle,
-                           const char *p_format);
+                           const char *p_format,
+                           uint8_t debug);
 static int EwfDestroyHandle(void **pp_handle);
 static int EwfOpen(void *p_handle,
                    const char **pp_filename_arr,

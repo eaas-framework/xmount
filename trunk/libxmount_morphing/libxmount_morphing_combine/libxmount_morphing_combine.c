@@ -63,7 +63,7 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
  * CombineCreateHandle
  */
 static int CombineCreateHandle(void **pp_handle,
-                               char *p_format,
+                               const char *p_format,
                                uint8_t debug)
 {
   pts_CombineHandle p_combine_handle;
@@ -233,8 +233,9 @@ static int CombineRead(void *p_handle,
 /*
  * CombineOptionsHelp
  */
-static const char* CombineOptionsHelp() {
-  return NULL;
+static int CombineOptionsHelp(const char **pp_help) {
+  *pp_help=NULL;
+  return COMBINE_OK;
 }
 
 /*
@@ -242,8 +243,8 @@ static const char* CombineOptionsHelp() {
  */
 static int CombineOptionsParse(void *p_handle,
                                uint32_t options_count,
-                               pts_LibXmountOptions *pp_options,
-                               char **pp_error)
+                               const pts_LibXmountOptions *pp_options,
+                               const char **pp_error)
 {
   return COMBINE_OK;
 }
@@ -251,7 +252,9 @@ static int CombineOptionsParse(void *p_handle,
 /*
  * CombineGetInfofileContent
  */
-static int CombineGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int CombineGetInfofileContent(void *p_handle,
+                                     const char **pp_info_buf)
+{
   *pp_info_buf=NULL;
   return COMBINE_OK;
 }

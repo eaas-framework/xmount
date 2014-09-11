@@ -90,7 +90,8 @@ typedef struct {
  * Forward declarations
  ******************************************************************************/
 static int DdCreateHandle(void **pp_handle,
-                          const char *p_format);
+                          const char *p_format,
+                          uint8_t debug);
 static int DdDestroyHandle(void **pp_handle);
 static int DdOpen(void *p_handle,
                   const char **pp_filename_arr,

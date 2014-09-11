@@ -271,7 +271,14 @@ static void PrintUsage(char *p_prog_name) {
     }
   }
   for(uint32_t i=0;i<glob_xmount.morphing.libs_count;i++) {
-    p_buf=(char*)(glob_xmount.morphing.pp_libs[i]->lib_functions.OptionsHelp());
+    ret=glob_xmount.morphing.pp_libs[i]->
+          lib_functions.OptionsHelp((const char**)&p_buf);
+    if(ret!=0) {
+      LOG_ERROR("Unable to get options help for library '%s': %s!\n",
+                glob_xmount.morphing.pp_libs[i]->p_name,
+                glob_xmount.morphing.pp_libs[i]->
+                  lib_functions.GetErrorMessage(ret));
+    }
     if(p_buf==NULL) continue;
     printf("  - %s\n",glob_xmount.morphing.pp_libs[i]->p_name);
     printf("%s\n",p_buf);
@@ -2024,7 +2031,7 @@ static int InitVirtImageInfoFile() {
 
   // Get and add infos from morphing lib
   ret=glob_xmount.morphing.p_functions->
-        GetInfofileContent(glob_xmount.morphing.p_handle,&p_buf);
+        GetInfofileContent(glob_xmount.morphing.p_handle,(const char**)&p_buf);
   if(ret!=0) {
     LOG_ERROR("Unable to get info file content from morphing lib: %s!\n",
               glob_xmount.morphing.p_functions->GetErrorMessage(ret));
@@ -3553,7 +3560,8 @@ int main(int argc, char *argv[]) {
     // Init input image handle
     ret=glob_xmount.input.pp_images[i]->p_functions->
           CreateHandle(&(glob_xmount.input.pp_images[i]->p_handle),
-                       glob_xmount.input.pp_images[i]->p_type);
+                       glob_xmount.input.pp_images[i]->p_type,
+                       glob_xmount.debug);
     if(ret!=0) {
       LOG_ERROR("Unable to init input handle for input image '%s': %s!\n",
                 glob_xmount.input.pp_images[i]->pp_files[0],
@@ -3659,6 +3667,33 @@ int main(int argc, char *argv[]) {
     FreeResources();
     return 1;
   }
+
+  // Parse morphing lib specific options
+  if(glob_xmount.morphing.pp_lib_params!=NULL) {
+    p_err_msg=NULL;
+    ret=glob_xmount.morphing.p_functions->
+          OptionsParse(glob_xmount.morphing.p_handle,
+                       glob_xmount.morphing.lib_params_count,
+                       glob_xmount.morphing.pp_lib_params,
+                       (const char**)&p_err_msg);
+    if(ret!=0) {
+      if(p_err_msg!=NULL) {
+        LOG_ERROR("Unable to parse morphing library specific options: %s: %s!\n",
+                  glob_xmount.morphing.p_functions->GetErrorMessage(ret),
+                  p_err_msg);
+        glob_xmount.morphing.p_functions->FreeBuffer(p_err_msg);
+        FreeResources();
+        return 1;
+      } else {
+        LOG_ERROR("Unable to parse morphing library specific options: %s!\n",
+                  glob_xmount.morphing.p_functions->GetErrorMessage(ret));
+        FreeResources();
+        return 1;
+      }
+    }
+  }
+
+  // Morph image
   ret=glob_xmount.morphing.p_functions->
         Morph(glob_xmount.morphing.p_handle,
               &(glob_xmount.morphing.input_image_functions));

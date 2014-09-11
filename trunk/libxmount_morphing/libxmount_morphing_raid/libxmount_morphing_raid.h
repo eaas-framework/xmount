@@ -65,7 +65,7 @@ typedef struct s_RaidHandle {
  * Forward declarations
  ******************************************************************************/
 static int RaidCreateHandle(void **pp_handle,
-                            char *p_format,
+                            const char *p_format,
                             uint8_t debug);
 static int RaidDestroyHandle(void **pp_handle);
 static int RaidMorph(void *p_handle,
@@ -77,13 +77,13 @@ static int RaidRead(void *p_handle,
                     off_t offset,
                     size_t count,
                     size_t *p_read);
-static const char* RaidOptionsHelp();
+static int RaidOptionsHelp(const char **pp_help);
 static int RaidOptionsParse(void *p_handle,
                             uint32_t options_count,
-                            pts_LibXmountOptions *pp_options,
-                            char **pp_error);
+                            const pts_LibXmountOptions *pp_options,
+                            const char **pp_error);
 static int RaidGetInfofileContent(void *p_handle,
-                                  char **pp_info_buf);
+                                  const char **pp_info_buf);
 static const char* RaidGetErrorMessage(int err_num);
 static void RaidFreeBuffer(void *p_buf);
 

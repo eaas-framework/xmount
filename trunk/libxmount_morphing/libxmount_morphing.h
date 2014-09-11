@@ -84,7 +84,7 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*CreateHandle)(void **pp_handle,
-                      char *p_type,
+                      const char *p_type,
                       uint8_t debug);
 
   //! Function to destroy handle
@@ -143,16 +143,18 @@ typedef struct s_LibXmountMorphingFunctions {
   //! Function to get a help message for any supported lib-specific options
   /*!
    * Calling this function should return a string containing help messages for
-   * any supported lib-specific options. Every line of this text must be
-   * prepended with 6 spaces.
+   * any supported lib-specific options. Lines should be formated as follows:
    *
-   * Returned string must be constant. It won't be freed!
+   * "    option : description\n"
    *
-   * If there is no help text, this function must return NULL.
+   * Returned string will be freed by the caller using FreeBuffer().
    *
-   * \return Pointer to a null-terminated string containing the help text
+   * If there is no help text, this function must return NULL in pp_help.
+   *
+   * \param Pointer to a string to return help text
+   * \return 0 on success or error code on error
    */
-  const char* (*OptionsHelp)();
+  int (*OptionsHelp)(const char **pp_help);
 
   //! Function to parse any lib-specific options
   /*!
@@ -168,8 +170,8 @@ typedef struct s_LibXmountMorphingFunctions {
    */
   int (*OptionsParse)(void *p_handle,
                       uint32_t options_count,
-                      pts_LibXmountOptions *pp_options,
-                      char **pp_error);
+                      const pts_LibXmountOptions *pp_options,
+                      const char **pp_error);
 
   //! Function to get content to add to the info file
   /*!
@@ -182,7 +184,7 @@ typedef struct s_LibXmountMorphingFunctions {
    * \return 0 on success or error code
    */
   int (*GetInfofileContent)(void *p_handle,
-                            char **pp_info_buf);
+                            const char **pp_info_buf);
 
   //! Function to get an error message
   /*!

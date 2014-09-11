@@ -61,7 +61,7 @@ typedef struct s_CombineHandle {
  * Forward declarations
  ******************************************************************************/
 static int CombineCreateHandle(void **pp_handle,
-                               char *p_format,
+                               const char *p_format,
                                uint8_t debug);
 static int CombineDestroyHandle(void **pp_handle);
 static int CombineMorph(void *p_handle,
@@ -73,13 +73,13 @@ static int CombineRead(void *p_handle,
                        off_t offset,
                        size_t count,
                        size_t *p_read);
-static const char* CombineOptionsHelp();
+static int CombineOptionsHelp(const char **pp_help);
 static int CombineOptionsParse(void *p_handle,
                                uint32_t options_count,
-                               pts_LibXmountOptions *pp_options,
-                               char **pp_error);
+                               const pts_LibXmountOptions *pp_options,
+                               const char **pp_error);
 static int CombineGetInfofileContent(void *p_handle,
-                                     char **pp_info_buf);
+                                     const char **pp_info_buf);
 static const char* CombineGetErrorMessage(int err_num);
 static void CombineFreeBuffer(void *p_buf);
 

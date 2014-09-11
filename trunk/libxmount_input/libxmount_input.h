@@ -40,10 +40,12 @@ typedef struct s_LibXmountInputFunctions {
    *
    * \param pp_handle Pointer to handle
    * \param p_format Input image format
+   * \param debug If set to 1, print debugging infos to stdout
    * \return 0 on success or error code
    */
   int (*CreateHandle)(void **pp_handle,
-                      const char *p_format);
+                      const char *p_format,
+                      uint8_t debug);
 
   //! Function to destroy handle
   /*!

@@ -62,7 +62,10 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
 /*
  * RaidCreateHandle
  */
-static int RaidCreateHandle(void **pp_handle, char *p_format, uint8_t debug) {
+static int RaidCreateHandle(void **pp_handle,
+                           const char *p_format,
+                           uint8_t debug)
+{
   pts_RaidHandle p_raid_handle;
 
   // Alloc new handle
@@ -245,9 +248,20 @@ static int RaidRead(void *p_handle,
 /*
  * RaidOptionsHelp
  */
-static const char* RaidOptionsHelp() {
-  return "    raid_chunksize : Specify the chunk size to use in bytes. "
-           "Defaults to 524288 (512k).";
+static int RaidOptionsHelp(const char **pp_help) {
+  int ok;
+  char *p_buf;
+
+  ok=asprintf(&p_buf,
+              "    raid_chunksize : Specify the chunk size to use in bytes. "
+                "Defaults to 524288 (512k).");
+  if(ok<0 || p_buf==NULL) {
+    *pp_help=NULL;
+    return RAID_MEMALLOC_FAILED;
+  }
+
+  *pp_help=p_buf;
+  return RAID_OK;
 }
 
 /*
@@ -255,12 +269,13 @@ static const char* RaidOptionsHelp() {
  */
 static int RaidOptionsParse(void *p_handle,
                             uint32_t options_count,
-                            pts_LibXmountOptions *pp_options,
-                            char **pp_error)
+                            const pts_LibXmountOptions *pp_options,
+                            const char **pp_error)
 {
   pts_RaidHandle p_raid_handle=(pts_RaidHandle)p_handle;
   int ok;
   uint32_t uint32value;
+  char *p_buf;
 
   for(uint32_t i=0;i<options_count;i++) {
     if(strcmp(pp_options[i]->p_key,"raid_chunksize")) {
@@ -268,7 +283,7 @@ static int RaidOptionsParse(void *p_handle,
       uint32value=StrToUint32(pp_options[i]->p_value,&ok);
       if(ok==0 || uint32value==0) {
         // Conversion failed, generate error message and return
-        ok=asprintf(pp_error,
+        ok=asprintf(&p_buf,
                     "Unable to parse value '%s' of '%s' as valid 32bit number",
                     pp_options[i]->p_value,
                     pp_options[i]->p_key);
@@ -276,6 +291,7 @@ static int RaidOptionsParse(void *p_handle,
           *pp_error=NULL;
           return RAID_MEMALLOC_FAILED;
         }
+        *pp_error=p_buf;
         return RAID_CANNOT_PARSE_OPTION;
       }
 
@@ -294,11 +310,14 @@ static int RaidOptionsParse(void *p_handle,
 /*
  * RaidGetInfofileContent
  */
-static int RaidGetInfofileContent(void *p_handle, char **pp_info_buf) {
+static int RaidGetInfofileContent(void *p_handle,
+                                  const char **pp_info_buf)
+{
   pts_RaidHandle p_raid_handle=(pts_RaidHandle)p_handle;
   int ret;
+  char *p_buf;
 
-  ret=asprintf(pp_info_buf,
+  ret=asprintf(&p_buf,
                "Simulating RAID level 0 over %" PRIu64 " disks.\n"
                  "Chunk size: %" PRIu32 " bytes\n"
                  "Chunks per disk: %" PRIu64 "\n"
@@ -310,6 +329,7 @@ static int RaidGetInfofileContent(void *p_handle, char **pp_info_buf) {
                p_raid_handle->morphed_image_size/(1024.0*1024.0*1024.0));
   if(ret<0 || *pp_info_buf==NULL) return RAID_MEMALLOC_FAILED;
 
+  *pp_info_buf=p_buf;
   return RAID_OK;
 }
 
