@@ -226,7 +226,8 @@ static int DdRead(void *p_handle,
                   char *p_buf,
                   off_t seek,
                   size_t count,
-                  size_t *p_read)
+                  size_t *p_read,
+                  int *p_errno)
 {
   t_pdd p_dd_handle=(t_pdd)p_handle;
   uint32_t remaining=count;

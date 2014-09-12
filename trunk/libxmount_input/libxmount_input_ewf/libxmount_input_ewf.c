@@ -84,13 +84,14 @@ static int EwfCreateHandle(void **pp_handle,
   p_ewf_handle=(pts_EwfHandle)malloc(sizeof(ts_EwfHandle));
   if(p_ewf_handle==NULL) return EWF_MEMALLOC_FAILED;
 
-  // Init lib handle  
+  // Init handle values
+  p_ewf_handle->h_ewf=NULL;
+
+  // Init lib handle
 #ifdef HAVE_LIBEWF_V2_API
   if(libewf_handle_initialize(&(p_ewf_handle->h_ewf),NULL)!=1) {
     return EWF_HANDLE_CREATION_FAILED;
   }
-#else
-  p_ewf_handle->h_ewf=NULL;
 #endif
 
   *pp_handle=p_ewf_handle;
@@ -216,7 +217,8 @@ static int EwfRead(void *p_handle,
                    char *p_buf,
                    off_t offset,
                    size_t count,
-                   size_t *p_read)
+                   size_t *p_read,
+                   int *p_errno)
 {
   pts_EwfHandle p_ewf_handle=(pts_EwfHandle)p_handle;
   size_t bytes_read;

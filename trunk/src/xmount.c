@@ -244,7 +244,7 @@ static void PrintUsage(char *p_prog_name) {
   printf("Input / Morphing library specific options:\n");
   printf("  Input / Morphing libraries might support an own set of "
            "options to configure / tune their behaviour.\n");
-  printf("  Libraries supporting this feature (if any) and and their "
+  printf("  Libraries supporting this feature (if any) and their "
            "options are listed below.\n");
   printf("\n");
 
@@ -886,6 +886,7 @@ static int GetInputImageData(pts_InputImage p_image,
 {
   int ret;
   size_t to_read=0;
+  int read_errno=0;
 
   LOG_DEBUG("Reading %zu bytes at offset %zu from input image '%s'\n",
             size,
@@ -916,7 +917,8 @@ static int GetInputImageData(pts_InputImage p_image,
                                  p_buf,
                                  offset+glob_xmount.input.image_offset,
                                  to_read,
-                                 p_read);
+                                 p_read,
+                                 &read_errno);
   if(ret!=0) {
     LOG_ERROR("Couldn't read %zu bytes at offset %zu from input image "
                 "'%s': %s!\n",
@@ -924,7 +926,8 @@ static int GetInputImageData(pts_InputImage p_image,
               offset,
               p_image->pp_files[0],
               p_image->p_functions->GetErrorMessage(ret));
-    return -EIO;
+    if(read_errno==0) return -EIO;
+    else return (read_errno*(-1));
   }
 
   return 0;
@@ -2283,7 +2286,7 @@ static int LoadLibs() {
     p_library_path=realloc(p_library_path,
                            base_library_path_len+strlen(p_dirent->d_name)+1);
     if(p_library_path==NULL) {
-      LOG_ERROR("Couldn't allocate memmory!\n");
+      LOG_ERROR("Couldn't allocate memory!\n");
       exit(1);
     }
     strcpy(p_library_path+base_library_path_len,p_dirent->d_name);

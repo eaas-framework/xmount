@@ -161,7 +161,8 @@ static int AffRead(void *p_handle,
                    char *p_buf,
                    off_t offset,
                    size_t count,
-                   size_t *p_read)
+                   size_t *p_read,
+                   int *p_errno)
 {
   pts_AffHandle p_aff_handle=(pts_AffHandle)p_handle;
   size_t bytes_read;

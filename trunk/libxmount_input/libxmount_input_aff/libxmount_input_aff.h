@@ -57,7 +57,8 @@ static int AffRead(void *p_handle,
                    char *p_buf,
                    off_t seek,
                    size_t count,
-                   size_t *p_read);
+                   size_t *p_read,
+                   int *p_errno);
 static int AffOptionsHelp(const char **pp_help);
 static int AffOptionsParse(void *p_handle,
                            uint32_t options_count,

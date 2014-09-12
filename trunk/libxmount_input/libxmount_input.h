@@ -109,13 +109,15 @@ typedef struct s_LibXmountInputFunctions {
    * \param offset Position at which to start reading
    * \param count Amount of bytes to read
    * \param p_read Amount of bytes read
+   * \param p_errno errno in case of an error
    * \return 0 on success or error code
    */
   int (*Read)(void *p_handle,
               char *p_buf,
               off_t offset,
               size_t count,
-              size_t *p_read);
+              size_t *p_read,
+              int *p_errno);
 
   //! Function to get a help message for any supported lib-specific options
   /*!
