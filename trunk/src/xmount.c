@@ -228,6 +228,8 @@ static void PrintUsage(char *p_prog_name) {
 
   printf("    --owcache <file> : Same as --cache <file> but overwrites "
            "existing cache file.\n");
+  printf("    --sizelimit <size> : The data end of input image(s) is set to no "
+           "more than <size> bytes after the data start.\n");
   printf("    --version : Same as --info.\n");
   printf("\n");
   printf("  mntp:\n");
@@ -260,7 +262,7 @@ static void PrintUsage(char *p_prog_name) {
     }
     if(p_buf==NULL) continue;
     printf("  - %s\n",glob_xmount.input.pp_libs[i]->p_name);
-    printf("%s\n",p_buf);
+    printf("%s",p_buf);
     printf("\n");
     ret=glob_xmount.input.pp_libs[i]->lib_functions.FreeBuffer(p_buf);
     if(ret!=0) {
@@ -281,9 +283,11 @@ static void PrintUsage(char *p_prog_name) {
     }
     if(p_buf==NULL) continue;
     printf("  - %s\n",glob_xmount.morphing.pp_libs[i]->p_name);
-    printf("%s\n",p_buf);
+    printf("%s",p_buf);
     printf("\n");
   }
+
+  printf("\n");
 }
 
 //! Check fuse settings
@@ -515,6 +519,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--inopts")==0) {
+        // Set input lib options
         if((argc+1)>i) {
           i++;
           if(glob_xmount.input.pp_lib_params==NULL) {
@@ -536,6 +541,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--morph")==0) {
+        // Set morphing lib to use
         if((argc+1)>i) {
           i++;
           if(glob_xmount.morphing.p_morph_type==NULL) {
@@ -549,6 +555,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           return FALSE;
         }
       } else if(strcmp(pp_argv[i],"--morphopts")==0) {
+        // Set morphing lib options
         if((argc+1)>i) {
           i++;
           if(glob_xmount.morphing.pp_lib_params==NULL) {
@@ -569,6 +576,17 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           LOG_ERROR("You must specify special morphing lib params!\n");
           return FALSE;
         }
+      } else if(strcmp(pp_argv[i],"--offset")==0) {
+        // Set input image offset
+        if((argc+1)>i) {
+          i++;
+          glob_xmount.input.image_offset=strtoull(pp_argv[i],NULL,10);
+        } else {
+          LOG_ERROR("You must specify an offset!\n")
+          return FALSE;
+        }
+        LOG_DEBUG("Setting input image offset to \"%" PRIu64 "\"\n",
+                  glob_xmount.input.image_offset)
       } else if(strcmp(pp_argv[i],"--out")==0) {
         // Specify output image type
         // Next parameter must be image type
@@ -614,9 +632,21 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
         LOG_DEBUG("Enabling virtual write support overwriting cache file %s\n",
                   glob_xmount.cache.p_cache_file)
+      } else if(strcmp(pp_argv[i],"--sizelimit")==0) {
+        // Set input image size limit
+        if((argc+1)>i) {
+          i++;
+          glob_xmount.input.image_size_limit=strtoull(pp_argv[i],NULL,10);
+        } else {
+          LOG_ERROR("You must specify a size limit!\n")
+          return FALSE;
+        }
+        LOG_DEBUG("Setting input image size limit to \"%" PRIu64 "\"\n",
+                  glob_xmount.input.image_size_limit)
       } else if(strcmp(pp_argv[i],"--version")==0 ||
                 strcmp(pp_argv[i],"--info")==0)
       {
+        // Print xmount info
         printf(XMOUNT_COPYRIGHT_NOTICE "\n\n",XMOUNT_VERSION);
 #ifdef __GNUC__
         printf("  compile timestamp: %s %s\n",__DATE__,__TIME__);
@@ -653,16 +683,6 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
         printf("\n");
         exit(0);
-      } else if(strcmp(pp_argv[i],"--offset")==0) {
-        if((argc+1)>i) {
-          i++;
-          glob_xmount.input.image_offset=strtoull(pp_argv[i],NULL,10);
-        } else {
-          LOG_ERROR("You must specify an offset!\n")
-          return FALSE;
-        }
-        LOG_DEBUG("Setting input image offset to \"%" PRIu64 "\"\n",
-                  glob_xmount.input.image_offset)
       } else {
         LOG_ERROR("Unknown command line option \"%s\"\n",pp_argv[i]);
         return FALSE;
@@ -2547,6 +2567,7 @@ static void InitResources() {
   glob_xmount.input.images_count=0;
   glob_xmount.input.pp_images=NULL;
   glob_xmount.input.image_offset=0;
+  glob_xmount.input.image_size_limit=0;
   glob_xmount.input.image_hash_lo=0;
   glob_xmount.input.image_hash_hi=0;
 
@@ -3637,7 +3658,7 @@ int main(int argc, char *argv[]) {
     // If an offset was specified, check it against offset and change size
     if(glob_xmount.input.image_offset!=0) {
       if(glob_xmount.input.image_offset>glob_xmount.input.pp_images[i]->size) {
-        LOG_ERROR("The specified offset is larger then the size of the input "
+        LOG_ERROR("The specified offset is larger than the size of the input "
                     "image '%s'! (%" PRIu64 " > %" PRIu64 ")\n",
                   glob_xmount.input.pp_images[i]->pp_files[0],
                   glob_xmount.input.image_offset,
@@ -3646,6 +3667,22 @@ int main(int argc, char *argv[]) {
         return 1;
       }
       glob_xmount.input.pp_images[i]->size-=glob_xmount.input.image_offset;
+    }
+
+    // If a size limit was specified, check it and change size
+    if(glob_xmount.input.image_size_limit!=0) {
+      if(glob_xmount.input.pp_images[i]->size<
+           glob_xmount.input.image_size_limit)
+      {
+        LOG_ERROR("The specified size limit is larger than the size of the "
+                    "input image '%s'! (%" PRIu64 " > %" PRIu64 ")\n",
+                  glob_xmount.input.pp_images[i]->pp_files[0],
+                  glob_xmount.input.image_size_limit,
+                  glob_xmount.input.pp_images[i]->size);
+        FreeResources();
+        return 1;
+      }
+      glob_xmount.input.pp_images[i]->size-=glob_xmount.input.image_size_limit;
     }
 
     LOG_DEBUG("Input image loaded successfully\n")

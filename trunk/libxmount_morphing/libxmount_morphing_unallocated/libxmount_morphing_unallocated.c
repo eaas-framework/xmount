@@ -242,7 +242,7 @@ static int UnallocatedOptionsHelp(const char **pp_help) {
 
   ok=asprintf(&p_buf,
               "    unallocated_fs : Specify the filesystem to extract "
-                "unallocated blocks from. Supported filesystems are: 'hfs+'");
+                "unallocated blocks from. Supported filesystems are: 'hfs+'\n");
   if(ok<0 || p_buf==NULL) {
     *pp_help=NULL;
     return UNALLOCATED_MEMALLOC_FAILED;

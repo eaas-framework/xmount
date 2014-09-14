@@ -1051,7 +1051,7 @@ static int AewfRead (void *pHandle, char *pBuf, off_t Seek, size_t Count, size_t
    unsigned int   ChunkLen, Ofs, ToCopy;
    int            Ret = AEWF_OK;
 
-   LOG ("Called - Seek=%'" PRIu64 ",Count=%'llu", Seek, Count);
+   LOG ("Called - Seek=%" PRIu64 ",Count=%" PRIu64, Seek, Count);
    *pRead  = 0;
    *pErrno = 0;
 
@@ -1098,15 +1098,12 @@ static int AewfOptionsHelp (const char **ppHelp)
    char *pHelp=NULL;
    int    wr;
 
-   wr = asprintf (&pHelp, "     %-8s : Maximum amount of RAM cache, in MiB, for image offset tables.\n"
-                          "                Default: %llu MiB\n"
-                          "     %-8s : Maximum number of concurrently opened image segment files.\n"
-                          "                Default: %llu\n"
-                          "     %-8s : Output statistics at regular intervals to this file.\n"
-                          "     %-8s : The update interval, in seconds, for the statistics.\n"
-                          "                Ignored if %s is not set. Default: %llus.\n"
-                          "     %-8s : Log file name.\n"
-                          "     Specify full paths for options %s and %s. The given file names are extended by _<pid>.\n",
+   wr = asprintf (&pHelp, "    %-8s : Maximum amount of RAM cache, in MiB, for image offset tables. Default: %llu MiB\n"
+                          "    %-8s : Maximum number of concurrently opened image segment files. Default: %llu\n"
+                          "    %-8s : Output statistics at regular intervals to this file.\n"
+                          "    %-8s : The update interval, in seconds, for the statistics. Ignored if %s is not set. Default: %llus.\n"
+                          "    %-8s : Log file name.\n"
+                          "    Specify full paths for %s and %s options. The given file names are extended by _<pid>.\n",
                           AEWF_OPTION_TABLECACHE,      AEWF_DEFAULT_TABLECACHE,
                           AEWF_OPTION_MAXOPENSEGMENTS, AEWF_DEFAULT_MAXOPENSEGMENTS,
                           AEWF_OPTION_STATS,

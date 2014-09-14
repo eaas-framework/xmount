@@ -309,6 +309,8 @@ typedef struct s_InputData {
   pts_InputImage *pp_images;
   //! Input image offset (--offset)
   uint64_t image_offset;
+  //! Input image size limit (--sizelimit)
+  uint64_t image_size_limit;
   //! MD5 hash of partial input image (lower 64 bit) (after morph)
   uint64_t image_hash_lo;
   //! MD5 hash of partial input image (higher 64 bit) (after morph)
