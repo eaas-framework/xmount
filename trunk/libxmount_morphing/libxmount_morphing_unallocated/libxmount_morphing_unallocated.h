@@ -45,8 +45,9 @@
 enum {
   UNALLOCATED_OK=0,
   UNALLOCATED_MEMALLOC_FAILED,
-  UNALLOCATED_NO_FS_SPECIFIED,
+  UNALLOCATED_NO_SUPPORTED_FS_DETECTED,
   UNALLOCATED_UNSUPPORTED_FS_SPECIFIED,
+  UNALLOCATED_INTERNAL_ERROR,
   UNALLOCATED_CANNOT_GET_IMAGECOUNT,
   UNALLOCATED_WRONG_INPUT_IMAGE_COUNT,
   UNALLOCATED_CANNOT_GET_IMAGESIZE,
@@ -62,20 +63,24 @@ enum {
 // Supported fs types
 typedef enum e_UnallocatedFsType {
   UnallocatedFsType_Unknown=0,
-  UnallocatedFsType_HfsPlus
+  UnallocatedFsType_HfsPlus,
+  UnallocatedFsType_Fat,
+  UnallocatedFsType_Fat12,
+  UnallocatedFsType_Fat16,
+  UnallocatedFsType_Fat32
 } te_UnallocatedFsType;
 
 // HFS+ extend
-typedef struct s_UnallocatedHfsPlusExtend {
+typedef struct s_HfsPlusExtend {
   uint32_t start_block;
   uint32_t block_count;
-} __attribute__ ((packed)) ts_UnallocatedHfsPlusExtend, *pts_UnallocatedHfsPlusExtend;
+} __attribute__ ((packed)) ts_HfsPlusExtend, *pts_HfsPlusExtend;
 
 // Needed parts of the HFS+ volume header
-#define UNALLOCATED_HFSPLUS_VH_OFFSET 1024
-#define UNALLOCATED_HFSPLUS_VH_SIGNATURE 0x482b //"H+"
-#define UNALLOCATED_HFSPLUS_VH_VERSION 4
-typedef struct s_UnallocatedHfsPlusVH {
+#define HFSPLUS_VH_OFFSET 1024
+#define HFSPLUS_VH_SIGNATURE 0x482b //"H+"
+#define HFSPLUS_VH_VERSION 4
+typedef struct s_HfsPlusVH {
   uint16_t signature; // "H+"
   uint16_t version; // Currently 4 for HFS+
   uint32_t unused01[9];
@@ -86,24 +91,34 @@ typedef struct s_UnallocatedHfsPlusVH {
   uint64_t alloc_file_size;
   uint32_t alloc_file_clump_size;
   uint32_t alloc_file_total_blocks;
-  ts_UnallocatedHfsPlusExtend alloc_file_extends[8];
-} __attribute__ ((packed)) ts_UnallocatedHfsPlusVH, *pts_UnallocatedHfsPlusVH;
+  ts_HfsPlusExtend alloc_file_extends[8];
+} __attribute__ ((packed)) ts_HfsPlusVH, *pts_HfsPlusVH;
 
 // Needed data for HFS+
+/*
 typedef struct s_UnallocatedHfsPlusData {
   pts_UnallocatedHfsPlusVH p_vh;
   uint8_t *p_alloc_file;
   uint64_t free_block_map_size;
   uint64_t *p_free_block_map;
 } ts_UnallocatedHfsPlusData, *pts_UnallocatedHfsPlusData;
+*/
 
 // Handle
 typedef struct s_UnallocatedHandle {
   uint8_t debug;
   te_UnallocatedFsType fs_type;
   pts_LibXmountMorphingInputFunctions p_input_functions;
+  
+  uint64_t block_size;
+  uint64_t free_block_map_size;
+  uint64_t *p_free_block_map;
   uint64_t morphed_image_size;
-  ts_UnallocatedHfsPlusData hfsplus;
+  
+  union {
+    pts_HfsPlusVH p_hfsplus_vh;
+    
+  };
 } ts_UnallocatedHandle, *pts_UnallocatedHandle;
 
 /*******************************************************************************
@@ -134,18 +149,14 @@ static const char* UnallocatedGetErrorMessage(int err_num);
 static void UnallocatedFreeBuffer(void *p_buf);
 
 // Helper functions
-static int UnallocatedReadHfsPlusHeader(
-  pts_UnallocatedHandle p_unallocated_handle);
-static int UnallocatedReadHfsPlusAllocFile(
-  pts_UnallocatedHandle p_unallocated_handle);
-static int UnallocatedBuildHfsPlusBlockMap(
-  pts_UnallocatedHandle p_unallocated_handle);
-static int UnallocatedReadHfsPlusBlock(
-  pts_UnallocatedHandle p_unallocated_handle,
-  char *p_buf,
-  off_t offset,
-  size_t count,
-  size_t *p_read);
+static int DetectFs(pts_UnallocatedHandle p_unallocated_handle);
+
+// Helper functions for HFS
+static int ReadHfsPlusHeader(pts_UnallocatedHandle p_unallocated_handle);
+static int ReadHfsPlusAllocFile(pts_UnallocatedHandle p_unallocated_handle,
+                                uint8_t **pp_alloc_file);
+static int BuildHfsPlusBlockMap(pts_UnallocatedHandle p_unallocated_handle,
+                                uint8_t *p_alloc_file);
 
 #endif // LIBXMOUNT_MORPHING_UNALLOCATED_H
 
