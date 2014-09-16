@@ -57,14 +57,14 @@ enum {
   UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER,
   UNALLOCATED_INVALID_HFSPLUS_HEADER,
   UNALLOCATED_CANNOT_READ_HFSPLUS_ALLOC_FILE,
-  UNALLOCATED_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS
+  UNALLOCATED_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS,
+  UNALLOCATED_INVALID_FAT_HEADER
 };
 
 // Supported fs types
 typedef enum e_UnallocatedFsType {
   UnallocatedFsType_Unknown=0,
   UnallocatedFsType_HfsPlus,
-  UnallocatedFsType_Fat,
   UnallocatedFsType_Fat12,
   UnallocatedFsType_Fat16,
   UnallocatedFsType_Fat32
@@ -94,30 +94,38 @@ typedef struct s_HfsPlusVH {
   ts_HfsPlusExtend alloc_file_extends[8];
 } __attribute__ ((packed)) ts_HfsPlusVH, *pts_HfsPlusVH;
 
-// Needed data for HFS+
-/*
-typedef struct s_UnallocatedHfsPlusData {
-  pts_UnallocatedHfsPlusVH p_vh;
-  uint8_t *p_alloc_file;
-  uint64_t free_block_map_size;
-  uint64_t *p_free_block_map;
-} ts_UnallocatedHfsPlusData, *pts_UnallocatedHfsPlusData;
-*/
+// Needed parts of the FAT volume header
+typedef struct s_FatVH {
+  uint8_t jump_inst[3];
+  uint8_t oem_name[8];
+  uint16_t bytes_per_sector;
+  uint8_t sectors_per_cluster;
+  uint16_t reserved_sectors;
+  uint8_t fat_count;
+  uint16_t root_entry_count;
+  uint16_t total_sectors_16;
+  uint8_t media_type;
+  uint16_t fat16_sectors;
+  uint64_t unused01;
+  uint32_t total_sectors_32;
+  // Following value is only valid for FAT32
+  uint32_t fat32_sectors;
+} __attribute__ ((packed)) ts_FatVH, *pts_FatVH;
 
 // Handle
 typedef struct s_UnallocatedHandle {
   uint8_t debug;
   te_UnallocatedFsType fs_type;
   pts_LibXmountMorphingInputFunctions p_input_functions;
-  
+
   uint64_t block_size;
   uint64_t free_block_map_size;
   uint64_t *p_free_block_map;
   uint64_t morphed_image_size;
-  
+
   union {
     pts_HfsPlusVH p_hfsplus_vh;
-    
+    pts_FatVH p_fat_vh;
   };
 } ts_UnallocatedHandle, *pts_UnallocatedHandle;
 
@@ -157,6 +165,9 @@ static int ReadHfsPlusAllocFile(pts_UnallocatedHandle p_unallocated_handle,
                                 uint8_t **pp_alloc_file);
 static int BuildHfsPlusBlockMap(pts_UnallocatedHandle p_unallocated_handle,
                                 uint8_t *p_alloc_file);
+
+// Helper functions for FAT
+static int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle);
 
 #endif // LIBXMOUNT_MORPHING_UNALLOCATED_H
 

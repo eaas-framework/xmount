@@ -100,6 +100,13 @@ static int UnallocatedDestroyHandle(void **pp_handle) {
         free(p_unallocated_handle->p_hfsplus_vh);
       break;
     }
+    case UnallocatedFsType_Fat12:
+    case UnallocatedFsType_Fat16:
+    case UnallocatedFsType_Fat32: {
+      if(p_unallocated_handle->p_fat_vh!=NULL)
+        free(p_unallocated_handle->p_fat_vh);
+      break;
+    }
     case UnallocatedFsType_Unknown:
     default:
       break;
@@ -177,6 +184,12 @@ static int UnallocatedMorph(
       free(p_alloc_file);
       if(ret!=UNALLOCATED_OK) return ret;
 
+      break;
+    }
+    case UnallocatedFsType_Fat12:
+    case UnallocatedFsType_Fat16:
+    case UnallocatedFsType_Fat32: {
+      // TODO
       break;
     }
     case UnallocatedFsType_Unknown:
@@ -283,7 +296,8 @@ static int UnallocatedOptionsHelp(const char **pp_help) {
   ok=asprintf(&p_buf,
               "    unallocated_fs : Specify the filesystem to extract "
                 "unallocated blocks from. Supported filesystems are: "
-                "'hfs+'. Default: autodetect.\n");
+                "'hfs+', 'fat12', 'fat16', 'fat32'. "
+                "Default: autodetect.\n");
   if(ok<0 || p_buf==NULL) {
     *pp_help=NULL;
     return UNALLOCATED_MEMALLOC_FAILED;
@@ -309,6 +323,12 @@ static int UnallocatedOptionsParse(void *p_handle,
     if(strcmp(pp_options[i]->p_key,"unallocated_fs")==0) {
       if(strcmp(pp_options[i]->p_value,"hfs+")==0) {
         p_unallocated_handle->fs_type=UnallocatedFsType_HfsPlus;
+      } else if(strcmp(pp_options[i]->p_value,"fat12")==0) {
+        p_unallocated_handle->fs_type=UnallocatedFsType_Fat12;
+      } else if(strcmp(pp_options[i]->p_value,"fat16")==0) {
+        p_unallocated_handle->fs_type=UnallocatedFsType_Fat16;
+      } else if(strcmp(pp_options[i]->p_value,"fat32")==0) {
+        p_unallocated_handle->fs_type=UnallocatedFsType_Fat32;
       } else {
         ok=asprintf(&p_buf,
                     "Unsupported filesystem '%s' specified",
@@ -360,6 +380,40 @@ static int UnallocatedGetInfofileContent(void *p_handle,
                    p_hfsplus_vh->free_blocks,
                    p_hfsplus_vh->alloc_file_size,
                    p_hfsplus_vh->alloc_file_total_blocks,
+                   p_unallocated_handle->free_block_map_size,
+                   p_unallocated_handle->free_block_map_size*
+                     p_unallocated_handle->block_size,
+                   (p_unallocated_handle->free_block_map_size*
+                     p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
+      break;
+    }
+    case UnallocatedFsType_Fat12:
+    case UnallocatedFsType_Fat16:
+    case UnallocatedFsType_Fat32: {
+      pts_FatVH p_fat_vh=p_unallocated_handle->p_fat_vh;
+      ret=asprintf(&p_buf,
+                   "FAT bytes per sector: %" PRIu16 "\n"
+                     "FAT sectors per cluster: %" PRIu8 "\n"
+                     "FAT reserved sectors: %" PRIu16 "\n"
+                     "FAT count: %" PRIu8 "\n"
+                     "FAT root entry count: %" PRIu16 "\n"
+                     "FAT media type: %02X\n"
+                     "FAT total sector count (16bit): %" PRIu16 "\n"
+                     "FAT sectors per FAT (16bit): %" PRIu16 "\n"
+                     "FAT total sector count (32bit): %" PRIu32 "\n"
+                     "FAT sectors per FAT (32bit): %" PRIu32 "\n"
+                     "Discovered free blocks: %" PRIu64 "\n"
+                     "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
+                   p_fat_vh->bytes_per_sector,
+                   p_fat_vh->sectors_per_cluster,
+                   p_fat_vh->reserved_sectors,
+                   p_fat_vh->fat_count,
+                   p_fat_vh->root_entry_count,
+                   p_fat_vh->media_type,
+                   p_fat_vh->total_sectors_16,
+                   p_fat_vh->fat16_sectors,
+                   p_fat_vh->total_sectors_32,
+                   p_fat_vh->fat32_sectors,
                    p_unallocated_handle->free_block_map_size,
                    p_unallocated_handle->free_block_map_size*
                      p_unallocated_handle->block_size,
@@ -427,6 +481,9 @@ static const char* UnallocatedGetErrorMessage(int err_num) {
       return "HFS+ allocation file has more then 8 extends. "
                "This is unsupported";
       break;
+    case UNALLOCATED_INVALID_FAT_HEADER:
+      return "Found invalid FAT volume header";
+      break;
     default:
       return "Unknown error";
   }
@@ -452,6 +509,9 @@ static int DetectFs(pts_UnallocatedHandle p_unallocated_handle) {
   if(ReadHfsPlusHeader(p_unallocated_handle)==UNALLOCATED_OK) {
     LOG_DEBUG("Detected HFS+ fs\n");
     p_unallocated_handle->fs_type=UnallocatedFsType_HfsPlus;
+    return UNALLOCATED_OK;
+  } else if(ReadFatHeader(p_unallocated_handle)==UNALLOCATED_OK) {
+    LOG_DEBUG("Detected FAT fs\n");
     return UNALLOCATED_OK;
   }
 
@@ -492,7 +552,7 @@ static int ReadHfsPlusHeader(pts_UnallocatedHandle p_unallocated_handle) {
     return UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER;
   }
 
-  // Convert VH to host endianness
+  // Convert VH to host endianness (HFS values are always stored in big endian)
   p_hfsplus_vh->signature=be16toh(p_hfsplus_vh->signature);
   p_hfsplus_vh->version=be16toh(p_hfsplus_vh->version);
   p_hfsplus_vh->block_size=be32toh(p_hfsplus_vh->block_size);
@@ -649,4 +709,121 @@ static int BuildHfsPlusBlockMap(pts_UnallocatedHandle p_unallocated_handle,
   p_unallocated_handle->block_size=p_hfsplus_vh->block_size;
   return UNALLOCATED_OK;
 }
+
+/*
+ * ReadFatHeader
+ */
+static int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle) {
+  pts_FatVH p_fat_vh;
+  int ret;
+  size_t bytes_read;
+
+  LOG_DEBUG("Trying to read FAT volume header\n");
+
+  // Alloc buffer for header
+  p_fat_vh=calloc(1,sizeof(ts_FatVH));
+  if(p_fat_vh==NULL) return UNALLOCATED_MEMALLOC_FAILED;
+
+  // Read VH from input image
+  ret=p_unallocated_handle->
+        p_input_functions->
+          Read(0,
+               (char*)(p_fat_vh),
+               0,
+               sizeof(ts_FatVH),
+               &bytes_read);
+  if(ret!=0 || bytes_read!=sizeof(ts_FatVH)) {
+    free(p_fat_vh);
+    p_fat_vh=NULL;
+    return UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER;
+  }
+
+  // Convert values to host endianness (FAT values are always stored in little
+  // endian)
+  p_fat_vh->bytes_per_sector=le16toh(p_fat_vh->bytes_per_sector);
+  p_fat_vh->reserved_sectors=le16toh(p_fat_vh->reserved_sectors);
+  p_fat_vh->root_entry_count=le16toh(p_fat_vh->root_entry_count);
+  p_fat_vh->total_sectors_16=le16toh(p_fat_vh->total_sectors_16);
+  p_fat_vh->fat16_sectors=le16toh(p_fat_vh->fat16_sectors);
+  p_fat_vh->total_sectors_32=le32toh(p_fat_vh->total_sectors_32);
+  p_fat_vh->fat32_sectors=le32toh(p_fat_vh->fat32_sectors);
+
+  LOG_DEBUG("FAT VH jump instruction 1: 0x%02X\n",p_fat_vh->jump_inst[0]);
+  LOG_DEBUG("FAT bytes per sector: %" PRIu16 "\n",
+            p_fat_vh->bytes_per_sector);
+  LOG_DEBUG("FAT sectors per cluster: %" PRIu8 "\n",
+            p_fat_vh->sectors_per_cluster);
+  LOG_DEBUG("FAT reserved sectors: %" PRIu16 "\n",
+            p_fat_vh->reserved_sectors);
+  LOG_DEBUG("FAT count: %" PRIu8 "\n",p_fat_vh->fat_count);
+  LOG_DEBUG("FAT root entry count: %" PRIu16 "\n",
+            p_fat_vh->root_entry_count);
+  LOG_DEBUG("FAT media type: %02X\n",p_fat_vh->media_type);
+  LOG_DEBUG("FAT total sector count (16bit): %" PRIu16 "\n",
+            p_fat_vh->total_sectors_16);
+  LOG_DEBUG("FAT sectors per FAT (16bit): %" PRIu16 "\n",
+            p_fat_vh->fat16_sectors);
+  LOG_DEBUG("FAT total sector count (32bit): %" PRIu32 "\n",
+            p_fat_vh->total_sectors_32);
+  LOG_DEBUG("FAT sectors per FAT (32bit): %" PRIu32 "\n",
+            p_fat_vh->fat32_sectors);
+
+  // Check header values
+  if((p_fat_vh->jump_inst[0]!=0xEB && p_fat_vh->jump_inst[0]!=0xE9) ||
+     p_fat_vh->bytes_per_sector==0 ||
+     p_fat_vh->bytes_per_sector%512!=0 ||
+     p_fat_vh->sectors_per_cluster==0 ||
+     p_fat_vh->sectors_per_cluster%2!=0 ||
+     p_fat_vh->reserved_sectors==0 ||
+     p_fat_vh->fat_count==0 ||
+     (p_fat_vh->total_sectors_16==0 && p_fat_vh->total_sectors_32==0) ||
+     (p_fat_vh->total_sectors_16!=0 && p_fat_vh->total_sectors_32!=0))
+  {
+    free(p_fat_vh);
+    p_fat_vh=NULL;
+    return UNALLOCATED_INVALID_FAT_HEADER;
+  }
+
+  // If FAT type was not specified, try to detect it
+  if(p_unallocated_handle->fs_type==UnallocatedFsType_Unknown) {
+    uint32_t root_dir_sectors;
+    uint32_t fat_size;
+    uint32_t total_sectors;
+    uint32_t data_sectors;
+    uint32_t cluster_count;
+
+    LOG_DEBUG("Determining FAT type\n");
+
+    // Determine the count of sectors occupied by the root directory
+    root_dir_sectors=((p_fat_vh->root_entry_count*32)+
+      (p_fat_vh->bytes_per_sector-1))/p_fat_vh->bytes_per_sector;
+
+    // Determine the count of sectors in the data region
+    if(p_fat_vh->fat16_sectors!=0) fat_size=p_fat_vh->fat16_sectors;
+    else fat_size=p_fat_vh->fat32_sectors;
+    if(p_fat_vh->total_sectors_16!=0) total_sectors=p_fat_vh->total_sectors_16;
+    else total_sectors=p_fat_vh->total_sectors_32;
+    data_sectors=total_sectors-(p_fat_vh->reserved_sectors+
+      (p_fat_vh->fat_count*fat_size)+root_dir_sectors);
+
+    // Determine the count of clusters
+    cluster_count=data_sectors/p_fat_vh->sectors_per_cluster;
+
+    // Determine FAT type
+    if(cluster_count<4085) {
+      LOG_DEBUG("FAT is of type FAT12\n");
+      p_unallocated_handle->fs_type=UnallocatedFsType_Fat12;
+    } else if(cluster_count<65525) {
+      LOG_DEBUG("FAT is of type FAT16\n");
+      p_unallocated_handle->fs_type=UnallocatedFsType_Fat16;
+    } else {
+      LOG_DEBUG("FAT is of type FAT32\n");
+      p_unallocated_handle->fs_type=UnallocatedFsType_Fat32;
+    }
+  }
+
+  p_unallocated_handle->p_fat_vh=p_fat_vh;
+  return UNALLOCATED_OK;
+}
+
 
