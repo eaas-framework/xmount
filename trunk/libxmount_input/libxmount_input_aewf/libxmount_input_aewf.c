@@ -81,9 +81,9 @@
 static int         AewfClose           (void *pHandle);
 static const char* AewfGetErrorMessage (int ErrNum);
 
-#define AEWF_DEFAULT_TABLECACHE        10LLU  // MiB
-#define AEWF_DEFAULT_MAXOPENSEGMENTS   10LLU
-#define AEWF_DEFAULT_STATSREFRESH      10LLU
+const uint64_t AEWF_DEFAULT_TABLECACHE      = 10;  // MiB
+const uint64_t AEWF_DEFAULT_MAXOPENSEGMENTS = 10;
+const uint64_t AEWF_DEFAULT_STATSREFRESH    = 10;
 
 // ----------------------------
 //  Logging and error handling
@@ -215,12 +215,6 @@ static void AewfCheckError (t_pAewf pAewf, int Ret, int *pErrno)
 // ------------------------------------
 //         Internal functions
 // ------------------------------------
-
-static int AewfLogStdout (t_pAewf pAewf, uint8_t Flag)
-{
-   pAewf->LogStdout = Flag;
-   return AEWF_OK;
-}
 
 static int OpenFile (FILE **ppFile, const char *pFilename)
 {
@@ -786,7 +780,7 @@ static int AewfCreateHandle (void **ppHandle, const char *pFormat, uint8_t Debug
 
    // Create handle and clear it
    // --------------------------
-   pAewf=(t_pAewf)malloc(sizeof(t_Aewf));
+   pAewf = (t_pAewf) malloc (sizeof(t_Aewf));
    if (pAewf == NULL)
       return AEWF_MEMALLOC_FAILED;
 
@@ -814,13 +808,11 @@ static int AewfCreateHandle (void **ppHandle, const char *pFormat, uint8_t Debug
    pAewf->pStatsFilename        = NULL;
    pAewf->StatsRefresh          = 0;
    pAewf->pLogFilename          = NULL;
-   pAewf->LogStdout             = FALSE;
+   pAewf->LogStdout             = Debug;
 
    pAewf->MaxTableCache   = AEWF_DEFAULT_TABLECACHE * 1024*1024;
    pAewf->MaxOpenSegments = AEWF_DEFAULT_MAXOPENSEGMENTS;
    pAewf->StatsRefresh    = AEWF_DEFAULT_STATSREFRESH;
-
-   CHK (AewfLogStdout (pAewf, Debug))
 
    *ppHandle = (void*) pAewf;
 
@@ -844,7 +836,7 @@ int AewfDestroyHandle(void **ppHandle)
    return AEWF_OK;
 }
 
-int AewfOpen(void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen)
+int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen)
 {
    t_pAewf                 pAewf = (t_pAewf) pHandle;
    t_AewfFileHeader         FileHeader;
@@ -1046,25 +1038,33 @@ static int AewfRead (void *pHandle, char *pBuf, off_t Seek, size_t Count, size_t
 {
    t_pAewf       pAewf = (t_pAewf) pHandle;
    char         *pChunkBuffer;
+   uint64_t       Seek64;
    uint64_t       Chunk;
    uint64_t       Remaining;
    unsigned int   ChunkLen, Ofs, ToCopy;
    int            Ret = AEWF_OK;
 
-   LOG ("Called - Seek=%" PRIu64 ",Count=%" PRIu64, Seek, Count);
+   LOG ("Called - Seek=%'" PRIu64 ",Count=%'" PRIu64, Seek, Count);
    *pRead  = 0;
    *pErrno = 0;
+
+   if (Seek < 0)
+   {
+      Ret = AEWF_NEGATIVE_SEEK;
+      goto Leave;
+   }
+   Seek64 = Seek;
 
    pAewf->ReadOperations++;
    pAewf->DataRequestedByCaller+=Count;
 
-   if (Seek >= pAewf->ImageSize)        // If calling function asks
-      goto Leave;                       // for data beyond end of
-   if ((Seek+Count) > pAewf->ImageSize) // image simply return what
-      Count = pAewf->ImageSize - Seek;  // is possible.
+   if (Seek64 >= pAewf->ImageSize)        // If calling function asks
+      goto Leave;                         // for data beyond end of
+   if ((Seek64+Count) > pAewf->ImageSize) // image simply return what
+      Count = pAewf->ImageSize - Seek64;  // is possible.
 
-   Ofs       = Seek % pAewf->ChunkSize;
-   Chunk     = Seek / pAewf->ChunkSize;
+   Ofs       = Seek64 % pAewf->ChunkSize;
+   Chunk     = Seek64 / pAewf->ChunkSize;
    Remaining = Count;
 
    while (Remaining)
@@ -1098,11 +1098,11 @@ static int AewfOptionsHelp (const char **ppHelp)
    char *pHelp=NULL;
    int    wr;
 
-   wr = asprintf (&pHelp, "    %-8s : Maximum amount of RAM cache, in MiB, for image offset tables. Default: %llu MiB\n"
-                          "    %-8s : Maximum number of concurrently opened image segment files. Default: %llu\n"
-                          "    %-8s : Output statistics at regular intervals to this file.\n"
-                          "    %-8s : The update interval, in seconds, for the statistics. Ignored if %s is not set. Default: %llus.\n"
-                          "    %-8s : Log file name.\n"
+   wr = asprintf (&pHelp, "    %-12s : Maximum amount of RAM cache, in MiB, for image offset tables. Default: %"PRIu64" MiB\n"
+                          "    %-12s : Maximum number of concurrently opened image segment files. Default: %"PRIu64"\n"
+                          "    %-12s : Output statistics at regular intervals to this file.\n"
+                          "    %-12s : The update interval, in seconds, for the statistics. Ignored if %s is not set. Default: %"PRIu64"s.\n"
+                          "    %-12s : Log file name.\n"
                           "    Specify full paths for %s and %s options. The given file names are extended by _<pid>.\n",
                           AEWF_OPTION_TABLECACHE,      AEWF_DEFAULT_TABLECACHE,
                           AEWF_OPTION_MAXOPENSEGMENTS, AEWF_DEFAULT_MAXOPENSEGMENTS,
@@ -1202,6 +1202,7 @@ static const char* AewfGetErrorMessage (int ErrNum)
       ADD_ERR (AEWF_MEMALLOC_FAILED)
       ADD_ERR (AEWF_READ_BEYOND_END_OF_IMAGE)
       ADD_ERR (AEWF_OPTIONS_ERROR)
+      ADD_ERR (AEWF_CANNOT_OPEN_LOGFILE)
       ADD_ERR (AEWF_FILE_OPEN_FAILED)
       ADD_ERR (AEWF_FILE_CLOSE_FAILED)
       ADD_ERR (AEWF_FILE_SEEK_FAILED)
@@ -1224,8 +1225,8 @@ static const char* AewfGetErrorMessage (int ErrNum)
       ADD_ERR (AEWF_VASPRINTF_FAILED)
       ADD_ERR (AEWF_UNCOMPRESS_HEADER_FAILED)
       ADD_ERR (AEWF_ASPRINTF_FAILED)
-      ADD_ERR (AEWF_CANNOT_OPEN_LOGFILE)
-      ADD_ERR (AEWF_ERROR_EIO_END)
+      ADD_ERR (AEWF_CHUNK_LENGTH_ZERO)
+      ADD_ERR (AEWF_NEGATIVE_SEEK)
       default:
          pMsg = "Unknown error";
    }
@@ -1372,6 +1373,7 @@ int main(int argc, const char *argv[])
    int            Percent;
    int            PercentOld;
    int            rc;
+   int            Errno;
    char         *pOptions = NULL;
    const char   *pHelp;
    const char   *pInfoBuff;
@@ -1409,6 +1411,7 @@ int main(int argc, const char *argv[])
       printf ("Usage: %s <EWF segment file 1> <EWF segment file 2> <...> [-comma_separated_options]\n", argv[0]);
       printf ("Possible options:\n%s\n", pHelp);
       printf ("The output file will be named dd.\n");
+      CHK (AewfFreeBuffer ((void*) pHelp))
       exit (1);
    }
 
@@ -1417,11 +1420,9 @@ int main(int argc, const char *argv[])
       pOptions = strdup (&(argv[argc-1][1]));
       argc--;
    }
-   rc = AewfCreateHandle ((void**) &pAewf, "aewf");
+   rc = AewfCreateHandle ((void**) &pAewf, "aewf", LOG_STDOUT);
    if (rc != AEWF_OK)
       PRINT_ERROR_AND_EXIT ("Cannot create handle, rc=%d\n", rc)
-
-   CHK (AewfLogStdout (pAewf, LOG_STDOUT))
 
    if (pOptions)
       CHK (ParseOptions(pAewf, pOptions))
@@ -1430,10 +1431,9 @@ int main(int argc, const char *argv[])
       PRINT_ERROR_AND_EXIT ("Cannot open EWF files, rc=%d\n", rc)
 
    #if defined(CREATE_REVERSE_FILE) && defined(REVERSE_FILE_USES_SEPARATE_HANDLE)
-      rc = AewfCreateHandle ((void**) &pAewfRev, "aewf");
+      rc = AewfCreateHandle ((void**) &pAewfRev, "aewf", LOG_STDOUT);
       if (rc != AEWF_OK)
          PRINT_ERROR_AND_EXIT ("Cannot create reverse handle, rc=%d\n", rc)
-      CHK (AewfLogStdout (pAewfRev, LOG_STDOUT))
       if (pOptions)
          CHK (ParseOptions (pAewfRev, pOptions))
       rc = AewfOpen (pAewfRev, &argv[1], argc-1);
@@ -1444,6 +1444,7 @@ int main(int argc, const char *argv[])
    CHK (AewfGetInfofileContent ((void*) pAewf, &pInfoBuff))
    if (pInfoBuff)
       printf ("Contents of info buffer:\n%s\n", pInfoBuff);
+   CHK (AewfFreeBuffer ((void*) pInfoBuff))
 
    CHK (AewfSize (pAewf, &TotalSize))
    printf ("Total size: %" PRIu64 " bytes\n", TotalSize);
@@ -1462,13 +1463,15 @@ int main(int argc, const char *argv[])
    Remaining  = TotalSize;
    Pos        = 0;
    PercentOld = -1;
+   Errno      = 0;
    while (Remaining)
    {
 //      LOG ("Pos %" PRIu64 " -- Remaining %" PRIu64 " ", Pos, Remaining);
       ToRead = GETMIN (Remaining, BuffSize);
-      rc = AewfRead ((void*) pAewf, &Buff[0], Pos, ToRead, &Read);
-      if (rc != AEWF_OK)
-         PRINT_ERROR_AND_EXIT("Error %d while calling AewfRead\n", rc);
+
+     rc = AewfRead ((void*) pAewf, &Buff[0], Pos, ToRead, &Read, &Errno);
+      if ((rc != AEWF_OK) || (Errno != 0))
+         PRINT_ERROR_AND_EXIT("Error %d while calling AewfRead (Errno %d)\n", rc, Errno);
       if (Read != ToRead)
          PRINT_ERROR_AND_EXIT("Only %" PRIu64 " out of %" PRIu64 " bytes read\n", Read, ToRead);
 
@@ -1480,9 +1483,9 @@ int main(int argc, const char *argv[])
 
       #ifdef CREATE_REVERSE_FILE
          PosRev -= ToRead;
-         rc = AewfRead ((void*) pAewfRev, &Buff[0], PosRev, ToRead, &Read);
-         if (rc != AEWF_OK)
-            PRINT_ERROR_AND_EXIT("Error %d while reverse calling AewfRead\n", rc);
+         rc = AewfRead ((void*) pAewfRev, &Buff[0], PosRev, ToRead, &Read, &Errno);
+         if ((rc != AEWF_OK) || (Errno != 0))
+            PRINT_ERROR_AND_EXIT("Error %d while reverse calling AewfRead (Errno %d)\n", rc, Errno);
          if (Read != ToRead)
             PRINT_ERROR_AND_EXIT("Only %" PRIu64 " out of %" PRIu64 " bytes read from rev file\n", Read, ToRead);
 

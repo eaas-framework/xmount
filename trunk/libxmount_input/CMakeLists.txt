@@ -23,6 +23,6 @@ endif(NOT STATIC_AFF)
 find_package(LibZ)
 if(LIBZ_FOUND)
   add_subdirectory(libxmount_input_aewf)
-#  add_subdirectory(libxmount_input_aaff)
+  add_subdirectory(libxmount_input_aaff)
 endif(LIBZ_FOUND)
 

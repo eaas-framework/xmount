@@ -21,6 +21,8 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
+// Please don't touch source code formatting!
+
 #ifndef AAFF_H
 #define AAFF_H
 
@@ -30,12 +32,14 @@ typedef struct _t_Aaff *t_pAaff;
 //  Constant definitions
 // ----------------------
 
-#define AAFF_DEFAULT_PAGE_SEEK_MAX_ENTRIES 1000000  // Default max. number of cached seek points for fast page access
-
-#define AAFF_CURRENTPAGE_NOTSET ULONG_LONG_MAX
-
 #define GETMAX(a,b) ((a)>(b)?(a):(b))
 #define GETMIN(a,b) ((a)<(b)?(a):(b))
+
+#define FALSE 0
+#define TRUE  1
+
+const uint64_t AAFF_DEFAULT_MAX_PAGE_ARR_MEM = 10;  // Default max. memory for caching seek points for fast page access (MiB)
+const uint64_t AAFF_CURRENTPAGE_NOTSET       = UINT64_MAX;
 
 // -----------------
 //  AFF definitions
@@ -101,86 +105,78 @@ const int AaffInfoBuffLen = 1024*1024;
 
 typedef struct _t_Aaff
 {
-   char                *pFilename;
-   FILE                *pFile;
+   char         *pFilename;
+   FILE         *pFile;
 
-   char                 *pLibVersion;  // AFF File Header info
-   char                 *pFileType;
-   unsigned int           PageSize;
-   unsigned int           SectorSize;
-   uint64_t     Sectors;
-   uint64_t     ImageSize;
-   uint64_t     TotalPages;
+   char         *pLibVersion;  // AFF File Header info
+   char         *pFileType;
+   unsigned int   PageSize;
+   unsigned int   SectorSize;
+   uint64_t       Sectors;
+   uint64_t       ImageSize;
+   uint64_t       TotalPages;
 
-   char                *pNameBuff;     // Buffers
-   char       *pDataBuff;
-   unsigned int          NameBuffLen;
-   unsigned int          DataBuffLen;
+   char         *pNameBuff;     // Buffers
+   char         *pDataBuff;
+   unsigned int   NameBuffLen;
+   unsigned int   DataBuffLen;
 
-   uint64_t    CurrentPage;
-   char       *pPageBuff;        // Length is PageSize, contains data of CurrentPage
-   unsigned int          PageBuffDataLen; // Length of current data in PageBuff (the same for all pages, but the last one might contain less data)
+   uint64_t       CurrentPage;
+   char         *pPageBuff;        // Length is PageSize, contains data of CurrentPage
+   unsigned int   PageBuffDataLen; // Length of current data in PageBuff (the same for all pages, but the last one might contain less data)
 
-   char                *pInfoBuff;
-   char                *pInfoBuffConst;
+   char         *pInfoBuff;
+   char         *pInfoBuffConst;
 
-   uint64_t  *pPageSeekArr;
-   uint64_t    PageSeekArrLen;
-   uint64_t    Interleave;  // The number of pages lying between 2 entries in the PageSeekArr
+   uint64_t     *pPageSeekArr;
+   uint64_t       PageSeekArrLen;
+   uint64_t       Interleave;      // The number of pages lying between 2 entries in the PageSeekArr
+
+   // Options
+   char         *pLogFilename;
+   uint64_t       MaxPageArrMem;   // Maximum amount of memory (in MiB) for storing page pointers
+   uint8_t        LogStdout;
 } t_Aaff;
 
-
-// ----------------
-//  Error handling
-// ----------------
-
-#ifdef AAFF_DEBUG
-   #define CHK(ChkVal)    \
-   {                                                                  \
-      int ChkValRc;                                                   \
-      if ((ChkValRc=(ChkVal)) != AAFF_OK)                             \
-      {                                                               \
-         printf ("Err %d in %s, %d\n", ChkValRc, __FILE__, __LINE__); \
-         return ChkValRc;                                             \
-      }                                                               \
-   }
-   #define DEBUG_PRINTF(pFormat, ...) \
-      printf (pFormat, ##__VA_ARGS__);
-#else
-   #define CHK(ChkVal)                      \
-   {                                        \
-      int ChkValRc;                         \
-      if ((ChkValRc=(ChkVal)) != AAFF_OK)   \
-         return ChkValRc;                   \
-   }
-   #define DEBUG_PRINTF(...)
-#endif
 
 // Possible error codes
 enum
 {
-    AAFF_OK = 0,
-    AAFF_FOUND,
+   AAFF_OK = 0,
+   AAFF_FOUND,
 
-    AAFF_MEMALLOC_FAILED=100,
-    AAFF_FILE_OPEN_FAILED,
-    AAFF_INVALID_SIGNATURE,
-    AAFF_CANNOT_READ_DATA,
-    AAFF_INVALID_HEADER,
-    AAFF_INVALID_FOOTER,                // 105
-    AAFF_TOO_MANY_HEADER_SEGEMENTS,
-    AAFF_NOT_CREATED_BY_GUYMAGER,
-    AAFF_INVALID_PAGE_NUMBER,
-    AAFF_UNEXPECTED_PAGE_NUMBER,
-    AAFF_CANNOT_CLOSE_FILE,             // 110
-    AAFF_CANNOT_SEEK,
-    AAFF_WRONG_SEGMENT,
-    AAFF_UNCOMPRESS_FAILED,
-    AAFF_INVALID_PAGE_ARGUMENT,
-    AAFF_SEEKARR_CORRUPT,               // 115
-    AAFF_PAGE_NOT_FOUND,
-    AAFF_READ_BEYOND_IMAGE_LENGTH,
-    AAFF_READ_BEYOND_LAST_PAGE
+   AAFF_ERROR_ENOMEM_START=1000,
+   AAFF_MEMALLOC_FAILED,
+   AAFF_ERROR_ENOMEM_END,
+
+   AAFF_ERROR_EINVAL_START=2000,
+   AAFF_OPTIONS_ERROR,
+   AAFF_SPLIT_IMAGES_NOT_SUPPORTED,
+   AAFF_INVALID_SIGNATURE,
+   AAFF_NOT_CREATED_BY_GUYMAGER,
+   AAFF_CANNOT_OPEN_LOGFILE,
+   AAFF_ERROR_EINVAL_END,
+
+   AAFF_ERROR_EIO_START=3000,
+   AAFF_FILE_OPEN_FAILED,
+   AAFF_CANNOT_READ_DATA,
+   AAFF_INVALID_HEADER,
+   AAFF_INVALID_FOOTER,
+   AAFF_TOO_MANY_HEADER_SEGEMENTS,
+   AAFF_INVALID_PAGE_NUMBER,
+   AAFF_UNEXPECTED_PAGE_NUMBER,
+   AAFF_CANNOT_CLOSE_FILE,
+   AAFF_CANNOT_SEEK,
+   AAFF_WRONG_SEGMENT,
+   AAFF_UNCOMPRESS_FAILED,
+   AAFF_INVALID_PAGE_ARGUMENT,
+   AAFF_SEEKARR_CORRUPT,
+   AAFF_PAGE_NOT_FOUND,
+   AAFF_READ_BEYOND_IMAGE_LENGTH,
+   AAFF_READ_BEYOND_LAST_PAGE,
+   AAFF_PAGE_LENGTH_ZERO,
+   AAFF_NEGATIVE_SEEK,
+   AAFF_ERROR_EIO_END,
 };
 
 

@@ -143,28 +143,29 @@ typedef struct
    t_pAewfSectionTable pEwfTable;           // Contains the original EWF table section or NULL, if never read or kicked out from cache
 } t_Table, *t_pTable;
 
-#define AEWF_NONE ULONG_LONG_MAX
+#define AEWF_NONE UINT64_MAX
+
 typedef struct _t_Aewf
 {
-   t_pSegment          pSegmentArr;      // Array of all segment files (in correct order)
-   t_pTable            pTableArr;        // Array of all chunk offset tables found in the segment files (in correct order)
-   uint64_t             Segments;
-   uint64_t             Tables;
-   uint64_t             Chunks;          // Total number of chunks in all tables
-   uint64_t             TableCache;      // Current amount RAM used by tables, in bytes
-   uint64_t             OpenSegments;    // Current number of open segment files
-   uint64_t             SectorSize;
-   uint64_t             Sectors;
-   uint64_t             ChunkSize;
-   uint64_t             ImageSize;       // Equals to Sectors * SectorSize
-   char               *pChunkBuffCompressed;
-   char               *pChunkBuffUncompressed;
-   uint64_t             ChunkBuffUncompressedDataLen;  // This normally always is equal to the chunk size (32K), except maybe for the last chunk, if the image's total size is not a multiple of the chunk size
-   uint32_t             ChunkBuffSize;
-   uint64_t             ChunkInBuff;     // Chunk currently residing in pChunkBuffUncompressed (AEWF_NONE if none)
-   char               *pErrorText;       // Used for assembling error text during option parsing
-   time_t               LastStatsUpdate;
-   char               *pInfo;
+   t_pSegment  pSegmentArr;      // Array of all segment files (in correct order)
+   t_pTable    pTableArr;        // Array of all chunk offset tables found in the segment files (in correct order)
+   uint64_t     Segments;
+   uint64_t     Tables;
+   uint64_t     Chunks;          // Total number of chunks in all tables
+   uint64_t     TableCache;      // Current amount RAM used by tables, in bytes
+   uint64_t     OpenSegments;    // Current number of open segment files
+   uint64_t     SectorSize;
+   uint64_t     Sectors;
+   uint64_t     ChunkSize;
+   uint64_t     ImageSize;       // Equals to Sectors * SectorSize
+   char       *pChunkBuffCompressed;
+   char       *pChunkBuffUncompressed;
+   uint64_t     ChunkBuffUncompressedDataLen;  // This normally always is equal to the chunk size (32K), except maybe for the last chunk, if the image's total size is not a multiple of the chunk size
+   uint32_t     ChunkBuffSize;
+   uint64_t     ChunkInBuff;     // Chunk currently residing in pChunkBuffUncompressed (AEWF_NONE if none)
+   char       *pErrorText;       // Used for assembling error text during option parsing
+   time_t       LastStatsUpdate;
+   char       *pInfo;
 
    // Statistics
    uint64_t   SegmentCacheHits;
@@ -240,6 +241,7 @@ enum
    AEWF_UNCOMPRESS_HEADER_FAILED,
    AEWF_ASPRINTF_FAILED,
    AEWF_CHUNK_LENGTH_ZERO,
+   AEWF_NEGATIVE_SEEK,
    AEWF_ERROR_EIO_END,
 };
 
