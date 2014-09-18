@@ -22,6 +22,7 @@
 
 #include <config.h>
 
+#include <stdlib.h> // For alloc, calloc, free
 #include <stdio.h>  // For printf
 #include <stdint.h> // For int*_t and uint*_t
 #include <stdarg.h> // For va_*, vprintf
@@ -242,33 +243,6 @@ typedef const char* (*t_LibXmount_Morphing_GetSupportedTypes)();
  */
 void LibXmount_Morphing_GetFunctions(pts_LibXmountMorphingFunctions p_functions);
 typedef void (*t_LibXmount_Morphing_GetFunctions)(pts_LibXmountMorphingFunctions);
-
-/*******************************************************************************
- * Helper functions
- ******************************************************************************/
-//! Print error and debug messages to stdout
-/*!
- * \param p_msg_type "ERROR" or "DEBUG"
- * \param p_calling_fun Name of calling function
- * \param line Line number of call
- * \param p_msg Message string
- * \param ... Variable params with values to include in message string
- */
-static inline void LibXmount_Morphing_LogMessage(char *p_msg_type,
-                                                 char *p_calling_fun,
-                                                 int line,
-                                                 char *p_msg,
-                                                 ...)
-{
-  va_list var_list;
-
-  // Print message "header"
-  printf("%s: %s.%s@%u : ",p_msg_type,p_calling_fun,XMOUNT_VERSION,line);
-  // Print message with variable parameters
-  va_start(var_list,p_msg);
-  vprintf(p_msg,var_list);
-  va_end(var_list);
-}
 
 #endif // LIBXMOUNT_MORPHING_H
 

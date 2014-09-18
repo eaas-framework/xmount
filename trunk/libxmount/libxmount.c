@@ -18,10 +18,39 @@
 #include <config.h>
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
+#include <stdarg.h>
 
 #include "libxmount.h"
+
+//! Print error and debug messages to stdout
+/*!
+ * \param p_msg_type "ERROR" or "DEBUG"
+ * \param p_calling_fun Name of calling function
+ * \param line Line number of call
+ * \param p_msg Message string
+ * \param ... Variable params with values to include in message string
+ */
+/*
+ * LogMessage
+ */
+void LogMessage(char *p_msg_type,
+                char *p_calling_fun,
+                int line,
+                char *p_msg,
+                ...)
+{
+  va_list var_list;
+
+  // Print message "header"
+  printf("%s: %s@%u : ",p_msg_type,p_calling_fun,line);
+  // Print message with variable parameters
+  va_start(var_list,p_msg);
+  vprintf(p_msg,var_list);
+  va_end(var_list);
+}
 
 /*
  * StrToInt32

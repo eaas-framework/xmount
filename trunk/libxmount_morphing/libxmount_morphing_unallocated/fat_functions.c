@@ -16,14 +16,31 @@
 *******************************************************************************/
 
 #include "fat_functions.h"
+#include "libxmount_morphing_unallocated_retvalues.h"
+
+#define LOG_DEBUG(...) {                                  \
+    LIBXMOUNT_LOG_DEBUG(p_fat_handle->debug,__VA_ARGS__); \
+}
 
 /*
  * ReadFatHeader
  */
-int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle) {
+int ReadFatHeader(pts_FatHandle p_fat_handle,
+                  pts_LibXmountMorphingInputFunctions p_input_functions,
+                  uint8_t debug)
+{
   pts_FatVH p_fat_vh;
   int ret;
   size_t bytes_read;
+  uint32_t root_dir_sectors;
+  uint32_t fat_size;
+  uint32_t total_sectors;
+  uint32_t data_sectors;
+  uint32_t cluster_count;
+
+  // Init FAT handle
+  p_fat_handle->p_fat_vh=NULL;
+  p_fat_handle->debug=debug;
 
   LOG_DEBUG("Trying to read FAT volume header\n");
 
@@ -32,17 +49,15 @@ int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle) {
   if(p_fat_vh==NULL) return UNALLOCATED_MEMALLOC_FAILED;
 
   // Read VH from input image
-  ret=p_unallocated_handle->
-        p_input_functions->
-          Read(0,
-               (char*)(p_fat_vh),
-               0,
-               sizeof(ts_FatVH),
-               &bytes_read);
+  ret=p_input_functions->Read(0,
+                              (char*)(p_fat_vh),
+                              0,
+                              sizeof(ts_FatVH),
+                              &bytes_read);
   if(ret!=0 || bytes_read!=sizeof(ts_FatVH)) {
     free(p_fat_vh);
     p_fat_vh=NULL;
-    return UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER;
+    return UNALLOCATED_FAT_CANNOT_READ_HEADER;
   }
 
   // Convert values to host endianness (FAT values are always stored in little
@@ -88,48 +103,47 @@ int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle) {
   {
     free(p_fat_vh);
     p_fat_vh=NULL;
-    return UNALLOCATED_INVALID_FAT_HEADER;
+    return UNALLOCATED_FAT_INVALID_HEADER;
   }
 
-  // If FAT type was not specified, try to detect it
-  if(p_unallocated_handle->fs_type==UnallocatedFsType_Unknown) {
-    uint32_t root_dir_sectors;
-    uint32_t fat_size;
-    uint32_t total_sectors;
-    uint32_t data_sectors;
-    uint32_t cluster_count;
+  LOG_DEBUG("Determining FAT type\n");
 
-    LOG_DEBUG("Determining FAT type\n");
+  // Determine the count of sectors occupied by the root directory
+  root_dir_sectors=((p_fat_vh->root_entry_count*32)+
+    (p_fat_vh->bytes_per_sector-1))/p_fat_vh->bytes_per_sector;
 
-    // Determine the count of sectors occupied by the root directory
-    root_dir_sectors=((p_fat_vh->root_entry_count*32)+
-      (p_fat_vh->bytes_per_sector-1))/p_fat_vh->bytes_per_sector;
+  // Determine the count of sectors in the data region
+  if(p_fat_vh->fat16_sectors!=0) fat_size=p_fat_vh->fat16_sectors;
+  else fat_size=p_fat_vh->fat32_sectors;
+  if(p_fat_vh->total_sectors_16!=0) total_sectors=p_fat_vh->total_sectors_16;
+  else total_sectors=p_fat_vh->total_sectors_32;
+  data_sectors=total_sectors-(p_fat_vh->reserved_sectors+
+    (p_fat_vh->fat_count*fat_size)+root_dir_sectors);
 
-    // Determine the count of sectors in the data region
-    if(p_fat_vh->fat16_sectors!=0) fat_size=p_fat_vh->fat16_sectors;
-    else fat_size=p_fat_vh->fat32_sectors;
-    if(p_fat_vh->total_sectors_16!=0) total_sectors=p_fat_vh->total_sectors_16;
-    else total_sectors=p_fat_vh->total_sectors_32;
-    data_sectors=total_sectors-(p_fat_vh->reserved_sectors+
-      (p_fat_vh->fat_count*fat_size)+root_dir_sectors);
+  // Determine the count of clusters
+  cluster_count=data_sectors/p_fat_vh->sectors_per_cluster;
 
-    // Determine the count of clusters
-    cluster_count=data_sectors/p_fat_vh->sectors_per_cluster;
-
-    // Determine FAT type
-    if(cluster_count<4085) {
-      LOG_DEBUG("FAT is of type FAT12\n");
-      p_unallocated_handle->fs_type=UnallocatedFsType_Fat12;
-    } else if(cluster_count<65525) {
-      LOG_DEBUG("FAT is of type FAT16\n");
-      p_unallocated_handle->fs_type=UnallocatedFsType_Fat16;
-    } else {
-      LOG_DEBUG("FAT is of type FAT32\n");
-      p_unallocated_handle->fs_type=UnallocatedFsType_Fat32;
-    }
+  // Determine FAT type
+  if(cluster_count<4085) {
+    LOG_DEBUG("FAT is of type FAT12\n");
+    p_fat_handle->fat_type=FatType_Fat12;
+  } else if(cluster_count<65525) {
+    LOG_DEBUG("FAT is of type FAT16\n");
+    p_fat_handle->fat_type=FatType_Fat16;
+  } else {
+    LOG_DEBUG("FAT is of type FAT32\n");
+    p_fat_handle->fat_type=FatType_Fat32;
   }
 
-  p_unallocated_handle->p_fat_vh=p_fat_vh;
+  p_fat_handle->p_fat_vh=p_fat_vh;
   return UNALLOCATED_OK;
+}
+
+/*
+ * FreeFatHeader
+ */
+void FreeFatHeader(pts_FatHandle p_fat_handle) {
+  if(p_fat_handle==NULL) return;
+  if(p_fat_handle->p_fat_vh!=NULL) free(p_fat_handle->p_fat_vh);
 }
 

@@ -22,6 +22,10 @@
 #include "../libxmount_morphing.h"
 #include "libxmount_morphing_raid.h"
 
+#define LOG_DEBUG(...) {                                 \
+  LIBXMOUNT_LOG_DEBUG(p_raid_handle->debug,__VA_ARGS__); \
+}
+
 /*******************************************************************************
  * LibXmount_Morphing API implementation
  ******************************************************************************/

@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdarg.h>
 #include <string.h>
 #include <inttypes.h> // For PRI*
 #include <errno.h>
@@ -48,11 +47,21 @@
 
 #include "xmount.h"
 #include "md5.h"
-#include "endianness.h"
 #include "macros.h"
+#include "../libxmount/libxmount.h"
 
 #define XMOUNT_COPYRIGHT_NOTICE \
   "xmount v%s Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>"
+
+#define LOG_WARNING(...) {            \
+  LIBXMOUNT_LOG_WARNING(__VA_ARGS__); \
+}
+#define LOG_ERROR(...) {            \
+  LIBXMOUNT_LOG_ERROR(__VA_ARGS__); \
+}
+#define LOG_DEBUG(...) {                              \
+  LIBXMOUNT_LOG_DEBUG(glob_xmount.debug,__VA_ARGS__); \
+}
 
 /*******************************************************************************
  * Global vars
@@ -64,7 +73,6 @@ static ts_XmountData glob_xmount;
  * Forward declarations
  ******************************************************************************/
 // Helper functions
-static void LogMessage(char*, char*, int, char*, ...);
 static void PrintUsage(char*);
 static void CheckFuseSettings();
 static int ParseCmdLine(const int, char**);
@@ -117,30 +125,6 @@ static int FuseWrite(const char *p_path,
 /*******************************************************************************
  * Helper functions
  ******************************************************************************/
-//! Print error and debug messages to stdout
-/*!
- * \param p_msg_type "ERROR" or "DEBUG"
- * \param p_calling_fun Name of calling function
- * \param line Line number of call
- * \param p_msg Message string
- * \param ... Variable params with values to include in message string
- */
-static void LogMessage(char *p_msg_type,
-                       char *p_calling_fun,
-                       int line,
-                       char *p_msg,
-                       ...)
-{
-  va_list var_list;
-
-  // Print message "header"
-  printf("%s: %s.%s@%u : ",p_msg_type,p_calling_fun,XMOUNT_VERSION,line);
-  // Print message with variable parameters
-  va_start(var_list,p_msg);
-  vprintf(p_msg,var_list);
-  va_end(var_list);
-}
-
 //! Print usage instructions (cmdline options etc..)
 /*!
  * \param p_prog_name Program name (argv[0])
@@ -395,6 +379,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
   int first;
   char *p_buf;
   pts_InputImage p_input_image;
+  int ret;
 
   // add pp_argv[0] to FUSE's argv
   XMOUNT_MALLOC(glob_xmount.pp_fuse_argv,char**,sizeof(char*));
@@ -580,7 +565,11 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         // Set input image offset
         if((argc+1)>i) {
           i++;
-          glob_xmount.input.image_offset=strtoull(pp_argv[i],NULL,10);
+          glob_xmount.input.image_offset=StrToUint64(pp_argv[i],&ret);
+          if(ret==0) {
+            LOG_ERROR("Unable to convert '%s' to a number!\n",pp_argv[i])
+            return FALSE;
+          }
         } else {
           LOG_ERROR("You must specify an offset!\n")
           return FALSE;
@@ -636,7 +625,11 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         // Set input image size limit
         if((argc+1)>i) {
           i++;
-          glob_xmount.input.image_size_limit=strtoull(pp_argv[i],NULL,10);
+          glob_xmount.input.image_size_limit=StrToUint64(pp_argv[i],&ret);
+          if(ret==0) {
+            LOG_ERROR("Unable to convert '%s' to a number!\n",pp_argv[i])
+            return FALSE;
+          }
         } else {
           LOG_ERROR("You must specify a size limit!\n")
           return FALSE;

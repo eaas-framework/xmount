@@ -18,7 +18,20 @@
 #ifndef LIBXMOUNT_H
 #define LIBXMOUNT_H
 
-#include "../src/endianness.h"
+#include "endianness.h"
+
+/*
+ * Macros to ease debugging and error reporting
+ */
+#define LIBXMOUNT_LOG_ERROR(...) {                              \
+  LogMessage("ERROR",(char*)__FUNCTION__,__LINE__,__VA_ARGS__); \
+}
+#define LIBXMOUNT_LOG_WARNING(...) {                              \
+  LogMessage("WARNING",(char*)__FUNCTION__,__LINE__,__VA_ARGS__); \
+}
+#define LIBXMOUNT_LOG_DEBUG(debug,...) {                                  \
+  if(debug) LogMessage("DEBUG",(char*)__FUNCTION__,__LINE__,__VA_ARGS__); \
+}
 
 //! Struct containing lib options
 typedef struct s_LibXmountOptions {
@@ -29,6 +42,20 @@ typedef struct s_LibXmountOptions {
   //! Set to 1 if key/value has been parsed and is valid
   uint8_t valid;
 } ts_LibXmountOptions, *pts_LibXmountOptions;
+
+//! Log messages
+/*!
+ * \param p_msg_type "ERROR", "DEBUG", etc...
+ * \param p_calling_fun Name of calling function
+ * \param line Line number of call
+ * \param p_msg Message string
+ * \param ... Variable params with values to include in message string
+ */
+void LogMessage(char *p_msg_type,
+                char *p_calling_fun,
+                int line,
+                char *p_msg,
+                ...);
 
 int32_t StrToInt32(const char *p_value, int *p_ok);
 uint32_t StrToUint32(const char *p_value, int *p_ok);

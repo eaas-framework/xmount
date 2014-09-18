@@ -18,7 +18,14 @@
 #ifndef FAT_FUNCTIONS_H
 #define FAT_FUNCTIONS_H
 
-#include "libxmount_morphing_unallocated.h"
+#include "../libxmount_morphing.h"
+
+// Supported FAT types
+typedef enum e_FatType {
+  FatType_Fat12=0,
+  FatType_Fat16,
+  FatType_Fat32
+} te_FatType;
 
 // Needed parts of the FAT volume header
 typedef struct s_FatVH {
@@ -38,7 +45,17 @@ typedef struct s_FatVH {
   uint32_t fat32_sectors;
 } __attribute__ ((packed)) ts_FatVH, *pts_FatVH;
 
-int ReadFatHeader(pts_UnallocatedHandle p_unallocated_handle);
+// FAT handle
+typedef struct s_FatHandle {
+  te_FatType fat_type;
+  pts_FatVH p_fat_vh;
+  uint8_t debug;
+} ts_FatHandle, *pts_FatHandle;
+
+int ReadFatHeader(pts_FatHandle p_fat_handle,
+                  pts_LibXmountMorphingInputFunctions p_input_functions,
+                  uint8_t debug);
+void FreeFatHeader(pts_FatHandle p_fat_handle);
 
 #endif // FAT_FUNCTIONS_H
 

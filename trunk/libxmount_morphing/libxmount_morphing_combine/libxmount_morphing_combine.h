@@ -18,26 +18,6 @@
 #ifndef LIBXMOUNT_MORPHING_COMBINE_H
 #define LIBXMOUNT_MORPHING_COMBINE_H
 
-#define LOG_ERROR(...) {                             \
-  LibXmount_Morphing_LogMessage("ERROR",             \
-                                (char*)__FUNCTION__, \
-                                __LINE__,            \
-                                __VA_ARGS__);        \
-}
-#define LOG_WARNING(...) {                           \
-  LibXmount_Morphing_LogMessage("WARNING",           \
-                                (char*)__FUNCTION__, \
-                                __LINE__,            \
-                                __VA_ARGS__);        \
-}
-#define LOG_DEBUG(...) {                               \
-  if(p_combine_handle->debug==1)                       \
-    LibXmount_Morphing_LogMessage("DEBUG",             \
-                                  (char*)__FUNCTION__, \
-                                  __LINE__,            \
-                                  __VA_ARGS__);        \
-}
-
 /*******************************************************************************
  * Enums, type defs, etc...
  ******************************************************************************/

@@ -15,55 +15,31 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#ifndef MACROS_H
-#define MACROS_H
+#ifndef LIBXMOUNT_MORPHING_UNALLOCATED_RETVALUES_H
+#define LIBXMOUNT_MORPHING_UNALLOCATED_RETVALUES_H
 
-#ifndef __APPLE__
-  #define FOPEN fopen64
-#else
-  // Apple does use fopen for fopen64 too
-  #define FOPEN fopen
-#endif
+// Error codes
+enum {
+  UNALLOCATED_OK=0,
+  UNALLOCATED_MEMALLOC_FAILED,
+  UNALLOCATED_NO_SUPPORTED_FS_DETECTED,
+  UNALLOCATED_UNSUPPORTED_FS_SPECIFIED,
+  UNALLOCATED_INTERNAL_ERROR,
+  UNALLOCATED_CANNOT_GET_IMAGECOUNT,
+  UNALLOCATED_WRONG_INPUT_IMAGE_COUNT,
+  UNALLOCATED_CANNOT_GET_IMAGESIZE,
+  UNALLOCATED_READ_BEYOND_END_OF_IMAGE,
+  UNALLOCATED_CANNOT_READ_DATA,
+  UNALLOCATED_CANNOT_PARSE_OPTION,
+  // HFS return values
+  UNALLOCATED_HFS_CANNOT_READ_HEADER,
+  UNALLOCATED_HFS_INVALID_HEADER,
+  UNALLOCATED_HFS_CANNOT_READ_ALLOC_FILE,
+  UNALLOCATED_HFS_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS,
+  // FAT return values
+  UNALLOCATED_FAT_CANNOT_READ_HEADER,
+  UNALLOCATED_FAT_INVALID_HEADER
+};
 
-/*
- * Macros to alloc or realloc memory and check whether it worked or not
- */
-#define XMOUNT_MALLOC(var,var_type,size) { \
-  (var)=(var_type)malloc(size); \
-  if((var)==NULL) { \
-    LOG_ERROR("Couldn't allocate memmory!\n"); \
-    exit(1); \
-  } \
-}
-#define XMOUNT_REALLOC(var,var_type,size) { \
-  (var)=(var_type)realloc((var),size); \
-  if((var)==NULL) { \
-    LOG_ERROR("Couldn't allocate memmory!\n"); \
-    exit(1); \
-  } \
-}
-
-/*
- * Macros for some often used string functions
- */
-#define XMOUNT_STRSET(var1,var2) { \
-  XMOUNT_MALLOC(var1,char*,strlen(var2)+1) \
-  strcpy(var1,var2); \
-}
-#define XMOUNT_STRNSET(var1,var2,size) { \
-  XMOUNT_MALLOC(var1,char*,(size)+1) \
-  strncpy(var1,var2,size); \
-  (var1)[size]='\0'; \
-}
-#define XMOUNT_STRAPP(var1,var2) { \
-  XMOUNT_REALLOC(var1,char*,strlen(var1)+strlen(var2)+1) \
-  strcpy((var1)+strlen(var1),var2); \
-}
-#define XMOUNT_STRNAPP(var1,var2,size) { \
-  XMOUNT_REALLOC(var1,char*,strlen(var1)+(size)+1) \
-  (var1)[strlen(var1)+(size)]='\0'; \
-  strncpy((var1)+strlen(var1),var2,size); \
-}
-
-#endif // MACROS_H
+#endif // LIBXMOUNT_MORPHING_UNALLOCATED_RETVALUES_H
 

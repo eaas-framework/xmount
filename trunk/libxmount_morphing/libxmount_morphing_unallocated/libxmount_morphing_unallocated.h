@@ -18,59 +18,19 @@
 #ifndef LIBXMOUNT_MORPHING_UNALLOCATED_H
 #define LIBXMOUNT_MORPHING_UNALLOCATED_H
 
+#include "../libxmount_morphing.h"
+
 #include "hfs_functions.h"
 #include "fat_functions.h"
-
-#define LOG_ERROR(...) {                             \
-  LibXmount_Morphing_LogMessage("ERROR",             \
-                                (char*)__FUNCTION__, \
-                                __LINE__,            \
-                                __VA_ARGS__);        \
-}
-#define LOG_WARNING(...) {                           \
-  LibXmount_Morphing_LogMessage("WARNING",           \
-                                (char*)__FUNCTION__, \
-                                __LINE__,            \
-                                __VA_ARGS__);        \
-}
-#define LOG_DEBUG(...) {                               \
-  if(p_unallocated_handle->debug==1)                   \
-    LibXmount_Morphing_LogMessage("DEBUG",             \
-                                  (char*)__FUNCTION__, \
-                                  __LINE__,            \
-                                  __VA_ARGS__);        \
-}
 
 /*******************************************************************************
  * Enums, type defs, etc...
  ******************************************************************************/
-// Error codes
-enum {
-  UNALLOCATED_OK=0,
-  UNALLOCATED_MEMALLOC_FAILED,
-  UNALLOCATED_NO_SUPPORTED_FS_DETECTED,
-  UNALLOCATED_UNSUPPORTED_FS_SPECIFIED,
-  UNALLOCATED_INTERNAL_ERROR,
-  UNALLOCATED_CANNOT_GET_IMAGECOUNT,
-  UNALLOCATED_WRONG_INPUT_IMAGE_COUNT,
-  UNALLOCATED_CANNOT_GET_IMAGESIZE,
-  UNALLOCATED_READ_BEYOND_END_OF_IMAGE,
-  UNALLOCATED_CANNOT_READ_DATA,
-  UNALLOCATED_CANNOT_PARSE_OPTION,
-  UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER,
-  UNALLOCATED_INVALID_HFSPLUS_HEADER,
-  UNALLOCATED_CANNOT_READ_HFSPLUS_ALLOC_FILE,
-  UNALLOCATED_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS,
-  UNALLOCATED_INVALID_FAT_HEADER
-};
-
 // Supported fs types
 typedef enum e_UnallocatedFsType {
   UnallocatedFsType_Unknown=0,
-  UnallocatedFsType_HfsPlus,
-  UnallocatedFsType_Fat12,
-  UnallocatedFsType_Fat16,
-  UnallocatedFsType_Fat32
+  UnallocatedFsType_Hfs,
+  UnallocatedFsType_Fat
 } te_UnallocatedFsType;
 
 // Handle
@@ -85,8 +45,8 @@ typedef struct s_UnallocatedHandle {
   uint64_t morphed_image_size;
 
   union {
-    pts_HfsPlusVH p_hfsplus_vh;
-    pts_FatVH p_fat_vh;
+    ts_HfsHandle hfs_handle;
+    ts_FatHandle fat_handle;
   };
 } ts_UnallocatedHandle, *pts_UnallocatedHandle;
 
@@ -116,9 +76,6 @@ static int UnallocatedGetInfofileContent(void *p_handle,
                                        const char **pp_info_buf);
 static const char* UnallocatedGetErrorMessage(int err_num);
 static void UnallocatedFreeBuffer(void *p_buf);
-
-// Helper functions
-static int DetectFs(pts_UnallocatedHandle p_unallocated_handle);
 
 #endif // LIBXMOUNT_MORPHING_UNALLOCATED_H
 

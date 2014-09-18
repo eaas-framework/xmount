@@ -19,8 +19,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../libxmount_morphing.h"
 #include "libxmount_morphing_unallocated.h"
+#include "libxmount_morphing_unallocated_retvalues.h"
+
+#define LOG_DEBUG(...) {                                        \
+  LIBXMOUNT_LOG_DEBUG(p_unallocated_handle->debug,__VA_ARGS__); \
+}
 
 /*******************************************************************************
  * LibXmount_Morphing API implementation
@@ -93,18 +97,14 @@ static int UnallocatedDestroyHandle(void **pp_handle) {
 
   // TODO: Return if p_unallocated_handle==NULL
 
-  // Free fs data
+  // Free fs handle
   switch(p_unallocated_handle->fs_type) {
-    case UnallocatedFsType_HfsPlus: {
-      if(p_unallocated_handle->p_hfsplus_vh!=NULL)
-        free(p_unallocated_handle->p_hfsplus_vh);
+    case UnallocatedFsType_Hfs: {
+      FreeHfsHeader(&(p_unallocated_handle->hfs_handle));
       break;
     }
-    case UnallocatedFsType_Fat12:
-    case UnallocatedFsType_Fat16:
-    case UnallocatedFsType_Fat32: {
-      if(p_unallocated_handle->p_fat_vh!=NULL)
-        free(p_unallocated_handle->p_fat_vh);
+    case UnallocatedFsType_Fat: {
+      FreeFatHeader(&(p_unallocated_handle->fat_handle));
       break;
     }
     case UnallocatedFsType_Unknown:
@@ -150,18 +150,44 @@ static int UnallocatedMorph(
 
   // Read filesystem header
   switch(p_unallocated_handle->fs_type) {
-    case UnallocatedFsType_HfsPlus: {
-      // Read HFS+ VH
-      ret=ReadHfsPlusHeader(p_unallocated_handle);
+    case UnallocatedFsType_Hfs: {
+      // Read HFS VH
+      ret=ReadHfsHeader(&(p_unallocated_handle->hfs_handle),
+                        p_unallocated_handle->p_input_functions,
+                        p_unallocated_handle->debug);
+      if(ret!=UNALLOCATED_OK) return ret;
+      break;
+    }
+    case UnallocatedFsType_Fat: {
+      // Read FAT VH
+      ret=ReadFatHeader(&(p_unallocated_handle->fat_handle),
+                        p_unallocated_handle->p_input_functions,
+                        p_unallocated_handle->debug);
       if(ret!=UNALLOCATED_OK) return ret;
       break;
     }
     case UnallocatedFsType_Unknown: {
-      // Filesystem wasn't specified. Try to autodetect it. This will also read
-      // its header.
-      ret=DetectFs(p_unallocated_handle);
-      if(ret!=UNALLOCATED_OK) return ret;
-      break;
+      // Filesystem wasn't specified. Try to autodetect it by reading all
+      // available fs headers
+      ret=ReadHfsHeader(&(p_unallocated_handle->hfs_handle),
+                        p_unallocated_handle->p_input_functions,
+                        p_unallocated_handle->debug);
+      if(ret==UNALLOCATED_OK) {
+        LOG_DEBUG("Detected HFS+ fs\n");
+        p_unallocated_handle->fs_type=UnallocatedFsType_Hfs;
+        break;
+      }
+      ret=ReadFatHeader(&(p_unallocated_handle->fat_handle),
+                        p_unallocated_handle->p_input_functions,
+                        p_unallocated_handle->debug);
+      if(ret==UNALLOCATED_OK) {
+        LOG_DEBUG("Detected FAT fs\n");
+        p_unallocated_handle->fs_type=UnallocatedFsType_Fat;
+        break;
+      }
+
+      LOG_DEBUG("Unable to autodetect fs\n");
+      return UNALLOCATED_NO_SUPPORTED_FS_DETECTED;
     }
     default: {
       return UNALLOCATED_INTERNAL_ERROR;
@@ -170,25 +196,20 @@ static int UnallocatedMorph(
 
   // Extract unallocated blocks from input image
   switch(p_unallocated_handle->fs_type) {
-    case UnallocatedFsType_HfsPlus: {
-      uint8_t *p_alloc_file;
-
-      // Read HFS+ alloc file
-      ret=ReadHfsPlusAllocFile(p_unallocated_handle,&p_alloc_file);
+    case UnallocatedFsType_Hfs: {
+      // Read HFS alloc file
+      ret=ReadHfsAllocFile(&(p_unallocated_handle->hfs_handle),
+                           p_unallocated_handle->p_input_functions);
       if(ret!=UNALLOCATED_OK) return ret;
-
       // Build free block map
-      ret=BuildHfsPlusBlockMap(p_unallocated_handle,p_alloc_file);
-      // Free alloc file before checking for errors as it needs to be freed
-      // either way
-      free(p_alloc_file);
+      ret=BuildHfsBlockMap(&(p_unallocated_handle->hfs_handle),
+                           &(p_unallocated_handle->p_free_block_map),
+                           &(p_unallocated_handle->free_block_map_size),
+                           &(p_unallocated_handle->block_size));
       if(ret!=UNALLOCATED_OK) return ret;
-
       break;
     }
-    case UnallocatedFsType_Fat12:
-    case UnallocatedFsType_Fat16:
-    case UnallocatedFsType_Fat32: {
+    case UnallocatedFsType_Fat: {
       // TODO
       break;
     }
@@ -296,7 +317,7 @@ static int UnallocatedOptionsHelp(const char **pp_help) {
   ok=asprintf(&p_buf,
               "    unallocated_fs : Specify the filesystem to extract "
                 "unallocated blocks from. Supported filesystems are: "
-                "'hfs+', 'fat12', 'fat16', 'fat32'. "
+                "'hfs', 'fat'. "
                 "Default: autodetect.\n");
   if(ok<0 || p_buf==NULL) {
     *pp_help=NULL;
@@ -321,14 +342,10 @@ static int UnallocatedOptionsParse(void *p_handle,
 
   for(uint32_t i=0;i<options_count;i++) {
     if(strcmp(pp_options[i]->p_key,"unallocated_fs")==0) {
-      if(strcmp(pp_options[i]->p_value,"hfs+")==0) {
-        p_unallocated_handle->fs_type=UnallocatedFsType_HfsPlus;
-      } else if(strcmp(pp_options[i]->p_value,"fat12")==0) {
-        p_unallocated_handle->fs_type=UnallocatedFsType_Fat12;
-      } else if(strcmp(pp_options[i]->p_value,"fat16")==0) {
-        p_unallocated_handle->fs_type=UnallocatedFsType_Fat16;
-      } else if(strcmp(pp_options[i]->p_value,"fat32")==0) {
-        p_unallocated_handle->fs_type=UnallocatedFsType_Fat32;
+      if(strcmp(pp_options[i]->p_value,"hfs")==0) {
+        p_unallocated_handle->fs_type=UnallocatedFsType_Hfs;
+      } else if(strcmp(pp_options[i]->p_value,"fat")==0) {
+        p_unallocated_handle->fs_type=UnallocatedFsType_Fat;
       } else {
         ok=asprintf(&p_buf,
                     "Unsupported filesystem '%s' specified",
@@ -361,7 +378,9 @@ static int UnallocatedGetInfofileContent(void *p_handle,
   char *p_buf=NULL;
 
   switch(p_unallocated_handle->fs_type) {
-    case UnallocatedFsType_HfsPlus: {
+    case UnallocatedFsType_Hfs: {
+      // TODO
+/*
       pts_HfsPlusVH p_hfsplus_vh=p_unallocated_handle->p_hfsplus_vh;
       ret=asprintf(&p_buf,
                    "HFS+ VH signature: 0x%04X\n"
@@ -385,11 +404,12 @@ static int UnallocatedGetInfofileContent(void *p_handle,
                      p_unallocated_handle->block_size,
                    (p_unallocated_handle->free_block_map_size*
                      p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
+*/
       break;
     }
-    case UnallocatedFsType_Fat12:
-    case UnallocatedFsType_Fat16:
-    case UnallocatedFsType_Fat32: {
+    case UnallocatedFsType_Fat: {
+      // TODO
+/*
       pts_FatVH p_fat_vh=p_unallocated_handle->p_fat_vh;
       ret=asprintf(&p_buf,
                    "FAT bytes per sector: %" PRIu16 "\n"
@@ -419,6 +439,7 @@ static int UnallocatedGetInfofileContent(void *p_handle,
                      p_unallocated_handle->block_size,
                    (p_unallocated_handle->free_block_map_size*
                      p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
+*/
       break;
     }
     case UnallocatedFsType_Unknown:
@@ -468,20 +489,25 @@ static const char* UnallocatedGetErrorMessage(int err_num) {
     case UNALLOCATED_CANNOT_PARSE_OPTION:
       return "Unable to parse library option";
       break;
-    case UNALLOCATED_CANNOT_READ_HFSPLUS_HEADER:
-      return "Unable to read HFS+ volume header";
+    // HFS errors
+    case UNALLOCATED_HFS_CANNOT_READ_HEADER:
+      return "Unable to read HFS volume header";
       break;
-    case UNALLOCATED_INVALID_HFSPLUS_HEADER:
-      return "Found invalid HFS+ volume header";
+    case UNALLOCATED_HFS_INVALID_HEADER:
+      return "Found invalid HFS volume header";
       break;
-    case UNALLOCATED_CANNOT_READ_HFSPLUS_ALLOC_FILE:
-      return "Unable to read HFS+ allocation file";
+    case UNALLOCATED_HFS_CANNOT_READ_ALLOC_FILE:
+      return "Unable to read HFS allocation file";
       break;
-    case UNALLOCATED_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS:
-      return "HFS+ allocation file has more then 8 extends. "
+    case UNALLOCATED_HFS_ALLOC_FILE_HAS_TOO_MUCH_EXTENDS:
+      return "HFS allocation file has more than 8 extends. "
                "This is unsupported";
       break;
-    case UNALLOCATED_INVALID_FAT_HEADER:
+    // FAT errors
+    case UNALLOCATED_FAT_CANNOT_READ_HEADER:
+      return "Unable to read FAT volume header";
+      break;
+    case UNALLOCATED_FAT_INVALID_HEADER:
       return "Found invalid FAT volume header";
       break;
     default:
@@ -494,29 +520,5 @@ static const char* UnallocatedGetErrorMessage(int err_num) {
  */
 static void UnallocatedFreeBuffer(void *p_buf) {
   free(p_buf);
-}
-
-/*******************************************************************************
- * Private helper functions
- ******************************************************************************/
-/*
- * DetectFs
- */
-static int DetectFs(pts_UnallocatedHandle p_unallocated_handle) {
-  LOG_DEBUG("Trying to autodetect fs\n");
-
-  // Probe all supported filesystems by trying to read their headers
-  if(ReadHfsPlusHeader(p_unallocated_handle)==UNALLOCATED_OK) {
-    LOG_DEBUG("Detected HFS+ fs\n");
-    p_unallocated_handle->fs_type=UnallocatedFsType_HfsPlus;
-    return UNALLOCATED_OK;
-  } else if(ReadFatHeader(p_unallocated_handle)==UNALLOCATED_OK) {
-    LOG_DEBUG("Detected FAT fs\n");
-    return UNALLOCATED_OK;
-  }
-
-  LOG_DEBUG("Unable to autodetect fs\n");
-
-  return UNALLOCATED_NO_SUPPORTED_FS_DETECTED;
 }
 

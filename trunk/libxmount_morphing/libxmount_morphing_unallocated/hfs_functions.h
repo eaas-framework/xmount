@@ -18,19 +18,24 @@
 #ifndef HFS_FUNCTIONS_H
 #define HFS_FUNCTIONS_H
 
-#include "libxmount_morphing_unallocated.h"
+#include "../libxmount_morphing.h"
 
-// HFS+ extend
-typedef struct s_HfsPlusExtend {
+// Supported HFS types
+typedef enum e_HfsType {
+  HfsType_HfsPlus=0
+} te_HfsType;
+
+// HFS extend
+typedef struct s_HfsExtend {
   uint32_t start_block;
   uint32_t block_count;
-} __attribute__ ((packed)) ts_HfsPlusExtend, *pts_HfsPlusExtend;
+} __attribute__ ((packed)) ts_HfsExtend, *pts_HfsExtend;
 
-// Needed parts of the HFS+ volume header
-#define HFSPLUS_VH_OFFSET 1024
-#define HFSPLUS_VH_SIGNATURE 0x482b //"H+"
-#define HFSPLUS_VH_VERSION 4
-typedef struct s_HfsPlusVH {
+// Needed parts of the HFS volume header
+#define HFS_VH_OFFSET 1024
+#define HFS_VH_SIGNATURE 0x482b //"H+"
+#define HFS_VH_VERSION 4
+typedef struct s_HfsVH {
   uint16_t signature; // "H+"
   uint16_t version; // Currently 4 for HFS+
   uint32_t unused01[9];
@@ -41,14 +46,27 @@ typedef struct s_HfsPlusVH {
   uint64_t alloc_file_size;
   uint32_t alloc_file_clump_size;
   uint32_t alloc_file_total_blocks;
-  ts_HfsPlusExtend alloc_file_extends[8];
-} __attribute__ ((packed)) ts_HfsPlusVH, *pts_HfsPlusVH;
+  ts_HfsExtend alloc_file_extends[8];
+} __attribute__ ((packed)) ts_HfsVH, *pts_HfsVH;
 
-int ReadHfsPlusHeader(pts_UnallocatedHandle p_unallocated_handle);
-int ReadHfsPlusAllocFile(pts_UnallocatedHandle p_unallocated_handle,
-                         uint8_t **pp_alloc_file);
-int BuildHfsPlusBlockMap(pts_UnallocatedHandle p_unallocated_handle,
-                         uint8_t *p_alloc_file);
+// HFS handle
+typedef struct s_HfsHandle {
+  te_HfsType hfs_type;
+  pts_HfsVH p_hfs_vh;
+  uint8_t *p_alloc_file;
+  uint8_t debug;
+} ts_HfsHandle, *pts_HfsHandle;
+
+int ReadHfsHeader(pts_HfsHandle p_hfs_handle,
+                  pts_LibXmountMorphingInputFunctions p_input_functions,
+                  uint8_t debug);
+void FreeHfsHeader(pts_HfsHandle p_hfs_handle);
+int ReadHfsAllocFile(pts_HfsHandle p_hfs_handle,
+                     pts_LibXmountMorphingInputFunctions p_input_functions);
+int BuildHfsBlockMap(pts_HfsHandle p_hfs_handle,
+                     uint64_t **pp_free_block_map,
+                     uint64_t *p_free_block_map_size,
+                     uint64_t *p_block_size);
 
 #endif // HFS_FUNCTIONS_H
 
