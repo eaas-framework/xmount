@@ -22,7 +22,7 @@
 
 // Supported FAT types
 typedef enum e_FatType {
-  FatType_Fat12=0,
+  FatType_Unknown=0,
   FatType_Fat16,
   FatType_Fat32
 } te_FatType;
@@ -49,6 +49,10 @@ typedef struct s_FatVH {
 typedef struct s_FatHandle {
   te_FatType fat_type;
   pts_FatVH p_fat_vh;
+  union {
+    uint16_t *p_fat16;
+    uint32_t *p_fat32;
+  };
   uint8_t debug;
 } ts_FatHandle, *pts_FatHandle;
 
@@ -56,6 +60,13 @@ int ReadFatHeader(pts_FatHandle p_fat_handle,
                   pts_LibXmountMorphingInputFunctions p_input_functions,
                   uint8_t debug);
 void FreeFatHeader(pts_FatHandle p_fat_handle);
+int ReadFat(pts_FatHandle p_fat_handle,
+            pts_LibXmountMorphingInputFunctions p_input_functions);
+int BuildFatBlockMap(pts_FatHandle p_fat_handle,
+                     uint64_t **pp_free_block_map,
+                     uint64_t *p_free_block_map_size,
+                     uint64_t *p_block_size);
+int GetFatInfos(pts_FatHandle p_fat_handle, char **pp_buf);
 
 #endif // FAT_FUNCTIONS_H
 

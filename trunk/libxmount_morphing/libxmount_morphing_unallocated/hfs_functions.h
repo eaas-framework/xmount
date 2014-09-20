@@ -67,6 +67,7 @@ int BuildHfsBlockMap(pts_HfsHandle p_hfs_handle,
                      uint64_t **pp_free_block_map,
                      uint64_t *p_free_block_map_size,
                      uint64_t *p_block_size);
+int GetHfsInfos(pts_HfsHandle p_hfs_handle, char **pp_buf);
 
 #endif // HFS_FUNCTIONS_H
 

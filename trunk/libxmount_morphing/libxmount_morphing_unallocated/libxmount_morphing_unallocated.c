@@ -169,14 +169,17 @@ static int UnallocatedMorph(
     case UnallocatedFsType_Unknown: {
       // Filesystem wasn't specified. Try to autodetect it by reading all
       // available fs headers
+      LOG_DEBUG("Autodetecting filesystem\n");
+      LOG_DEBUG("Trying HFS\n");
       ret=ReadHfsHeader(&(p_unallocated_handle->hfs_handle),
                         p_unallocated_handle->p_input_functions,
                         p_unallocated_handle->debug);
       if(ret==UNALLOCATED_OK) {
-        LOG_DEBUG("Detected HFS+ fs\n");
+        LOG_DEBUG("Detected HFS fs\n");
         p_unallocated_handle->fs_type=UnallocatedFsType_Hfs;
         break;
       }
+      LOG_DEBUG("Trying FAT\n");
       ret=ReadFatHeader(&(p_unallocated_handle->fat_handle),
                         p_unallocated_handle->p_input_functions,
                         p_unallocated_handle->debug);
@@ -210,7 +213,16 @@ static int UnallocatedMorph(
       break;
     }
     case UnallocatedFsType_Fat: {
-      // TODO
+      // Read FAT
+      ret=ReadFat(&(p_unallocated_handle->fat_handle),
+                  p_unallocated_handle->p_input_functions);
+      if(ret!=UNALLOCATED_OK) return ret;
+      // Build free block map
+      ret=BuildFatBlockMap(&(p_unallocated_handle->fat_handle),
+                           &(p_unallocated_handle->p_free_block_map),
+                           &(p_unallocated_handle->free_block_map_size),
+                           &(p_unallocated_handle->block_size));
+      if(ret!=UNALLOCATED_OK) return ret;
       break;
     }
     case UnallocatedFsType_Unknown:
@@ -375,76 +387,45 @@ static int UnallocatedGetInfofileContent(void *p_handle,
 {
   pts_UnallocatedHandle p_unallocated_handle=(pts_UnallocatedHandle)p_handle;
   int ret=-1;
+  char *p_fs_buf=NULL;
   char *p_buf=NULL;
 
   switch(p_unallocated_handle->fs_type) {
     case UnallocatedFsType_Hfs: {
-      // TODO
-/*
-      pts_HfsPlusVH p_hfsplus_vh=p_unallocated_handle->p_hfsplus_vh;
-      ret=asprintf(&p_buf,
-                   "HFS+ VH signature: 0x%04X\n"
-                     "HFS+ VH version: %" PRIu16 "\n"
-                     "HFS+ block size: %" PRIu32 " bytes\n"
-                     "HFS+ total blocks: %" PRIu32 "\n"
-                     "HFS+ free blocks: %" PRIu32 "\n"
-                     "HFS+ allocation file size: %" PRIu64 " bytes\n"
-                     "HFS+ allocation file blocks: %" PRIu32 "\n"
-                     "Discovered free blocks: %" PRIu64 "\n"
-                     "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
-                   p_hfsplus_vh->signature,
-                   p_hfsplus_vh->version,
-                   p_hfsplus_vh->block_size,
-                   p_hfsplus_vh->total_blocks,
-                   p_hfsplus_vh->free_blocks,
-                   p_hfsplus_vh->alloc_file_size,
-                   p_hfsplus_vh->alloc_file_total_blocks,
-                   p_unallocated_handle->free_block_map_size,
-                   p_unallocated_handle->free_block_map_size*
-                     p_unallocated_handle->block_size,
-                   (p_unallocated_handle->free_block_map_size*
-                     p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
-*/
+      ret=GetHfsInfos(&(p_unallocated_handle->hfs_handle),&p_fs_buf);
       break;
     }
     case UnallocatedFsType_Fat: {
-      // TODO
-/*
-      pts_FatVH p_fat_vh=p_unallocated_handle->p_fat_vh;
-      ret=asprintf(&p_buf,
-                   "FAT bytes per sector: %" PRIu16 "\n"
-                     "FAT sectors per cluster: %" PRIu8 "\n"
-                     "FAT reserved sectors: %" PRIu16 "\n"
-                     "FAT count: %" PRIu8 "\n"
-                     "FAT root entry count: %" PRIu16 "\n"
-                     "FAT media type: %02X\n"
-                     "FAT total sector count (16bit): %" PRIu16 "\n"
-                     "FAT sectors per FAT (16bit): %" PRIu16 "\n"
-                     "FAT total sector count (32bit): %" PRIu32 "\n"
-                     "FAT sectors per FAT (32bit): %" PRIu32 "\n"
-                     "Discovered free blocks: %" PRIu64 "\n"
-                     "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
-                   p_fat_vh->bytes_per_sector,
-                   p_fat_vh->sectors_per_cluster,
-                   p_fat_vh->reserved_sectors,
-                   p_fat_vh->fat_count,
-                   p_fat_vh->root_entry_count,
-                   p_fat_vh->media_type,
-                   p_fat_vh->total_sectors_16,
-                   p_fat_vh->fat16_sectors,
-                   p_fat_vh->total_sectors_32,
-                   p_fat_vh->fat32_sectors,
-                   p_unallocated_handle->free_block_map_size,
-                   p_unallocated_handle->free_block_map_size*
-                     p_unallocated_handle->block_size,
-                   (p_unallocated_handle->free_block_map_size*
-                     p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
-*/
+      ret=GetFatInfos(&(p_unallocated_handle->fat_handle),&p_fs_buf);
       break;
     }
     case UnallocatedFsType_Unknown:
     default:
       return UNALLOCATED_INTERNAL_ERROR;
+  }
+  if(ret!=UNALLOCATED_OK) return ret;
+  
+  if(p_fs_buf!=NULL) {
+    ret=asprintf(&p_buf,
+                 "%s\n"
+                   "Discovered free blocks: %" PRIu64 "\n"
+                   "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
+                 p_fs_buf,
+                 p_unallocated_handle->free_block_map_size,
+                 p_unallocated_handle->free_block_map_size*
+                   p_unallocated_handle->block_size,
+                 (p_unallocated_handle->free_block_map_size*
+                   p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
+    free(p_fs_buf);
+  } else {
+    ret=asprintf(&p_buf,
+                 "Discovered free blocks: %" PRIu64 "\n"
+                   "Total unallocated size: %" PRIu64 " bytes (%0.3f GiB)\n",
+                 p_unallocated_handle->free_block_map_size,
+                 p_unallocated_handle->free_block_map_size*
+                   p_unallocated_handle->block_size,
+                 (p_unallocated_handle->free_block_map_size*
+                   p_unallocated_handle->block_size)/(1024.0*1024.0*1024.0));
   }
 
   // Check if asprintf worked
@@ -509,6 +490,12 @@ static const char* UnallocatedGetErrorMessage(int err_num) {
       break;
     case UNALLOCATED_FAT_INVALID_HEADER:
       return "Found invalid FAT volume header";
+      break;
+    case UNALLOCATED_FAT_UNSUPPORTED_FS_TYPE:
+      return "Found unsupported FAT type";
+      break;
+    case UNALLOCATED_FAT_CANNOT_READ_FAT:
+      return "Unable to read FAT";
       break;
     default:
       return "Unknown error";

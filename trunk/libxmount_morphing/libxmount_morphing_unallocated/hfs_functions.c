@@ -226,3 +226,35 @@ int BuildHfsBlockMap(pts_HfsHandle p_hfs_handle,
   return UNALLOCATED_OK;
 }
 
+/*
+ * GetHfsInfos
+ */
+int GetHfsInfos(pts_HfsHandle p_hfs_handle, char **pp_buf) {
+  pts_HfsVH p_hfs_vh=p_hfs_handle->p_hfs_vh;
+  char *p_buf=NULL;
+  int ret;
+
+  ret=asprintf(&p_buf,
+               "HFS filesystem type: HFS+\n"
+                 "HFS VH signature: 0x%04X\n"
+                 "HFS VH version: %" PRIu16 "\n"
+                 "HFS block size: %" PRIu32 " bytes\n"
+                 "HFS total blocks: %" PRIu32 "\n"
+                 "HFS free blocks: %" PRIu32 "\n"
+                 "HFS allocation file size: %" PRIu64 " bytes\n"
+                 "HFS allocation file blocks: %" PRIu32,
+               p_hfs_vh->signature,
+               p_hfs_vh->version,
+               p_hfs_vh->block_size,
+               p_hfs_vh->total_blocks,
+               p_hfs_vh->free_blocks,
+               p_hfs_vh->alloc_file_size,
+               p_hfs_vh->alloc_file_total_blocks);
+
+  // Check if asprintf worked
+  if(ret<0 || p_buf==NULL) return UNALLOCATED_MEMALLOC_FAILED;
+
+  *pp_buf=p_buf;
+  return UNALLOCATED_OK;
+}
+
