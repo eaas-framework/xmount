@@ -248,31 +248,57 @@ int BuildFatBlockMap(pts_FatHandle p_fat_handle,
                      uint64_t *p_block_size)
 {
   pts_FatVH p_fat_vh=p_fat_handle->p_fat_vh;
+  uint64_t data_offset;
   uint64_t total_clusters;
   uint64_t *p_free_block_map=NULL;
   uint64_t free_block_map_size=0;
 
   LOG_DEBUG("Searching unallocated FAT clusters\n");
 
-  // Calculate total amount of cluster
+  // Calculate offset of first data cluster
+  data_offset=p_fat_vh->reserved_sectors+
+    (((p_fat_vh->root_entry_count*32)+(p_fat_vh->bytes_per_sector-1))/
+    p_fat_vh->bytes_per_sector);
+  if(p_fat_vh->fat16_sectors!=0) {
+    data_offset+=(p_fat_vh->fat_count*p_fat_vh->fat16_sectors);
+  } else {
+    data_offset+=(p_fat_vh->fat_count*p_fat_vh->fat32_sectors);
+  }
+  data_offset*=p_fat_vh->bytes_per_sector;
+
+  // Calculate total amount of data clusters
   if(p_fat_vh->total_sectors_16!=0) total_clusters=p_fat_vh->total_sectors_16;
   else total_clusters=p_fat_vh->total_sectors_32;
+  total_clusters-=(data_offset/p_fat_vh->bytes_per_sector);
   total_clusters/=p_fat_vh->sectors_per_cluster;
+  // Add 2 clusters as clusters 0 and 1 do not exist
+  total_clusters+=2;
+
+  LOG_DEBUG("Filesystem contains a total of %" PRIu64 " (2-%" PRIu64 ") "
+              " data clusters starting at offset %" PRIu64 "\n",
+            total_clusters-2,
+            total_clusters-1,
+            data_offset);
 
   // Save offset of every unallocated cluster in block map
+  // Clusters 0 and 1 can not hold data in a FAT fs
   if(p_fat_handle->fat_type==FatType_Fat32) {
-    for(uint64_t cur_cluster=0;cur_cluster<total_clusters;cur_cluster++) {
+    for(uint64_t cur_cluster=2;cur_cluster<total_clusters;cur_cluster++) {
       if((p_fat_handle->p_fat32[cur_cluster] & 0x0FFFFFFF)==0 ||
          (p_fat_handle->p_fat32[cur_cluster] & 0x0FFFFFFF)==0x0FFFFFF7)
       {
-        LOG_DEBUG("Cluster %" PRIu64 " is unallocated (FAT value 0x%08X)\n",
-                  cur_cluster,
-                  p_fat_handle->p_fat32[cur_cluster]);
         p_free_block_map=realloc(p_free_block_map,
                                  (free_block_map_size+1)*sizeof(uint64_t));
         if(p_free_block_map==NULL) return UNALLOCATED_MEMALLOC_FAILED;
-        p_free_block_map[free_block_map_size]=
-          cur_cluster*p_fat_vh->bytes_per_sector*p_fat_vh->sectors_per_cluster;
+        p_free_block_map[free_block_map_size]=data_offset+((cur_cluster-2)*
+          p_fat_vh->bytes_per_sector*p_fat_vh->sectors_per_cluster);
+
+        LOG_DEBUG("Cluster %" PRIu64 " is unallocated "
+                    "(FAT value 0x%04X, Image offset %" PRIu64 ")\n",
+                  cur_cluster,
+                  p_fat_handle->p_fat32[cur_cluster],
+                  p_free_block_map[free_block_map_size]);
+
         free_block_map_size++;
       } else {
         LOG_DEBUG("Cluster %" PRIu64 " is allocated (FAT value 0x%08X)\n",
@@ -281,18 +307,22 @@ int BuildFatBlockMap(pts_FatHandle p_fat_handle,
       }
     }
   } else {
-    for(uint64_t cur_cluster=0;cur_cluster<total_clusters;cur_cluster++) {
+    for(uint64_t cur_cluster=2;cur_cluster<total_clusters;cur_cluster++) {
       if((p_fat_handle->p_fat16[cur_cluster] & 0x0FFF)==0 ||
          (p_fat_handle->p_fat16[cur_cluster] & 0x0FFF)==0x0FF7)
       {
-        LOG_DEBUG("Cluster %" PRIu64 " is unallocated (FAT value 0x%04X)\n",
-                  cur_cluster,
-                  p_fat_handle->p_fat16[cur_cluster]);
         p_free_block_map=realloc(p_free_block_map,
                                  (free_block_map_size+1)*sizeof(uint64_t));
         if(p_free_block_map==NULL) return UNALLOCATED_MEMALLOC_FAILED;
-        p_free_block_map[free_block_map_size]=
-          cur_cluster*p_fat_vh->sectors_per_cluster*p_fat_vh->bytes_per_sector;
+        p_free_block_map[free_block_map_size]=data_offset+((cur_cluster-2)*
+          p_fat_vh->sectors_per_cluster*p_fat_vh->bytes_per_sector);
+
+        LOG_DEBUG("Cluster %" PRIu64 " is unallocated "
+                    "(FAT value 0x%04X, Image offset %" PRIu64 ")\n",
+                  cur_cluster,
+                  p_fat_handle->p_fat16[cur_cluster],
+                  p_free_block_map[free_block_map_size]);
+  
         free_block_map_size++;
       } else {
         LOG_DEBUG("Cluster %" PRIu64 " is allocated (FAT value 0x%04X)\n",
@@ -313,6 +343,8 @@ int BuildFatBlockMap(pts_FatHandle p_fat_handle,
     free(p_fat_handle->p_fat16);
     p_fat_handle->p_fat16=NULL;
   }
+
+  // TODO: There may be trailing unclustered sectors. Add them?
 
   *pp_free_block_map=p_free_block_map;
   *p_free_block_map_size=free_block_map_size;

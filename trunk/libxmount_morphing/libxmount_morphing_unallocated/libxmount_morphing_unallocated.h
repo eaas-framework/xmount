@@ -22,6 +22,7 @@
 
 #include "hfs_functions.h"
 #include "fat_functions.h"
+#include "ntfs_functions.h"
 
 /*******************************************************************************
  * Enums, type defs, etc...
@@ -47,6 +48,7 @@ typedef struct s_UnallocatedHandle {
   union {
     ts_HfsHandle hfs_handle;
     ts_FatHandle fat_handle;
+    ts_NtfsHandle ntfs_handle;
   };
 } ts_UnallocatedHandle, *pts_UnallocatedHandle;
 
