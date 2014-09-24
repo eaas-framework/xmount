@@ -4,9 +4,6 @@
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing EWF images created by Guymager and others.                         *
 *                                                                              *
-* xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
-* vdi, vhd or vmdk files and enable virtual write access to them.              *
-*                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *
 * Software Foundation, either version 3 of the License, or (at your option)    *
@@ -152,6 +149,7 @@ typedef struct _t_Aewf
    uint64_t     Segments;
    uint64_t     Tables;
    uint64_t     Chunks;          // Total number of chunks in all tables
+   uint64_t     TotalTableSize;  // Total size of all tables
    uint64_t     TableCache;      // Current amount RAM used by tables, in bytes
    uint64_t     OpenSegments;    // Current number of open segment files
    uint64_t     SectorSize;

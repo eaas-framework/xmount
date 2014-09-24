@@ -270,8 +270,6 @@ static void PrintUsage(char *p_prog_name) {
     printf("%s",p_buf);
     printf("\n");
   }
-
-  printf("\n");
 }
 
 //! Check fuse settings
@@ -372,14 +370,18 @@ static void CheckFuseSettings() {
  * \param pp_argv Array containing cmdline params
  * \return TRUE on success, FALSE on error
  */
+#define SUPPORT_DEPRECATED_IN 1
 static int ParseCmdLine(const int argc, char **pp_argv) {
   int i=1;
   int FuseMinusOControl=TRUE;
   int FuseAllowOther=TRUE;
   int first;
   char *p_buf;
-  pts_InputImage p_input_image;
+  pts_InputImage p_input_image=NULL;
   int ret;
+#ifdef SUPPORT_DEPRECATED_IN
+  int use_old_in_syntax=FALSE;
+#endif
 
   // add pp_argv[0] to FUSE's argv
   XMOUNT_MALLOC(glob_xmount.pp_fuse_argv,char**,sizeof(char*));
@@ -463,6 +465,15 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
                   glob_xmount.cache.p_cache_file)
       } else if(strcmp(pp_argv[i],"--in")==0) {
         // Specify input image type and source files
+#ifdef SUPPORT_DEPRECATED_IN
+        if(use_old_in_syntax==TRUE) {
+          LOG_ERROR("When using the deprecated --in option syntax, it is not "
+                      "possible to specify --in multiple times!\n");
+          free(p_input_image->p_type);
+          free(p_input_image);
+          return FALSE;
+        }
+#endif
         if((argc+2)>i) {
           i++;
           // Alloc and init new ts_InputImage struct
@@ -485,11 +496,16 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           }
           i--;
           if(p_input_image->files_count==0) {
+#ifndef SUPPORT_DEPRECATED_IN
             LOG_ERROR("No input files specified for \"--in %s\"!\n",
                       p_input_image->p_type)
             free(p_input_image->p_type);
             free(p_input_image);
             return FALSE;
+#else
+            use_old_in_syntax=TRUE;
+            continue;
+#endif
           }
           // Add input image struct to input image array
           glob_xmount.input.images_count++;
@@ -683,6 +699,34 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
     }
     i++;
   }
+
+#ifdef SUPPORT_DEPRECATED_IN
+  if(use_old_in_syntax==TRUE && i<(argc-1)) {
+    LOG_WARNING("You are using a deprecated --in option syntax which will be "
+                  "removed in the next release. Please see the man page "
+                  "on how to use the new syntax.\n");
+    while(i<(argc-1)) {
+      p_input_image->files_count++;
+      XMOUNT_REALLOC(p_input_image->pp_files,
+                     char**,
+                     p_input_image->files_count*sizeof(char*));
+      XMOUNT_STRSET(p_input_image->pp_files[p_input_image->files_count-1],
+                    pp_argv[i]);
+      i++;
+    }
+    // Add input image struct to input image array
+    glob_xmount.input.images_count++;
+    XMOUNT_REALLOC(glob_xmount.input.pp_images,
+                   pts_InputImage*,
+                   glob_xmount.input.images_count*sizeof(pts_InputImage));
+    glob_xmount.input.pp_images[glob_xmount.input.images_count-1]=p_input_image;
+  } else if(use_old_in_syntax==TRUE) {
+    free(p_input_image->p_type);
+    free(p_input_image);
+    LOG_ERROR("You must specify an input image type and source file!\n");
+    return FALSE;
+  }
+#endif
 
   // Extract mountpoint
   if(i==(argc-1)) {

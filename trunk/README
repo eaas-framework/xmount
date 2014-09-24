@@ -3,19 +3,29 @@ XMOUNT README FILE
 Table of contents
   0.0 Author and license stuff
   1.0 What is xmount? - A short description
-  2.0 A deeper view of things
-    2.1 Emulated DD file
-    2.2 Emulated DMG file
-    2.3 Emulated VDI file
-    2.4 Emulated VMDK file
-    2.5 Emulated VHD file
-    2.6 Virtual write access
-  3.0 Installation instructions
-    3.1 Prerequisits
-    3.1 Install from a package
-    3.2 Install from source
-  4.0 xmount command line parameters
-    4.1 xmount usage examples
+  2.0 Input image support
+    2.1 libxmount_input_raw
+    2.2 libxmount_input_ewf
+    2.3 libxmount_input_aewf
+    2.4 libxmount_input_aff
+    2.5 libxmount_input_aaff
+  3.0 Morphing support
+    3.1 libxmount_morphing_combine
+    3.2 libxmount_morphing_raid
+    3.3 libxmount_morphing_unallocated
+  4.0 Output image
+    4.1 Emulated DD file
+    4.2 Emulated DMG file
+    4.3 Emulated VDI file
+    4.4 Emulated VMDK file
+    4.5 Emulated VHD file
+  5.0 Virtual write access
+  6.0 Installation instructions
+    6.1 Prerequisits
+    6.1 Install from a package
+    6.2 Install from source
+  7.0 xmount command line parameters
+    7.1 xmount usage examples
 
 0.0 Author and license stuff
   xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>
@@ -56,25 +66,72 @@ Table of contents
   that is redirected to a cache file. This makes it possible to boot acquired
   harddisk images using QEMU, KVM, VirtualBox, VmWare or alike.
 
-2.0 A deeper view of things
-  2.1 Emulated DD file
+2.0 Input image support
+  Starting with version 0.7.0, input image support has been moved into external
+  libraries. The following chapters list the officially supported ones. They
+  might not all be available on your system though.
+
+  2.1 libxmount_input_raw
+    Supports raw DD images ("--in raw" or "--in dd").
+
+  2.2 libxmount_input_ewf
+    Supports EWF (Expert Witness Compression Format) images ("--in ewf") using
+    Joachim Metz's libewf (https://code.google.com/p/libewf/).
+
+  2.3 libxmount_input_aewf
+    Supports EWF (Expert Witness Compression Format) images ("--in aewf")
+    generated with Guymager (http://guymager.sourceforge.net/). This library
+    uses an EWF implementation written by Guy Voncken.
+
+  2.4 libxmount_input_aff
+    Supports AFF (Advanced Forensic Format) images ("--in aff") using Simson
+    Garfinkel's afflib (https://github.com/simsong/AFFLIBv3).
+
+  2.5 libxmount_input_aaff
+    Supports AFF (Advanced Forensic Format) images ("--in aaff") using an AFF
+    implementation written by Guy Voncken.
+
+3.0 Morphing support
+  Also starting with xmount version 0.7.0, a new concept of input image morphing
+  has been added. Morphing is a process which is applied to the data of all
+  specified input images and produces a single virtual image which can then be
+  converted into an output image. The following chapters list the currently
+  officially supported morphing libraries. As with the input image libs, not all
+  might be available on your system.
+
+  3.1 libxmount_morphing_combine
+    Using "--morph combine", data from all input images is concatenated into
+    a single image. Images are appended in the same order they are specified on
+    the command line. This morphing type is also the default if no "--morph"
+    option is specified.
+
+  3.2 libxmount_morphing_raid
+    This morphing library supports emulation of hardware / software raid.
+    Currently, only RAID0 ("--morph raid0") is supported. The used chunk /
+    stripe size in bytes can be specified with "--morphopts raid_chunksize=XXX". 
+
+  3.3 libxmount_morphing_unallocated
+    
+
+4.0 Output image
+  4.1 Emulated DD file
     This is the standard data representation used by xmount. It is a file
     containing the raw data contained in the input image file. Except for OSx
     (see 2.2) this is the default output format when no --out option is
     specified.
 
-  2.2 Emulated DMG file
+  4.2 Emulated DMG file
     This is also a file containing the raw data contained in the input image
     file but with a .dmg file extension. On OSx, this is the default output
     format when no --out option is specified.
 
-  2.3 Emulated VDI file
+  4.3 Emulated VDI file
     When using the "--out vdi" command line parameter, a VirtualBox disk file
     is emulated. This means that xmount builds a virtual VDI header and prepends
     it to the raw data contained in the input image. The VDI file can be used in
     VirtualBox as a virtual disk file.
 
-  2.4 Emulated VMDK file
+  4.4 Emulated VMDK file
     When using the "--out vmdk(s)" command line paramter, a VMWare virtual disk
     file will be emulated. This mainly consists in building a VMDK descriptor
     file that will access an emulated DD file. You can use this VMDK file to
@@ -88,12 +145,12 @@ Table of contents
     WARNING: VMDK support should be considered experimental and currently the
              VMDK descriptor file isn't cached.
 
-  2.5 Emulated VHD file
+  4.5 Emulated VHD file
     When using the "--out vhd" command line parameter, a Virtual Hard Disk Image
     file is emulated by appending to the raw data a valid VHD footer. Valid here
     means as described in Microsoft's Virtual Hard Disk Image Format specs v1.
 
-  2.6 Virtual write access
+5.0 Virtual write access
     By using the "--cache <cache_file>" command line parameter, xmount allows
     you to change data in the emulated image files. All changes are written to a
     separate cache file. No data will ever be written to the original input
@@ -102,12 +159,12 @@ Table of contents
     The same cache file can be used with different output image formats without
     loosing changed data.
 
-3.0 Installation instructions
+6.0 Installation instructions
   To install xmount, you can use a prebuild package for your distribution or
   you can build xmount from source. The two methods are described in the
   following sections.
 
-  3.1 Prerequisits
+  6.1 Prerequisits
     SYSTEM:
       - Linux: Some sort of Linux with a recent kernel (2.6.x or above).
       - OSx: OSx 10.6 or above
@@ -125,13 +182,13 @@ Table of contents
     LIBAFF:
       To enable AFF input image support. Get it from http://www.afflib.org/
 
-  3.2 Install from a package
+  6.2 Install from a package
     Chances are I provide prebuild binary packages for Debian / Ubuntu. In this
     case, you only have to fire up your distribution's package manager and
     install xmount. See https://www.pinguin.lu/xmount for more information and
     download links.
 
-  3.3 Install from source
+  6.3 Install from source
     After having checked the prerequisits, you should be able to compile and
     install xmount by simply issuing the following commands:
 
@@ -141,7 +198,7 @@ Table of contents
     $ make
     $ sudo make install
 
-4.0 xmount command line parameters
+7.0 xmount command line parameters
   xmount [[fopts] [mopts]] <ifile> [<ifile> [...]] <mntp>
 
   fopts:
@@ -177,7 +234,7 @@ Table of contents
     their behaviour. If so, their options can be specified here as comma
     sepearated list of key=value pairs.
 
-  4.1 xmount usage examples
+  7.1 xmount usage examples
     To xmount an EWF harddisk image from your acquired disk as a raw DD image
     under /mnt, use the following command:
 

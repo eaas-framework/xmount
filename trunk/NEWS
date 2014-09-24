@@ -5,7 +5,8 @@ New for version 0.7.0:
   - Switched build system from autoconf / autoamke to cmake
   - Massiv code cleanup
   - Input image support is now controlled by external libxmount_input libraries
-  - Added support for --offset command line argument
+  - Added support for morphing all input images into a virtual output image using libxmount_morphing libraries
+  - Added support for --offset and --sizelimit command line argument
 
 New for version 0.6.0:
   - Added support for split DD input files.

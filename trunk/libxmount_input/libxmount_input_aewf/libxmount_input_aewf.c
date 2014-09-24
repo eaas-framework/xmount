@@ -4,9 +4,6 @@
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing EWF images created by Guymager and others.                         *
 *                                                                              *
-* xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
-* vdi, vhd or vmdk files and enable virtual write access to them.              *
-*                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *
 * Software Foundation, either version 3 of the License, or (at your option)    *
@@ -517,14 +514,14 @@ static int AewfOpenSegment (t_pAewf pAewf, t_pTable pTable)
       if (pOldestSegment == NULL)
          break;
 
-      LOG ("Closing %s\n", pOldestSegment->pName);
+      LOG ("Closing %s", pOldestSegment->pName);
       CHK (CloseFile (&pOldestSegment->pFile))
       pAewf->OpenSegments--;
    }
 
    // Read the desired table into RAM
    // -------------------------------
-   LOG ("Opening %s\n", pTable->pSegment->pName);
+   LOG ("Opening %s", pTable->pSegment->pName);
    CHK (OpenFile(&pTable->pSegment->pFile, pTable->pSegment->pName))
    pAewf->OpenSegments++;
 
@@ -567,7 +564,7 @@ static int AewfLoadEwfTable (t_pAewf pAewf, t_pTable pTable)
       pAewf->TableCache -= pOldestTable->Size;
       free (pOldestTable->pEwfTable);
       pOldestTable->pEwfTable = NULL;
-      LOG ("Releasing table %" PRIu64 " (%lu bytes)\n", pOldestTable->Nr, pOldestTable->Size);
+      LOG ("Releasing table %" PRIu64 " (%lu bytes)", pOldestTable->Nr, pOldestTable->Size);
    }
 
    // Read the desired table into RAM
@@ -702,7 +699,7 @@ static int AewfReadChunk (t_pAewf pAewf, uint64_t AbsoluteChunk, char **ppBuffer
    if ((AbsoluteChunk - pTable->ChunkFrom) > UINT_MAX)
       CHK (AEWF_ERROR_IN_CHUNK_NUMBER)
    TableChunk = AbsoluteChunk - pTable->ChunkFrom;
-//   LOG ("table %d / entry %" PRIu64 " (%s)\n", TableNr, TableChunk, pTable->pSegment->pName)
+//   LOG ("table %d / entry %" PRIu64 " (%s)", TableNr, TableChunk, pTable->pSegment->pName)
    CHK (AewfReadChunk0 (pAewf, pTable, AbsoluteChunk, TableChunk))
    *pLen = pAewf->ChunkBuffUncompressedDataLen;
 
@@ -751,7 +748,8 @@ static int UpdateStats (t_pAewf pAewf, int Force)
          fprintf (pFile, "Data read from image     %10.1f MiB (raw)\n"       , pAewf->DataReadFromImageRaw / (1024.0*1024.0));
          fprintf (pFile, "Data requested by caller %10.1f MiB\n"             , pAewf->DataRequestedByCaller/ (1024.0*1024.0));
          fprintf (pFile, "Tables read from image   %10.1f MiB\n"             , pAewf->TablesReadFromImage  / (1024.0*1024.0));
-         fprintf (pFile, "RAM used as table cache  %10.1f MiB\n", pAewf->TableCache/ (1024.0*1024.0));
+         fprintf (pFile, "RAM used as table cache  %10.1f MiB\n"             , pAewf->TableCache           / (1024.0*1024.0));
+         fprintf (pFile, "Size of all image tables %10.1f MiB\n"             , pAewf->TotalTableSize       / (1024.0*1024.0));
 
          pCurrentWorkDir = getcwd (NULL, 0);
          if (pCurrentWorkDir == NULL)
@@ -870,9 +868,9 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
       pSegment = &pAewf->pSegmentArr[i];
       pSegment->pName = canonicalize_file_name (ppFilenameArr[i]); // canonicalize_file_name allocates a buffer
 
+      LOG ("Opening segment %s", ppFilenameArr[i]);
       CHK (OpenFile (&pFile, pSegment->pName))
       CHK (ReadFilePos (pAewf, pFile, (void*)&FileHeader, sizeof(FileHeader), 0))
-//      LOG ("Segment %s - %d \n", ppFilenameArr[i], FileHeader.SegmentNumber);
 
       pSegment->Number   = FileHeader.SegmentNumber;
       pSegment->LastUsed = 0;
@@ -892,12 +890,13 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
 
    // Find all tables in the segment files
    // ------------------------------------
-   pAewf->pTableArr   = NULL;
-   pAewf->Tables      = 0;
-   pAewf->Chunks      = 0;
-   SectionSectorsSize = 0;
+   pAewf->pTableArr      = NULL;
+   pAewf->Tables         = 0;
+   pAewf->Chunks         = 0;
+   pAewf->TotalTableSize = 0;
+   SectionSectorsSize    = 0;
 
-   LOG ("Reading tables\n");
+   LOG ("Reading tables");
    for (unsigned i=0; i<pAewf->Segments; i++)
    {
       pSegment = &pAewf->pSegmentArr[i];
@@ -932,6 +931,7 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
             pTable->pEwfTable          = NULL;
             pTable->ChunkFrom          = pAewf->Chunks;
             pTable->SectionSectorsSize = SectionSectorsSize;
+            pAewf->TotalTableSize     += pTable->Size;
             pAewf->Chunks             += pTable->ChunkCount;
             pTable->ChunkTo            = pAewf->Chunks-1;
             free (pEwfTable);
@@ -1159,7 +1159,7 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
       {
          pAewf->pStatsFilename = strdup (pOption->p_value);
          pOption->valid = TRUE;
-         LOG ("Option %s set to %s", AEWF_OPTION_LOG, pAewf->pLogFilename);
+         LOG ("Option %s set to %s", AEWF_OPTION_STATS, pAewf->pStatsFilename);
       }
 
       else TEST_OPTION_UINT64 (AEWF_OPTION_MAXOPENSEGMENTS, MaxOpenSegments)

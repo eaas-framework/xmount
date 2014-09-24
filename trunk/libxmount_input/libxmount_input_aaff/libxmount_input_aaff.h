@@ -1,11 +1,8 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2013 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing simple AFF images created by Guymager.                             *
-*                                                                              *
-* xmount is a small tool to "fuse mount" various harddisk image formats as dd, *
-* vdi, vhd or vmdk files and enable virtual write access to them.              *
 *                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *

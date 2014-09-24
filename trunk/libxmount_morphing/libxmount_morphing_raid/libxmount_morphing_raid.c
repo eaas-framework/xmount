@@ -258,7 +258,7 @@ static int RaidOptionsHelp(const char **pp_help) {
 
   ok=asprintf(&p_buf,
               "    raid_chunksize : Specify the chunk size to use in bytes. "
-                "Defaults to 524288 (512k).");
+                "Defaults to 524288 (512k).\n");
   if(ok<0 || p_buf==NULL) {
     *pp_help=NULL;
     return RAID_MEMALLOC_FAILED;

@@ -1,8 +1,7 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2013 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
-* This module has been written by Guy Voncken. It contains the functions for   *
-* accessing dd images. Split dd is supported as well.                          *
+* Mostly based upon code written and copyright 2014 by Guy Voncken.            *
 *                                                                              *
 * This program is free software: you can redistribute it and/or modify it      *
 * under the terms of the GNU General Public License as published by the Free   *
@@ -276,7 +275,6 @@ static int DdGetInfofileContent(void *p_handle, const char **pp_info_buf) {
   int ret;
   char *p_info_buf;
 
-  // TODO: TotalSize seems to be incorrect here???
   ret=asprintf(&p_info_buf,
                "DD image assembled of %" PRIu64 " piece(s)\n"
                  "%" PRIu64 " bytes in total (%0.3f GiB)\n",
@@ -324,89 +322,4 @@ static int DdFreeBuffer(void *p_buf) {
   free(p_buf);
   return DD_OK;
 }
-
-// -----------------------------------------------------
-//              Small main routine for testing
-//            It a split dd file to non-split dd
-// -----------------------------------------------------
-
-
-#ifdef DD_MAIN_FOR_TESTING
-
-int main(int argc, const char *argv[])
-{
-   t_pdd              pdd;
-   uint64_t            TotalSize;
-   uint64_t            Remaining;
-   uint64_t            Read;
-   uint64_t            Pos;
-   uint32_t            BuffSize = 1024;
-   char                Buff[BuffSize];
-   FILE              *pFile;
-   int                 Percent;
-   int                 PercentOld;
-   int                 rc;
-
-   printf ("Split DD to DD converter\n");
-   if (argc < 3)
-   {
-      printf ("Usage: %s <dd part 1> <dd part 2> <...> <dd destination>\n", argv[0]);
-      exit (1);
-   }
-
-   if (DdOpen ((void**)&pdd, argc-2, &argv[1]) != DD_OK)
-   {
-       printf ("Cannot open split dd file\n");
-       exit (1);
-   }
-   CHK (DdSize ((void*)pdd, &TotalSize))
-   printf ("Total size: %llu bytes\n", TotalSize);
-   Remaining = TotalSize;
-
-   pFile = fopen (argv[argc-1], "w");
-   if (pFile == NULL)
-   {
-       printf ("Cannot open destination file\n");
-       exit (1);
-   }
-
-   Remaining  = TotalSize;
-   Pos        = 0;
-   PercentOld = -1;
-   while (Remaining)
-   {
-       Read = GETMIN (Remaining, BuffSize);
-       rc = DdRead ((void*)pdd, Pos, &Buff[0], Read);
-       if (rc != DD_OK)
-       {
-           printf ("Error %d while calling DdRead\n", rc);
-           exit (1);
-       }
-
-       if (fwrite (Buff, Read, 1, pFile) != 1)
-       {
-          printf ("Could not write to destinationfile\n");
-          exit (2);
-       }
-
-       Remaining -= Read;
-       Pos       += Read;
-       Percent = (100*Pos) / TotalSize;
-       if (Percent != PercentOld)
-       {
-          printf ("\r%d%% done...", Percent);
-          PercentOld = Percent;
-       }
-   }
-   if (fclose (pFile))
-   {
-      printf ("Error while closing destinationfile\n");
-      exit (3);
-   }
-
-   printf ("\n");
-   return 0;
-}
-
-#endif // DD_MAIN_FOR_TESTING
 
