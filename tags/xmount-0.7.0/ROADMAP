@@ -1,0 +1,5 @@
+This file lists upcomming changes to xmount.
+
+  - Stable support of VMDK files
+  - New cache file version to support some new features
+
