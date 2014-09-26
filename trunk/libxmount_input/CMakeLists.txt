@@ -1,4 +1,4 @@
-add_subdirectory(libxmount_input_dd)
+add_subdirectory(libxmount_input_raw)
 
 if(NOT STATIC_EWF)
   find_package(LibEWF)

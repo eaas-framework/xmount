@@ -17,20 +17,20 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#ifndef LIBXMOUNT_INPUT_DD_H
-#define LIBXMOUNT_INPUT_DD_H
+#ifndef LIBXMOUNT_INPUT_RAW_H
+#define LIBXMOUNT_INPUT_RAW_H
 
 /*******************************************************************************
  * Error codes etc...
  ******************************************************************************/
 enum {
-  DD_OK=0,
-  DD_MEMALLOC_FAILED,
-  DD_FILE_OPEN_FAILED,
-  DD_CANNOT_READ_DATA,
-  DD_CANNOT_CLOSE_FILE,
-  DD_CANNOT_SEEK,
-  DD_READ_BEYOND_END_OF_IMAGE
+  RAW_OK=0,
+  RAW_MEMALLOC_FAILED,
+  RAW_FILE_OPEN_FAILED,
+  RAW_CANNOT_READ_DATA,
+  RAW_CANNOT_CLOSE_FILE,
+  RAW_CANNOT_SEEK,
+  RAW_READ_BEYOND_END_OF_IMAGE
 };
 
 // ----------------------
@@ -54,17 +54,17 @@ typedef struct {
   t_pPiece  pPieceArr;
   uint64_t   Pieces;
   uint64_t   TotalSize;
-} t_dd, *t_pdd;
+} t_raw, *t_praw;
 
 // ----------------
 //  Error handling
 // ----------------
 
-#ifdef DD_DEBUG
+#ifdef RAW_DEBUG
    #define CHK(ChkVal)    \
    {                                                                  \
       int ChkValRc;                                                   \
-      if ((ChkValRc=(ChkVal)) != DD_OK)                               \
+      if ((ChkValRc=(ChkVal)) != RAW_OK)                               \
       {                                                               \
          printf ("Err %d in %s, %d\n", ChkValRc, __FILE__, __LINE__); \
          return ChkValRc;                                             \
@@ -76,7 +76,7 @@ typedef struct {
    #define CHK(ChkVal)                      \
    {                                        \
       int ChkValRc;                         \
-      if ((ChkValRc=(ChkVal)) != DD_OK)     \
+      if ((ChkValRc=(ChkVal)) != RAW_OK)     \
          return ChkValRc;                   \
    }
    #define DEBUG_PRINTF(...)
@@ -85,31 +85,31 @@ typedef struct {
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
-static int DdCreateHandle(void **pp_handle,
-                          const char *p_format,
-                          uint8_t debug);
-static int DdDestroyHandle(void **pp_handle);
-static int DdOpen(void *p_handle,
-                  const char **pp_filename_arr,
-                  uint64_t filename_arr_len);
-static int DdClose(void *p_handle);
-static int DdSize(void *p_handle,
-                  uint64_t *p_size);
-static int DdRead(void *p_handle,
-                  char *p_buf,
-                  off_t seek,
-                  size_t count,
-                  size_t *p_read,
-                  int *p_errno);
-static int DdOptionsHelp(const char **pp_help);
-static int DdOptionsParse(void *p_handle,
-                          uint32_t options_count,
-                          const pts_LibXmountOptions *pp_options,
-                          const char **pp_error);
-static int DdGetInfofileContent(void *p_handle,
-                                const char **pp_info_buf);
-static const char* DdGetErrorMessage(int err_num);
-static int DdFreeBuffer(void *p_buf);
+static int RawCreateHandle(void **pp_handle,
+                           const char *p_format,
+                           uint8_t debug);
+static int RawDestroyHandle(void **pp_handle);
+static int RawOpen(void *p_handle,
+                   const char **pp_filename_arr,
+                   uint64_t filename_arr_len);
+static int RawClose(void *p_handle);
+static int RawSize(void *p_handle,
+                   uint64_t *p_size);
+static int RawRead(void *p_handle,
+                   char *p_buf,
+                   off_t seek,
+                   size_t count,
+                   size_t *p_read,
+                   int *p_errno);
+static int RawOptionsHelp(const char **pp_help);
+static int RawOptionsParse(void *p_handle,
+                           uint32_t options_count,
+                           const pts_LibXmountOptions *pp_options,
+                           const char **pp_error);
+static int RawGetInfofileContent(void *p_handle,
+                                 const char **pp_info_buf);
+static const char* RawGetErrorMessage(int err_num);
+static int RawFreeBuffer(void *p_buf);
 
-#endif // LIBXMOUNT_INPUT_DD_H
+#endif // LIBXMOUNT_INPUT_RAW_H
 

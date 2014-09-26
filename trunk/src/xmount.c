@@ -203,12 +203,12 @@ static void PrintUsage(char *p_prog_name) {
 #ifdef __APPLE__
   printf("\"dmg\".\n");
 #else
-  printf("\"dd\".\n");
+  printf("\"raw\".\n");
 #endif
   printf("      <otype> can be ");
 
   // List supported output formats
-  printf("\"dd\", \"dmg\", \"vdi\", \"vhd\", \"vmdk\", \"vmdks\".\n");
+  printf("\"raw\", \"dmg\", \"vdi\", \"vhd\", \"vmdk\", \"vmdks\".\n");
 
   printf("    --owcache <file> : Same as --cache <file> but overwrites "
            "existing cache file.\n");
@@ -504,6 +504,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
             return FALSE;
 #else
             use_old_in_syntax=TRUE;
+            i++;
             continue;
 #endif
           }
@@ -597,9 +598,15 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         // Next parameter must be image type
         if((argc+1)>i) {
           i++;
-          if(strcmp(pp_argv[i],"dd")==0) {
+          if(strcmp(pp_argv[i],"raw")==0) {
             glob_xmount.output.VirtImageType=VirtImageType_DD;
-            LOG_DEBUG("Setting virtual image type to DD\n")
+            LOG_DEBUG("Setting virtual image type to RAW\n")
+          } else if(strcmp(pp_argv[i],"dd")==0) {
+            glob_xmount.output.VirtImageType=VirtImageType_DD;
+            LOG_WARNING("Using '--out dd' is deprecated and will be removed in "
+                          "the next release. "
+                          "Please use '--out raw' instead.\n");
+            LOG_DEBUG("Setting virtual image type to RAW\n")
           } else if(strcmp(pp_argv[i],"dmg")==0) {
             glob_xmount.output.VirtImageType=VirtImageType_DMG;
             LOG_DEBUG("Setting virtual image type to DMG\n")
