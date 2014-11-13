@@ -406,8 +406,8 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         PrintUsage(pp_argv[0]);
         exit(0);
       } else if(strcmp(pp_argv[i],"-o")==0) {
-        // Next parameter specifies fuse / lib mount options
-        if((argc+1)>i) {
+        // Next parameter specifies fuse mount options
+        if((i+1)<argc) {
           i++;
           // As the user specified the -o option, we assume he knows what he is
           // doing. We won't append allow_other automatically. And we allow him
@@ -425,7 +425,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
             FuseMinusOControl=FALSE;
           } else FuseAllowOther=FALSE;
         } else {
-          LOG_ERROR("Couldn't parse mount options!\n")
+          LOG_ERROR("Couldn't parse fuse mount options!\n")
           return FALSE;
         }
       } else if(strcmp(pp_argv[i],"-s")==0) {
@@ -450,10 +450,10 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
       }
     } else {
       // Options beginning with -- are xmount specific
-      if(strcmp(pp_argv[i],"--cache")==0 || strcmp(pp_argv[i],"--rw")==0) {
+      if(strcmp(pp_argv[i],"--cache")==0 /*|| strcmp(pp_argv[i],"--rw")==0*/) {
         // Emulate writable access to mounted image
         // Next parameter must be cache file to read/write changes from/to
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           XMOUNT_STRSET(glob_xmount.cache.p_cache_file,pp_argv[i])
           glob_xmount.output.writable=TRUE;
@@ -474,7 +474,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
           return FALSE;
         }
 #endif
-        if((argc+2)>i) {
+        if((i+2)<argc) {
           i++;
           // Alloc and init new ts_InputImage struct
           XMOUNT_MALLOC(p_input_image,pts_InputImage,sizeof(ts_InputImage));
@@ -522,7 +522,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
       } else if(strcmp(pp_argv[i],"--inopts")==0) {
         // Set input lib options
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           if(glob_xmount.input.pp_lib_params==NULL) {
             if(SplitLibraryParameters(pp_argv[i],
@@ -544,7 +544,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
       } else if(strcmp(pp_argv[i],"--morph")==0) {
         // Set morphing lib to use
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           if(glob_xmount.morphing.p_morph_type==NULL) {
             XMOUNT_STRSET(glob_xmount.morphing.p_morph_type,pp_argv[i]);
@@ -558,7 +558,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
       } else if(strcmp(pp_argv[i],"--morphopts")==0) {
         // Set morphing lib options
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           if(glob_xmount.morphing.pp_lib_params==NULL) {
             if(SplitLibraryParameters(pp_argv[i],
@@ -580,7 +580,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
         }
       } else if(strcmp(pp_argv[i],"--offset")==0) {
         // Set input image offset
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           glob_xmount.input.image_offset=StrToUint64(pp_argv[i],&ret);
           if(ret==0) {
@@ -596,7 +596,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
       } else if(strcmp(pp_argv[i],"--out")==0) {
         // Specify output image type
         // Next parameter must be image type
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           if(strcmp(pp_argv[i],"raw")==0) {
             glob_xmount.output.VirtImageType=VirtImageType_DD;
@@ -633,7 +633,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
       } else if(strcmp(pp_argv[i],"--owcache")==0) {
         // Enable writable access to mounted image and overwrite existing cache
         // Next parameter must be cache file to read/write changes from/to
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           XMOUNT_STRSET(glob_xmount.cache.p_cache_file,pp_argv[i])
           glob_xmount.output.writable=TRUE;
@@ -646,7 +646,7 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
                   glob_xmount.cache.p_cache_file)
       } else if(strcmp(pp_argv[i],"--sizelimit")==0) {
         // Set input image size limit
-        if((argc+1)>i) {
+        if((i+1)<argc) {
           i++;
           glob_xmount.input.image_size_limit=StrToUint64(pp_argv[i],&ret);
           if(ret==0) {
@@ -730,7 +730,8 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
   } else if(use_old_in_syntax==TRUE) {
     free(p_input_image->p_type);
     free(p_input_image);
-    LOG_ERROR("You must specify an input image type and source file!\n");
+    LOG_ERROR("You must specify an input image type, source file(s) and a "
+                "mount point!\n");
     return FALSE;
   }
 #endif
@@ -4113,5 +4114,8 @@ int main(int argc, char *argv[]) {
   20141001: v0.7.2 released
             * Fixed bug in FreeResources(). Do not free vdi.p_vdi_block_map as
               it is part of vdi.p_vdi_header.
+  20141113: v0.7.3 released
+            * Fixed minor bug in ParseCmdLine() which was not checking upper
+              argc bounds correctly.
 */
 

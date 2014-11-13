@@ -1,3 +1,9 @@
+xmount (0.7.3) stable; urgency=low
+
+  * Fixed minor bug in ParseCmdLine() which was not checking upper argc bounds correctly
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Thu, 13 Nov 2014 21:07:00 +0100
+
 xmount (0.7.2) stable; urgency=low
 
   * Fixed minor bug in FreeResources() where an unallocated pointer was freed
