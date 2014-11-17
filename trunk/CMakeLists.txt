@@ -11,7 +11,7 @@ if(STATIC)
   set(STATIC_AFF 1)
 endif(STATIC)
 
-add_definitions(-DXMOUNT_VERSION="0.7.2")
+add_definitions(-DXMOUNT_VERSION="0.7.3")
 
 if(APPLE)
   # On OSx, do not try to find frameworks but only std headers / libraries
