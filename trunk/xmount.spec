@@ -2,14 +2,14 @@
 
 Name:			xmount
 Summary:		Tool to crossmount between multiple input and output harddisk images
-Version:		0.7.0
+Version:		0.7.3
 Release:		1%{?dist}
 License:		GPL
 Group:			Applications/System
-URL:			https://www.pinguin.lu/
+URL:			https://www.pinguin.lu/xmount
 Source0:		%{name}-%{version}.tar.gz
 Buildroot:		%{_tmppath}/%{name}-%{version}-%{release}-root
-Requires:		fuse openssl zlib libewf afflib
+Requires:		fuse zlib libewf afflib
 BuildRequires:		cmake fuse-devel zlib-devel libewf-devel afflib-devel
 
 %description
@@ -25,15 +25,18 @@ output files that is redirected to a cache file. This makes it for example
 possible to boot acquired harddisk images using QEMU, KVM, VirtualBox, VMware
 or alike.
 
+%prep
+%setup -q
+
 %build
-%cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} .
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_SKIP_RPATH=ON -DCMAKE_INSTALL_PREFIX=%{_prefix} ..
 make %{?_smp_mflags}
 
 %install
-rm -fr %{buildroot}
-make install DESTDIR=%{buildroot}
-
-%makeinstall
+cd build
+%{__make} DESTDIR=%{buildroot} install
 
 %clean
 rm -fr %{buildroot}
@@ -48,10 +51,11 @@ rm -fr %{buildroot}
 %defattr(-,root,root) 
 %{_bindir}/*
 %{_mandir}/*
+%{_exec_prefix}/lib/%{name}/*.so
 %doc AUTHORS COPYING INSTALL NEWS README ROADMAP
 
 %changelog
-* Wed Aug 13 2014 Daniel Gillen <gillen.dan@pinguin.lu> 0.7.0-1
-* Release 0.7.0-1
+* Wed Aug 13 2014 Daniel Gillen <gillen.dan@pinguin.lu> 0.7.3-1
+* Release 0.7.3-1
   See ChangeLog for details
-
+— build package
