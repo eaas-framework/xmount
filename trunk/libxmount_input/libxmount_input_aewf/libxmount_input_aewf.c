@@ -904,6 +904,7 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
       CHK (ReadFilePos (pAewf, pFile, &FileHeader, sizeof(FileHeader), 0))
       Pos = sizeof (FileHeader);
       LOG ("Segment %s ", pSegment->pName);
+      // Search for the important sections
       do
       {
          CHK (ReadFilePos (pAewf, pFile, &Section, sizeof (t_AewfSection), Pos))
@@ -948,7 +949,10 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
             Header2Len = Section.Size - sizeof(t_AewfSection);
             CHK (ReadFileAlloc (pAewf, pFile, (void**) &pHeader2, Header2Len))
          }
-         else if ((strcasecmp ((char *)Section.Type, "volume") == 0) && (pVolume==NULL))
+         else if ( ((strcasecmp ((char *)Section.Type, "volume") == 0) || // Guymager works with the volume section. Others use different names 
+                    (strcasecmp ((char *)Section.Type, "disk"  ) == 0) || // for it, but it all is the same. See Joachim Metz' EWF documentation
+                    (strcasecmp ((char *)Section.Type, "data"  ) == 0))
+                 && (pVolume==NULL))
          {
             CHK (ReadFileAlloc (pAewf, pFile, (void**) &pVolume, sizeof(t_AewfSectionVolume)))
             pAewf->Sectors    = pVolume->SectorCount;
