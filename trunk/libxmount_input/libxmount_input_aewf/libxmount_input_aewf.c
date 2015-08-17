@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2015 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing EWF images created by Guymager and others.                         *
@@ -93,7 +93,7 @@ const uint64_t AEWF_DEFAULT_THREADS         =  4;  // There normally is no sense
 
 #define LOG_HEADER_LEN 80
 
-int LogvEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileName, const char *pFunctionName, int LineNr, const char *pFormat, va_list pArguments)
+int LogvEntry (const char *pLogPath, uint8_t LogStdout, const char *pFileName, const char *pFunctionName, int LineNr, const char *pFormat, va_list pArguments)
 {
    time_t       NowT;
    struct tm  *pNowTM;
@@ -105,7 +105,7 @@ int LogvEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileNam
    pid_t        OwnPID;
    va_list     pArguments0;
 
-   if (!LogStdout && (pLogFileName==NULL))
+   if (!LogStdout && (pLogPath==NULL))
       return AEWF_OK;
 
    time (&NowT);
@@ -125,9 +125,9 @@ int LogvEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileNam
 //   while (wr < LOG_HEADER_LEN)
 //      LogLineHeader[wr++] = ' ';
 
-   if (pLogFileName)
+   if (pLogPath)
    {
-      wr = asprintf (&pFullLogFileName, "%s_%d", pLogFileName, OwnPID);
+      wr = asprintf (&pFullLogFileName, "%s/log_%d", pLogPath, OwnPID);
       if ((wr <= 0) || (pFullLogFileName == NULL))
       {
          if (LogStdout)
@@ -164,16 +164,16 @@ int LogvEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileNam
    return AEWF_OK;
 }
 
-int LogEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileName, const char *pFunctionName, int LineNr, const char *pFormat, ...)
+int LogEntry (const char *pLogPath, uint8_t LogStdout, const char *pFileName, const char *pFunctionName, int LineNr, const char *pFormat, ...)
 {
    va_list VaList;
    int     rc;
 
-   if (!LogStdout && (pLogFileName==NULL))
+   if (!LogStdout && (pLogPath==NULL))
       return AEWF_OK;
 
    va_start (VaList, pFormat); //lint !e530 Symbol 'VaList' not initialized
-   rc = LogvEntry (pLogFileName, LogStdout, pFileName, pFunctionName, LineNr, pFormat, VaList);
+   rc = LogvEntry (pLogPath, LogStdout, pFileName, pFunctionName, LineNr, pFormat, VaList);
    va_end(VaList);
    return rc;
 }
@@ -192,13 +192,13 @@ int LogEntry (const char *pLogFileName, uint8_t LogStdout, const char *pFileName
    if ((ChkValRc=(ChkVal)) != AEWF_OK)                                          \
    {                                                                            \
       const char *pErr = AewfGetErrorMessage (ChkValRc);                        \
-      LogEntry (pAewf->pLogFilename, LOG_ERRORS_ON_STDOUT, __FILE__, __FUNCTION__, __LINE__, "Error %d (%s) occured", ChkValRc, pErr); \
+      LogEntry (pAewf->pLogPath, LOG_ERRORS_ON_STDOUT, __FILE__, __FUNCTION__, __LINE__, "Error %d (%s) occured", ChkValRc, pErr); \
       return ChkValRc;                                                          \
    }                                                                            \
 }
 
 #define LOG(...) \
-   LogEntry (pAewf->pLogFilename, pAewf->LogStdout, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
+   LogEntry (pAewf->pLogPath, pAewf->LogStdout, __FILE__, __FUNCTION__, __LINE__, __VA_ARGS__);
 
 
 // AewfCheckError is called before exiting AewfRead. It should not
@@ -608,7 +608,7 @@ static int UpdateStats (t_pAewf pAewf, int Force)
    char   *pFilename       = NULL;
    char   *pCurrentWorkDir = NULL;
 
-   if (pAewf->pStatsFilename)
+   if (pAewf->pStatsPath)
    {
       time (&NowT);
       if (((NowT - pAewf->LastStatsUpdate) >= (int)pAewf->StatsRefresh) || Force)
@@ -616,7 +616,7 @@ static int UpdateStats (t_pAewf pAewf, int Force)
          pAewf->LastStatsUpdate = NowT;
 
          pid = getpid ();
-         if (asprintf (&pFilename, "%s_%d", pAewf->pStatsFilename, pid) < 0)
+         if (asprintf (&pFilename, "%s/stats_%d", pAewf->pStatsPath, pid) < 0)
             return AEWF_MEMALLOC_FAILED;
          pFile = fopen (pFilename, "w");
          if (pFile == NULL) // May be the file is locked by someone else, let's retry in 1 second
@@ -1130,9 +1130,9 @@ static int AewfCreateHandle (void **ppHandle, const char *pFormat, uint8_t Debug
    pAewf->LastError             = AEWF_OK;
    pAewf->MaxTableCache         = 0;
    pAewf->MaxOpenSegments       = 0;
-   pAewf->pStatsFilename        = NULL;
+   pAewf->pStatsPath            = NULL;
    pAewf->StatsRefresh          = 0;
-   pAewf->pLogFilename          = NULL;
+   pAewf->pLogPath              = NULL;
    pAewf->LogStdout             = Debug;
    pAewf->pThreadArr            = NULL;
 
@@ -1153,8 +1153,8 @@ int AewfDestroyHandle(void **ppHandle)
    LOG ("Called");
    LOG ("Remark: 'Ret' won't be logged"); // Handle gets destroyed, 'ret' logging not possible
 
-   if (pAewf->pLogFilename)   free(pAewf->pLogFilename);
-   if (pAewf->pStatsFilename) free(pAewf->pStatsFilename);
+   if (pAewf->pLogPath  )   free(pAewf->pLogPath  );
+   if (pAewf->pStatsPath)   free(pAewf->pStatsPath);
 
    memset (pAewf, 0, sizeof(t_Aewf));
    free (pAewf);
@@ -1472,19 +1472,19 @@ static int AewfOptionsHelp (const char **ppHelp)
 
    wr = asprintf (&pHelp, "    %-12s : Maximum amount of RAM cache, in MiB, for image offset tables. Default: %"PRIu64" MiB\n"
                           "    %-12s : Maximum number of concurrently opened image segment files. Default: %"PRIu64"\n"
-                          "    %-12s : Output statistics at regular intervals to this file.\n"
+                          "    %-12s : Output statistics at regular intervals to this directory (must exist).\n"
+                          "                   The files created in this directory will be named stats_<pid>.\n"
                           "    %-12s : The update interval, in seconds, for the statistics (%s must be set). Default: %"PRIu64"s.\n"
-                          "    %-12s : Log file name.\n"
+                          "    %-12s : Path for writing log file (must exist).\n"
+                          "                   The files created in this directory will be named log_<pid>.\n"
                           "    %-12s : Max. number of threads for parallelized decompression. Default: %"PRIu64"\n"
-                          "                   A value of 1 switches back to old, single-threaded legacy functions.\n"
-                          "    Specify full paths for %s and %s options! The given file names are extended by _<pid>.\n",
+                          "                   A value of 1 switches back to old, single-threaded legacy functions.\n",
                           AEWF_OPTION_TABLECACHE,      AEWF_DEFAULT_TABLECACHE,
                           AEWF_OPTION_MAXOPENSEGMENTS, AEWF_DEFAULT_MAXOPENSEGMENTS,
                           AEWF_OPTION_STATS,
                           AEWF_OPTION_STATSREFRESH, AEWF_OPTION_STATS, AEWF_DEFAULT_STATSREFRESH,
                           AEWF_OPTION_LOG,
-                          AEWF_OPTION_THREADS, AEWF_DEFAULT_THREADS,
-                          AEWF_OPTION_STATS, AEWF_OPTION_LOG);
+                          AEWF_OPTION_THREADS, AEWF_DEFAULT_THREADS);
    if ((pHelp == NULL) || (wr<=0))
       return AEWF_MEMALLOC_FAILED;
 
@@ -1520,7 +1520,12 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
       pOption = ppOptions[i];
       if (strcmp (pOption->p_key, AEWF_OPTION_LOG) == 0)
       {
-         pAewf->pLogFilename = realpath (pOption->p_value, NULL);
+         pAewf->pLogPath = realpath (pOption->p_value, NULL);
+         if (pAewf->pLogPath == NULL)
+         {
+            pError = "The given log path does not exist";
+            break;
+         }
          rc = LOG ("Logging for libxmount_input_aewf started")
          if (rc != AEWF_OK)
          {
@@ -1528,13 +1533,18 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
             break;
          }
          pOption->valid = TRUE;
-         LOG ("Option %s set to %s", AEWF_OPTION_LOG, pAewf->pLogFilename);
+         LOG ("Option %s set to %s", AEWF_OPTION_LOG, pAewf->pLogPath);
       }
       if (strcmp (pOption->p_key, AEWF_OPTION_STATS) == 0)
       {
-         pAewf->pStatsFilename = realpath (pOption->p_value, NULL);
+         pAewf->pStatsPath = realpath (pOption->p_value, NULL);
+         if (pAewf->pStatsPath == NULL)
+         {
+            pError = "The given stats path does not exist";
+            break;
+         }
          pOption->valid = TRUE;
-         LOG ("Option %s set to %s", AEWF_OPTION_STATS, pAewf->pStatsFilename);
+         LOG ("Option %s set to %s", AEWF_OPTION_STATS, pAewf->pStatsPath);
       }
 
       else TEST_OPTION_UINT64 (AEWF_OPTION_MAXOPENSEGMENTS, MaxOpenSegments)
@@ -1545,8 +1555,11 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
    #undef TEST_OPTION_UINT64
 
    if (pError)
+   {
       *ppError = strdup (pError);
-   LOG ("Ret - rc=%d,Error=%s", rc, *ppError);
+      rc = AEWF_OPTIONS_ERROR;
+   }
+   LOG ("Ret - rc=%d, error=%s", rc, *ppError);
    return rc;
 }
 

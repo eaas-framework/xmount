@@ -1,5 +1,5 @@
 /*******************************************************************************
-* xmount Copyright (c) 2008-2014 by Gillen Daniel <gillen.dan@pinguin.lu>      *
+* xmount Copyright (c) 2008-2015 by Gillen Daniel <gillen.dan@pinguin.lu>      *
 *                                                                              *
 * This module has been written by Guy Voncken. It contains the functions for   *
 * accessing EWF images created by Guymager and others.                         *
@@ -224,9 +224,9 @@ typedef struct _t_Aewf
    // Options
    uint64_t   MaxTableCache;    // Max. amount of bytes in pTableArr[x].pTableData, in bytes
    uint64_t   MaxOpenSegments;  // Max. number of open files in pSegmentArr
-   char     *pStatsFilename;    // Statistics file
+   char     *pStatsPath;        // Statistics path
    uint64_t   StatsRefresh;     // The time in seconds between update of the stats file
-   char     *pLogFilename;
+   char     *pLogPath;          // Path for log file
    uint8_t    LogStdout;
    uint64_t   Threads;          // Max. number of threads to be used in parallel actions. Currently only used for uncompression
 } t_Aewf;
