@@ -1170,6 +1170,7 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
    t_AewfSection            Section;
    FILE                   *pFile;
    t_pSegment              pSegment;
+   t_pSegment              pPrevSegment;
    t_pTable                pTable;
    uint64_t                 Pos;
    t_pAewfSectionTable     pEwfTable   = NULL;
@@ -1196,7 +1197,7 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
    for (unsigned i=0; i<FilenameArrLen; i++)
    {
       pSegment = &pAewf->pSegmentArr[i];
-      pSegment->pName = canonicalize_file_name (ppFilenameArr[i]); // canonicalize_file_name allocates a buffer
+      pSegment->pName = realpath (ppFilenameArr[i], NULL); // realpath allocates a buffer of the necessary length
 
       LOG ("Opening segment %s", ppFilenameArr[i]);
       CHK (OpenFile (&pFile, pSegment->pName))
@@ -1209,13 +1210,30 @@ int AewfOpen (void *pHandle, const char **ppFilenameArr, uint64_t FilenameArrLen
       CHK (CloseFile (&pFile))
    }
 
-   // Put segment array into correct sequence and check if segment number are correct
-   // -------------------------------------------------------------------------------
+   // Put segment array into correct sequence and check if segment numbers are correct
+   // --------------------------------------------------------------------------------
    qsort (pAewf->pSegmentArr, pAewf->Segments, sizeof (t_Segment), &QsortCompareSegments);
+   pPrevSegment = NULL;
    for (unsigned i=0; i<pAewf->Segments; i++)
    {
-      if ((i+1) != pAewf->pSegmentArr[i].Number)
-         return AEWF_INVALID_SEGMENT_NUMBER;
+      pSegment = &(pAewf->pSegmentArr[i]);
+      if (pPrevSegment)
+      {
+         if (pSegment->Number == pPrevSegment->Number)
+         {
+            LOG ("Error: Duplicate segment numbers");
+            LOG ("Segment files %s and %s have both segment number %u", pPrevSegment->pName, pSegment->pName, pSegment->Number);
+            return AEWF_DUPLICATE_SEGMENT_NUMBER;
+         }
+      }
+      if (pSegment->Number != (i+1))
+      {
+         LOG ("Error: Missing segment number(s)");
+         LOG ("Previous  segment file %s has segment number %u", pPrevSegment->pName, pPrevSegment->Number);
+         LOG ("Following segment file %s has segment number %u", pSegment->pName    , pSegment->Number    );
+         return AEWF_MISSING_SEGMENT_NUMBER;
+      }
+      pPrevSegment = pSegment;
    }
 
    // Find all tables in the segment files
@@ -1502,7 +1520,7 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
       pOption = ppOptions[i];
       if (strcmp (pOption->p_key, AEWF_OPTION_LOG) == 0)
       {
-         pAewf->pLogFilename = strdup (pOption->p_value);
+         pAewf->pLogFilename = realpath (pOption->p_value, NULL);
          rc = LOG ("Logging for libxmount_input_aewf started")
          if (rc != AEWF_OK)
          {
@@ -1514,7 +1532,7 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
       }
       if (strcmp (pOption->p_key, AEWF_OPTION_STATS) == 0)
       {
-         pAewf->pStatsFilename = strdup (pOption->p_value);
+         pAewf->pStatsFilename = realpath (pOption->p_value, NULL);
          pOption->valid = TRUE;
          LOG ("Option %s set to %s", AEWF_OPTION_STATS, pAewf->pStatsFilename);
       }
@@ -1566,7 +1584,16 @@ static const char* AewfGetErrorMessage (int ErrNum)
       ADD_ERR (AEWF_FILE_SEEK_FAILED)
       ADD_ERR (AEWF_FILE_READ_FAILED)
       ADD_ERR (AEWF_READFILE_BAD_MEM)
-      ADD_ERR (AEWF_INVALID_SEGMENT_NUMBER)
+//      ADD_ERR (AEWF_MISSING_SEGMENT_NUMBER)
+//      ADD_ERR (AEWF_DUPLICATE_SEGMENT_NUMBER)
+      case AEWF_MISSING_SEGMENT_NUMBER:
+         pMsg = "Missing segment number. The list of EWF segment files is incomplete. One or "
+                "more segment numbers are missing.";
+         break;
+      case AEWF_DUPLICATE_SEGMENT_NUMBER:
+         pMsg = "Duplicate segment number. The list of EWF segment files contains duplicate segment "
+                "numbers. Maybe you accidentally specified the segment files of more than just one EWF image.";
+         break;
       ADD_ERR (AEWF_WRONG_SEGMENT_FILE_COUNT)
       ADD_ERR (AEWF_VOLUME_MUST_PRECEDE_TABLES)
       ADD_ERR (AEWF_SECTORS_MUST_PRECEDE_TABLES)
