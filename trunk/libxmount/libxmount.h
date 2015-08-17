@@ -21,6 +21,14 @@
 #include "endianness.h"
 
 /*
+ * Under OSx, fopen handles 64bit I/O too
+ */
+#ifdef __APPLE__
+  #define fopen64 fopen
+  #define fseeko64 fseeko
+#endif
+
+/*
  * Macros to ease debugging and error reporting
  */
 #define LIBXMOUNT_LOG_ERROR(...) {                              \

@@ -24,6 +24,7 @@
 
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
+#include <sys/types.h> // For off_t
 
 #include "../libxmount/libxmount.h"
 
