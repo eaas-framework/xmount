@@ -23,7 +23,8 @@
 #ifndef AEWF_H
 #define AEWF_H
 
-typedef struct _t_Aewf *t_pAewf;
+typedef struct _t_Aewf       *t_pAewf;
+typedef struct _t_Aewf const *t_pcAewf;
 
 // ----------------------
 //  Constant definitions
@@ -153,9 +154,6 @@ enum
    READSIZE_ABOVE_1M,
    READSIZE_ARRLEN
 };
-
-typedef struct _t_Aewf       *t_pAewf;
-typedef struct _t_Aewf const *t_pcAewf;
 
 typedef enum
 {
