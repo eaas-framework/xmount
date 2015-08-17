@@ -142,28 +142,68 @@ typedef struct
 
 #define AEWF_NONE UINT64_MAX
 
+enum
+{
+   READSIZE_32K = 0,
+   READSIZE_64K,
+   READSIZE_128K,
+   READSIZE_256K,
+   READSIZE_512K,
+   READSIZE_1M,
+   READSIZE_ABOVE_1M,
+   READSIZE_ARRLEN
+};
+
+typedef struct _t_Aewf       *t_pAewf;
+typedef struct _t_Aewf const *t_pcAewf;
+
+typedef enum
+{
+   AEWF_IDLE = 0,
+   AEWF_LAUNCHED
+} t_AewfThreadState;
+
+typedef struct _t_AewfThread
+{
+   t_AewfThreadState  State;
+   t_pcAewf          pAewf; // Give the threads access to some Aewf constants - make sure the threads only have read access
+   pthread_t          ID;
+   char             *pChunkBuffCompressed;
+   uint64_t           ChunkBuffCompressedDataLen;
+   char             *pChunkBuffUncompressed;         // This buffer serves as cache as well. ChunkInBuff contains the absolute chunk number whose data is stored here
+   uint64_t           ChunkBuffUncompressedDataLen;  // This normally always is equal to the chunk size (32K), except maybe for the last chunk, if the image's total size is not a multiple of the chunk size
+   uint64_t           ChunkInBuff;
+
+   char              *pBuf;        // Job arguments to the thread: Copy the uncompressed
+   uint64_t            Ofs;        // chunk data starting at chunk offset Ofs to pBuf, Len
+   uint64_t            Len;        // bytes in total.
+
+   int                ReturnCode;
+} t_AewfThread, *t_pAewfThread;
+
 typedef struct _t_Aewf
 {
-   t_pSegment  pSegmentArr;      // Array of all segment files (in correct order)
-   t_pTable    pTableArr;        // Array of all chunk offset tables found in the segment files (in correct order)
-   uint64_t     Segments;
-   uint64_t     Tables;
-   uint64_t     Chunks;          // Total number of chunks in all tables
-   uint64_t     TotalTableSize;  // Total size of all tables
-   uint64_t     TableCache;      // Current amount RAM used by tables, in bytes
-   uint64_t     OpenSegments;    // Current number of open segment files
-   uint64_t     SectorSize;
-   uint64_t     Sectors;
-   uint64_t     ChunkSize;
-   uint64_t     ImageSize;       // Equals to Sectors * SectorSize
-   char       *pChunkBuffCompressed;
-   char       *pChunkBuffUncompressed;
-   uint64_t     ChunkBuffUncompressedDataLen;  // This normally always is equal to the chunk size (32K), except maybe for the last chunk, if the image's total size is not a multiple of the chunk size
-   uint32_t     ChunkBuffSize;
-   uint64_t     ChunkInBuff;     // Chunk currently residing in pChunkBuffUncompressed (AEWF_NONE if none)
-   char       *pErrorText;       // Used for assembling error text during option parsing
-   time_t       LastStatsUpdate;
-   char       *pInfo;
+   t_pSegment    pSegmentArr;      // Array of all segment files (in correct order)
+   t_pTable      pTableArr;        // Array of all chunk offset tables found in the segment files (in correct order)
+   uint64_t       Segments;
+   uint64_t       Tables;
+   uint64_t       Chunks;          // Total number of chunks in all tables
+   uint64_t       TotalTableSize;  // Total size of all tables
+   uint64_t       TableCache;      // Current amount RAM used by tables, in bytes
+   uint64_t       OpenSegments;    // Current number of open segment files
+   uint64_t       SectorSize;
+   uint64_t       Sectors;
+   uint64_t       ChunkSize;
+   uint64_t       ImageSize;       // Equals to Sectors * SectorSize
+   char         *pChunkBuffCompressed;
+   char         *pChunkBuffUncompressed;
+   uint64_t       ChunkBuffUncompressedDataLen;  // This normally always is equal to the chunk size (32K), except maybe for the last chunk, if the image's total size is not a multiple of the chunk size
+   uint32_t       ChunkBuffSize;
+   uint64_t       ChunkInBuff;     // Chunk currently residing in pChunkBuffUncompressed (AEWF_NONE if none)
+   char         *pErrorText;       // Used for assembling error text during option parsing
+   time_t         LastStatsUpdate;
+   char         *pInfo;
+   t_pAewfThread pThreadArr;
 
    // Statistics
    uint64_t   SegmentCacheHits;
@@ -179,6 +219,7 @@ typedef struct _t_Aewf
    uint64_t   TablesReadFromImage;   // The overhead of the table read operations (in bytes)
    uint64_t   ChunksRead;
    uint64_t   BytesRead;
+   uint64_t   ReadSizesArr[READSIZE_ARRLEN];  // Distribution of the requested block sites to be read
    uint64_t   Errors;
    int        LastError;
 
@@ -189,6 +230,7 @@ typedef struct _t_Aewf
    uint64_t   StatsRefresh;     // The time in seconds between update of the stats file
    char     *pLogFilename;
    uint8_t    LogStdout;
+   uint64_t   Threads;          // Max. number of threads to be used in parallel actions. Currently only used for uncompression
 } t_Aewf;
 
 // ----------------
@@ -241,6 +283,10 @@ enum
    AEWF_CHUNK_LENGTH_ZERO,
    AEWF_NEGATIVE_SEEK,
    AEWF_ERROR_EIO_END,
+   AEWF_ERROR_PTHREAD,
+   AEWF_WRONG_CHUNK_CALCULATION,
+   AEWF_SEEK_BEYOND_END,
+   AEWF_READ_BEYOND_END,
 };
 
 #endif
