@@ -4,6 +4,7 @@ if(NOT APPLE)
 else(NOT APPLE)
   include_directories(${LIBOSXFUSE_INCLUDE_DIRS})
   set(LIBS ${LIBS} ${LIBOSXFUSE_LIBRARIES})
+  link_directories(${LIBOSXFUSE_LIBRARY_DIRS})
 endif(NOT APPLE)
 
 set(LIBS ${LIBS} "dl")
