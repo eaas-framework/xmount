@@ -1,6 +1,6 @@
 # Try pkg-config first
 find_package(PkgConfig)
-pkg_check_modules(PKGC_LIBOSXFUSE QUIET libosxfuse)
+pkg_check_modules(PKGC_LIBOSXFUSE QUIET osxfuse)
 
 if(PKGC_LIBOSXFUSE_FOUND)
   # Found lib using pkg-config.
