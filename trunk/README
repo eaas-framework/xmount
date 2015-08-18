@@ -125,7 +125,7 @@ Table of contents
   4.1 Emulated RAW file
     This is the standard data representation used by xmount. It is a file
     containing the raw data contained in the input image file. Except for OSx
-    (see 2.2) this is the default output format when no --out option is
+    (see 4.2) this is the default output format when no --out option is
     specified.
 
   4.2 Emulated DMG file
@@ -178,10 +178,10 @@ Table of contents
       - OSx: OSx 10.6 or above
 
     FUSE:
-      Your os must support FUSE and have the appropriate libraries installed.
-      (See http://fuse.sourceforge.net/ for more informations). To be able to
-      install from source, you also need the FUSE header files. On OSx, you can
-      use osxfuse instead.
+      Your OS must support FUSE and have the appropriate libraries installed.
+      (See http://fuse.sourceforge.net/ for more informations). On OSx, you can
+      use OSXFuse (https://osxfuse.github.io/) as replacement. To be able to
+      install from source, you also need the FUSE header files.
 
     LIBEWF:
       To enable EWF input image support. Get it from
@@ -191,10 +191,10 @@ Table of contents
       To enable AFF input image support. Get it from http://www.afflib.org/
 
   6.2 Install from a package
-    Chances are I provide prebuild binary packages for Debian / Ubuntu. In this
-    case, you only have to fire up your distribution's package manager and
-    install xmount. See https://www.pinguin.lu/xmount for more information and
-    download links.
+    Chances are I provide prebuild binary packages for Debian / Ubuntu and OSx.
+    In this case, you only have to fire up your distribution's package manager
+    and install xmount. See https://www.pinguin.lu/xmount for more information
+    and download links.
 
   6.3 Install from source
     After having checked the prerequisits, you should be able to compile and
