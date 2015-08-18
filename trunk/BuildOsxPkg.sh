@@ -10,11 +10,13 @@ CWD=`cd "$CWD"; pwd`
 DSTROOT="$CWD/dstroot"
 FULL_PKG_NAME=`basename "$CWD"`
 PKG_VERSION=`echo "$FULL_PKG_NAME" | cut -d"-" -f2`
+PKG_SVERSION=`echo "$PKG_VERSION" | tr -d "."`
 
 echo "==== PKG build settings ==="
 echo "\$CWD=\"$CWD\""
 echo "\$DSTROOT=\"$DSTROOT\""
 echo "\$PKG_VERSION=\"$PKG_VERSION\""
+echo "\$PKG_SVERSION=\"$PKG_SVERSION\""
 echo
 echo "Press any key to continue or Ctrl-C to cancel"
 read
@@ -40,10 +42,12 @@ sed -i -e "s#PMDOC_DSTROOT#$DSTROOT#g" "$CWD"/xmount.pmdoc/01dstroot-contents.xm
 # Patch 01dstroot.xml
 sed -i -e "s#PMDOC_DSTROOT#$DSTROOT#g" "$CWD"/xmount.pmdoc/01dstroot.xml
 sed -i -e "s/PMDOC_VERSION/$PKG_VERSION/g" "$CWD"/xmount.pmdoc/01dstroot.xml
+sed -i -e "s/PMDOC_SVERSION/$PKG_SVERSION/g" "$CWD"/xmount.pmdoc/01dstroot.xml
 
 # Patch index.xml
 sed -i -e "s#PMDOC_CWD#$CWD#g" "$CWD"/xmount.pmdoc/index.xml
 sed -i -e "s/PMDOC_VERSION/$PKG_VERSION/g" "$CWD"/xmount.pmdoc/index.xml
+sed -i -e "s/PMDOC_SVERSION/$PKG_SVERSION/g" "$CWD"/xmount.pmdoc/index.xml
 
 open "$CWD"/xmount.pmdoc
 

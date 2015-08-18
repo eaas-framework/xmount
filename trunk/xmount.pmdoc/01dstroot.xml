@@ -1,6 +1,6 @@
 <pkgref spec="1.12" uuid="602B5E40-A3B9-4044-BF85-7BA882D111BE">
   <config>
-    <identifier>www.pinguin.lu.xmount.PMDOC_VERSION.dstroot.pkg</identifier>
+    <identifier>www.pinguin.lu.xmountPMDOC_SVERSION.dstroot.pkg</identifier>
     <version>1</version>
     <description></description>
     <post-install type="none"/>
