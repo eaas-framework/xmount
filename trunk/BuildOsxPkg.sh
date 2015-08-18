@@ -6,6 +6,7 @@ if [ "$(whoami)" != "root" ]; then
 fi
 
 CWD=`dirname "$0"`
+CWD=`cd "$CWD"; pwd`
 DSTROOT="$CWD/dstroot"
 FULL_PKG_NAME=`basename "$CWD"`
 PKG_VERSION=`echo "$FULL_PKG_NAME" | cut -d"-" -f2`
