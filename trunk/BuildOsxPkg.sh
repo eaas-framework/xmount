@@ -29,11 +29,8 @@ mkdir -p "$DSTROOT"/usr/local/share/man/man1
 
 # Populate dstroot with files
 cp "$CWD"/build/src/xmount "$DSTROOT"/usr/local/bin/
-cp "$CWD"/build/libxmount_input/libxmount_input_aaff/libxmount_input_aaff.dylib "$DSTROOT"/usr/local/lib/xmount/
-cp "$CWD"/build/libxmount_input/libxmount_input_aewf/libxmount_input_aewf.dylib "$DSTROOT"/usr/local/lib/xmount/
-cp "$CWD"/build/libxmount_input/libxmount_input_aff/libxmount_input_aff.dylib "$DSTROOT"/usr/local/lib/xmount/
-cp "$CWD"/build/libxmount_input/libxmount_input_ewf/libxmount_input_ewf.dylib "$DSTROOT"/usr/local/lib/xmount/
-cp "$CWD"/build/libxmount_input/libxmount_input_raw/libxmount_input_raw.dylib "$DSTROOT"/usr/local/lib/xmount/
+find "$CWD"/build/libxmount_input -name "libxmount_input_*.dylib" -exec cp "{}" "$DSTROOT"/usr/local/lib/xmount/ \;
+find "$CWD"/build/libxmount_morphing -name "libxmount_morphing_*.dylib" -exec cp "{}" "$DSTROOT"/usr/local/lib/xmount/ \;
 cp "$CWD"/xmount.1 "$DSTROOT"/usr/local/share/man/man1/
 
 # Patch 01dstroot-contents.xml
