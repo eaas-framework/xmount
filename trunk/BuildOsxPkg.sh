@@ -14,7 +14,7 @@ PKG_VERSION=`echo "$FULL_PKG_NAME" | cut -d"-" -f2`
 echo "==== PKG build settings ==="
 echo "\$CWD=\"$CWD\""
 echo "\$DSTROOT=\"$DSTROOT\""
-echo "\$PKG_VERSION=\"$PKG_VERSION_LONG\""
+echo "\$PKG_VERSION=\"$PKG_VERSION\""
 echo
 echo "Press any key to continue or Ctrl-C to cancel"
 read
