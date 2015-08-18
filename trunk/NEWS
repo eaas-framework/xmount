@@ -1,6 +1,10 @@
 This file lists the most important changes to the previous released version.
 For a full list of changes please refer to the source files.
 
+New for version 0.7.4:
+  - Re-enabled full OSx support
+  - libxmount_input_aewf input library is now able to decompress EWF chunks in parallel, which will increase read speed
+
 New for version 0.7.0:
   - Switched build system from autoconf / autoamke to cmake
   - Massiv code cleanup
