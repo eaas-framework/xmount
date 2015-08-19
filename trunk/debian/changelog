@@ -1,3 +1,10 @@
+xmount (0.7.4) stable; urgency=low
+
+  * libxmount_input_aewf input library is now able to decompress EWF chunks in parallel, which will increase read speed
+  * libxmount_input_ewf input library will now fail when not specifying all EWF segments
+
+ -- Gillen Daniel <gillen.dan@pinguin.lu>  Wed, 20 Aug 2015 11:06:00 +0200
+
 xmount (0.7.3) stable; urgency=low
 
   * Fixed minor bug in ParseCmdLine() which was not checking upper argc bounds correctly
