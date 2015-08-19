@@ -86,6 +86,7 @@ static int EwfCreateHandle(void **pp_handle,
 
   // Init handle values
   p_ewf_handle->h_ewf=NULL;
+  p_ewf_handle->debug=debug;
 
   // Init lib handle
 #ifdef HAVE_LIBEWF_V2_API
@@ -161,6 +162,33 @@ static int EwfOpen(void *p_handle,
   {
     return EWF_OPEN_FAILED;
   }
+
+#ifdef HAVE_LIBEWF_V2_API
+  // Try to read 1 byte from the image end to verify that all segments were
+  // specified (Only needed because libewf_handle_open() won't fail even if not
+  // all segments were specified!)
+  uint64_t image_size=0;
+  char buf;
+  if(libewf_handle_get_media_size(p_ewf_handle->h_ewf,&image_size,NULL)!=1) {
+    return EWF_GET_SIZE_FAILED;
+  }
+  if(image_size==0) return EWF_OK;
+  LIBXMOUNT_LOG_DEBUG(p_ewf_handle->debug,
+                      "Trying to read last byte of image at offset %"
+                        PRIu64 " (image size = %" PRIu64 " bytes)\n",
+                      image_size-1,
+                      image_size);
+  if(libewf_handle_seek_offset(p_ewf_handle->h_ewf,
+                               image_size-1,
+                               SEEK_SET,
+                               NULL)==-1)
+  {
+    return EWF_OPEN_FAILED_SEEK;
+  }
+  if(libewf_handle_read_buffer(p_ewf_handle->h_ewf,&buf,1,NULL)!=1) {
+    return EWF_OPEN_FAILED_READ;
+  }
+#endif
 
 #ifndef HAVE_LIBEWF_V2_API
   // Parse EWF header
@@ -449,6 +477,12 @@ static const char* EwfGetErrorMessage(int err_num) {
     case EWF_OPEN_FAILED:
       return "Unable to open EWF file(s)";
       break;
+    case EWF_OPEN_FAILED_SEEK:
+      return "Unable to seek to end of data! Did you specify all EWF segments?";
+      break;
+    case EWF_OPEN_FAILED_READ:
+      return "Unable to read end of data! Did you specify all EWF segments?";
+      break;
     case EWF_HEADER_PARSING_FAILED:
       return "Unable to parse EWF header values";
       break;
@@ -483,5 +517,8 @@ static int EwfFreeBuffer(void *p_buf) {
               EwfOptionsHelp, EwfOptionsParse and EwfFreeBuffer.
   20140731: * Added support for libewf v1 API.
   20140803: * Added EwfCreateHandle, EwfDestroyHandle and EwfGetInfofileContent.
+  20150819: * Added debug value to handle.
+            * Added v2 API check in EwfOpen to make sure user specified all EWF
+              segments.
 */
 

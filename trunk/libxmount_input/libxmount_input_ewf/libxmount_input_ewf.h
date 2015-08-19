@@ -30,6 +30,8 @@ enum {
   EWF_NO_INPUT_FILES,
   EWF_INVALID_INPUT_FILES,
   EWF_OPEN_FAILED,
+  EWF_OPEN_FAILED_SEEK,
+  EWF_OPEN_FAILED_READ,
   EWF_HEADER_PARSING_FAILED,
   EWF_CLOSE_FAILED,
   EWF_GET_SIZE_FAILED,
@@ -46,6 +48,8 @@ typedef struct s_EwfHandle {
   //! EWF handle
   LIBEWF_HANDLE *h_ewf;
 #endif
+  //! Debug settings
+  uint8_t debug;
 } ts_EwfHandle, *pts_EwfHandle;
 
 /*******************************************************************************
