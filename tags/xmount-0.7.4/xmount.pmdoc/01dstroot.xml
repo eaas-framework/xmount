@@ -1,0 +1,24 @@
+<pkgref spec="1.12" uuid="602B5E40-A3B9-4044-BF85-7BA882D111BE">
+  <config>
+    <identifier>www.pinguin.lu.xmountPMDOC_SVERSION.dstroot.pkg</identifier>
+    <version>1</version>
+    <description></description>
+    <post-install type="none"/>
+    <requireAuthorization/>
+    <installFrom>PMDOC_DSTROOT</installFrom>
+    <installTo>/</installTo>
+    <flags>
+      <followSymbolicLinks/>
+    </flags>
+    <packageStore type="internal"></packageStore>
+    <mod>parent</mod>
+  </config>
+  <contents>
+    <file-list>01dstroot-contents.xml</file-list>
+    <filter>/CVS$</filter>
+    <filter>/\.svn$</filter>
+    <filter>/\.cvsignore$</filter>
+    <filter>/\.cvspass$</filter>
+    <filter>/\.DS_Store$</filter>
+  </contents>
+</pkgref>

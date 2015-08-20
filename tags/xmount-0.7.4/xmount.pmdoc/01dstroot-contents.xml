@@ -1,0 +1,30 @@
+<pkg-contents spec="1.12">
+  <f n="dstroot" o="root" g="wheel" p="16877" pt="PMDOC_DSTROOT" m="false" t="file">
+    <f n="usr" o="root" g="wheel" p="16877">
+      <f n="local" o="root" g="wheel" p="16877">
+        <f n="bin" o="root" g="wheel" p="16877">
+          <f n="xmount" o="root" g="wheel" p="33277"><mod>mode</mod></f>
+        </f>
+        <f n="share" o="root" g="wheel" p="16877">
+          <f n="man" o="root" g="wheel" p="16877">
+            <f n="man1" o="root" g="wheel" p="16877">
+              <f n="xmount.1" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            </f>
+          </f>
+        </f>
+        <f n="lib" o="root" g="wheel" p="16877">
+          <f n="xmount" o="root" g="wheel" p="16877">
+            <f n="libxmount_input_aaff.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_input_aaff.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_input_aff.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_input_ewf.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_input_raw.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_morphing_combine.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_morphing_raid.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+            <f n="libxmount_morphing_unallocated.dylib" o="root" g="wheel" p="33204"><mod>mode</mod></f>
+          </f>
+        </f>
+      </f>
+    </f>
+  </f>
+</pkg-contents>

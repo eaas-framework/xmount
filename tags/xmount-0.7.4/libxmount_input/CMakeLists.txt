@@ -1,0 +1,28 @@
+add_subdirectory(libxmount_input_raw)
+
+if(NOT STATIC_EWF)
+  find_package(LibEWF)
+  if(LIBEWF_FOUND)
+    add_subdirectory(libxmount_input_ewf)
+  endif(LIBEWF_FOUND)
+else(NOT STATIC_EWF)
+  message(STATUS "Not checking for LibEWF (STATIC_EWF = 1)")
+  add_subdirectory(libxmount_input_ewf)
+endif(NOT STATIC_EWF)
+
+if(NOT STATIC_AFF)
+  find_package(LibAFF)
+  if(LIBAFF_FOUND)
+    add_subdirectory(libxmount_input_aff)
+  endif(LIBAFF_FOUND)
+else(NOT STATIC_AFF)
+  message(STATUS "Not checking for LibAFF (STATIC_AFF = 1)")
+  add_subdirectory(libxmount_input_aff)
+endif(NOT STATIC_AFF)
+
+find_package(LibZ)
+if(LIBZ_FOUND)
+  add_subdirectory(libxmount_input_aewf)
+  add_subdirectory(libxmount_input_aaff)
+endif(LIBZ_FOUND)
+
