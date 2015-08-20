@@ -1524,6 +1524,7 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
          if (pAewf->pLogPath == NULL)
          {
             pError = "The given log path does not exist";
+            LOG ("Log path %s not found", pOption->p_value);
             break;
          }
          rc = LOG ("Logging for libxmount_input_aewf started")
@@ -1533,7 +1534,7 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
             break;
          }
          pOption->valid = TRUE;
-         LOG ("Option %s set to %s", AEWF_OPTION_LOG, pAewf->pLogPath);
+         LOG ("Option %s set to %s (full path %s)", AEWF_OPTION_LOG, pOption->p_value, pAewf->pLogPath);
       }
       if (strcmp (pOption->p_key, AEWF_OPTION_STATS) == 0)
       {
@@ -1541,10 +1542,11 @@ static int AewfOptionsParse (void *pHandle, uint32_t OptionCount, const pts_LibX
          if (pAewf->pStatsPath == NULL)
          {
             pError = "The given stats path does not exist";
+            LOG ("Stats path %s not found", pOption->p_value);
             break;
          }
          pOption->valid = TRUE;
-         LOG ("Option %s set to %s", AEWF_OPTION_STATS, pAewf->pStatsPath);
+         LOG ("Option %s set to %s (full path %s)", AEWF_OPTION_STATS, pOption->p_value, pAewf->pLogPath);
       }
 
       else TEST_OPTION_UINT64 (AEWF_OPTION_MAXOPENSEGMENTS, MaxOpenSegments)
