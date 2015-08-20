@@ -4,7 +4,7 @@ endif(POLICY CMP0042)
 
 project(libxmount_input_ewf C)
 
-add_library(xmount_input_ewf SHARED libxmount_input_ewf.c)
+add_library(xmount_input_ewf SHARED libxmount_input_ewf.c ../../libxmount/libxmount.c)
 
 if(NOT STATIC_EWF)
   include_directories(${LIBEWF_INCLUDE_DIRS})
