@@ -24,8 +24,7 @@ Table of contents
     6.1 Prerequisits
     6.1 Install from a package
     6.2 Install from source
-  7.0 xmount command line parameters
-    7.1 xmount usage examples
+  7.0 xmount usage examples
 
 0.0 Author and license stuff
   xmount Copyright (c) 2008-2015 by Gillen Daniel <gillen.dan@pinguin.lu>
@@ -206,7 +205,7 @@ Table of contents
     $ make
     $ sudo make install
 
-7.1 xmount usage examples
+7.0 xmount usage examples
   To xmount an EWF harddisk image from your acquired disk as a raw DD image
   under /mnt, use the following command:
 

@@ -2,7 +2,7 @@
 
 Name:			xmount
 Summary:		Tool to crossmount between multiple input and output harddisk images
-Version:		0.7.3
+Version:		0.7.4
 Release:		1%{?dist}
 License:		GPL
 Group:			Applications/System
@@ -55,7 +55,7 @@ rm -fr %{buildroot}
 %doc AUTHORS COPYING INSTALL NEWS README ROADMAP
 
 %changelog
-* Wed Aug 13 2014 Daniel Gillen <gillen.dan@pinguin.lu> 0.7.3-1
-* Release 0.7.3-1
-  See ChangeLog for details
+* Wed Aug 20 2015 Daniel Gillen <gillen.dan@pinguin.lu> 0.7.4-1
+* Release 0.7.4-1
+  See NEWS for details
 — build package
