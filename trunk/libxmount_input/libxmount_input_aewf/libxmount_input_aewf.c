@@ -595,7 +595,7 @@ static int AewfLoadEwfTable (t_pAewf pAewf, t_pTable pTable)
    CHK (AewfOpenSegment (pAewf, pTable));
    CHK (ReadFileAllocPos (pAewf, pTable->pSegment->pFile, (void**) &pTable->pEwfTable, pTable->Size, pTable->Offset))
    pAewf->TableCache += pTable->Size;
-   pAewf->TablesReadFromImage = pTable->Size;
+   pAewf->TablesReadFromImage += pTable->Size;
 
    return AEWF_OK;
 }
