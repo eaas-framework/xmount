@@ -762,9 +762,22 @@ static int ParseCmdLine(const int argc, char **pp_argv) {
     if(glob_xmount.input.images_count!=0) {
       // Set name of first source file as fsname
       XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
-                    ",fsname=");
+                    ",fsname='");
+      // If possible, use full path
+      p_buf=realpath(glob_xmount.input.pp_images[0]->pp_files[0],NULL);
+      if(p_buf==NULL) {
+        XMOUNT_STRSET(p_buf,glob_xmount.input.pp_images[0]->pp_files[0]);
+      }
+      // Make sure fsname does not include some forbidden chars
+      for(uint32_t i=0;i<strlen(p_buf);i++) {
+        if(p_buf[i]=='\'') p_buf[i]='_';
+      }
+      // Set fsname
       XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
-                    glob_xmount.input.pp_images[0]->pp_files[0]);
+                    p_buf);
+      XMOUNT_STRAPP(glob_xmount.pp_fuse_argv[glob_xmount.fuse_argc-1],
+                    "'");
+      free(p_buf);
     }
     if(FuseAllowOther==TRUE) {
       // Add "allow_other" option if allowed
@@ -4117,5 +4130,7 @@ int main(int argc, char *argv[]) {
   20141113: v0.7.3 released
             * Fixed minor bug in ParseCmdLine() which was not checking upper
               argc bounds correctly.
+  20150820: v0.7.4 released
+  20150901: * Improved the way fsname is built
 */
 
