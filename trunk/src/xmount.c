@@ -3576,6 +3576,21 @@ int main(int argc, char *argv[]) {
     FreeResources();
     return 1;
   }
+  if(glob_xmount.input.images_count > 1
+      && strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0) {
+    LOG_ERROR("The \"writethrough\" cache currently does not allow " \
+              "multiple input files.");
+    PrintUsage(argv[0]);
+    FreeResources();
+    return 1;
+  }
+  if(glob_xmount.input.pp_images[0]->files_count != 1) {
+    LOG_ERROR("The \"writethrough\" cache currently only works with single " \
+              "(unsplit) files.");
+    PrintUsage(argv[0]);
+    FreeResources();
+    return 1;
+  }
   if(glob_xmount.fuse_argc<2) {
     LOG_ERROR("Couldn't parse command line options!\n")
     PrintUsage(argv[0]);
@@ -3585,6 +3600,15 @@ int main(int argc, char *argv[]) {
   if(glob_xmount.morphing.p_morph_type==NULL) {
     XMOUNT_STRSET(glob_xmount.morphing.p_morph_type,"combine");
   }
+  if(strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0
+      && strcmp(glob_xmount.morphing.p_morph_type, "combine") != 0) {
+    LOG_ERROR("The \"writethrough\" cache currently only works " \
+              "with \"combine\" morphing.");
+    PrintUsage(argv[0]);
+    FreeResources();
+    return 1;
+  }
+
 
   // Check if mountpoint is a valid dir
   if(stat(glob_xmount.p_mountpoint,&file_stat)!=0) {
