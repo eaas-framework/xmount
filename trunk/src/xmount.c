@@ -1120,7 +1120,8 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         } else {
           cur_to_read=to_read;
         }
-        if(glob_xmount.output.writable==TRUE &&
+        if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
+           glob_xmount.output.writable==TRUE &&
            glob_xmount.cache.p_cache_header->VdiFileHeaderCached==TRUE)
         {
           // VDI header was already cached
@@ -1187,7 +1188,9 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
     if(block_off+to_read>CACHE_BLOCK_SIZE) {
       cur_to_read=CACHE_BLOCK_SIZE-block_off;
     } else cur_to_read=to_read;
-    if(glob_xmount.output.writable==TRUE &&
+    // Disable cache lookup when caching mode is "writethrough"
+    if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
+       glob_xmount.output.writable==TRUE &&
        glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==TRUE)
     {
       // Write support enabled and need to read altered data from cachefile
@@ -1234,7 +1237,8 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         break;
       case VirtImageType_VHD:
         // Micro$oft has choosen to use a footer rather then a header.
-        if(glob_xmount.output.writable==TRUE &&
+        if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
+           glob_xmount.output.writable==TRUE &&
            glob_xmount.cache.p_cache_header->VhdFileHeaderCached==TRUE)
         {
           // VHD footer was already cached
@@ -2140,6 +2144,10 @@ static int InitCacheFile() {
   uint32_t needed_blocks=0;
   uint64_t buf;
 
+  if(strcmp("writethrough",glob_xmount.cache.p_cache_file)==0) {
+    LOG_DEBUG("Using \"writethrough\" caching, not initializing cache file");
+    return TRUE;
+  }
   if(!glob_xmount.cache.overwrite_cache) {
     // Try to open an existing cache file or create a new one
     glob_xmount.cache.h_cache_file=(FILE*)FOPEN(glob_xmount.cache.p_cache_file,
