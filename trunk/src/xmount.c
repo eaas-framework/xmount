@@ -1302,6 +1302,12 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
             size,
             offset);
 
+  if(strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+    // For writethrough caching, we directly modify our "virtual" header
+    // in memory
+    memcpy((char*)glob_xmount.output.vdi.p_vdi_header+offset,p_buf,size);
+    return size;
+  }
   if(glob_xmount.cache.p_cache_header->VdiFileHeaderCached==1) {
     // Header was already cached
     if(fseeko(glob_xmount.cache.h_cache_file,
@@ -1418,6 +1424,12 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
 static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
             " from VHD footer\n",size,offset)
+  if(strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+    // For writethrough caching, we directly modify our "virtual" header
+    // in memory
+    memcpy(((char*)glob_xmount.output.vhd.p_vhd_header)+offset,p_buf,size);
+    return size;
+  }
   if(glob_xmount.cache.p_cache_header->VhdFileHeaderCached==1) {
     // Header has already been cached
     if(fseeko(glob_xmount.cache.h_cache_file,
@@ -1605,152 +1617,187 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
       break;
   }
 
-  // Calculate block to write data to
-  cur_block=file_offset/CACHE_BLOCK_SIZE;
-  block_offset=file_offset%CACHE_BLOCK_SIZE;
-  
-  while(to_write!=0) {
-    // Calculate how many bytes we have to write to this block
-    if(block_offset+to_write>CACHE_BLOCK_SIZE) {
-      to_write_now=CACHE_BLOCK_SIZE-block_offset;
-    } else to_write_now=to_write;
-    if(glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==1) {
-      // Block was already cached
-      // Seek to data offset in cache file
-      if(fseeko(glob_xmount.cache.h_cache_file,
-             glob_xmount.cache.p_cache_blkidx[cur_block].off_data+block_offset,
-             SEEK_SET)!=0)
-      {
-        LOG_ERROR("Couldn't seek to cached block at address %" PRIu64 "\n",
-                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
-                    block_offset);
-        return -1;
-      }
-      if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
+  if(to_write>0 && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+    // only raw supports this, duplicate the handle data here
+    typedef struct {
+      char *pFilename;
+      uint64_t FileSize;
+      FILE *pFile;
+    } t_Piece, *t_pPiece;
+    typedef struct {
+      t_pPiece pPieceArr;
+      uint64_t Pieces;
+      uint64_t TotalSize;
+    } t_raw, *t_praw;
+
+    // In "writethrough" caching mode, directly write to
+    t_praw raw_handle=glob_xmount.input.pp_images[0]->p_handle;
+
+    if(fseeko(raw_handle->pPieceArr[0].pFile, file_offset, SEEK_SET)!=0)
+    {
+      LOG_ERROR("Couldn't seek to address %" PRIu64 "\n",file_offset);
+      return -1;
+    }
+    if (fwrite(p_buf,size,1,raw_handle->pPieceArr[0].pFile)!=1) {
+      perror("error");
+      raw_handle->pPieceArr[0].pFile = freopen(raw_handle->pPieceArr[0].pFilename, "rb+", raw_handle->pPieceArr[0].pFile);
+      if (fwrite(p_buf,size,1,raw_handle->pPieceArr[0].pFile)!=1) {
         LOG_ERROR("Error while writing %zu bytes "
-                  "to cache file at offset %" PRIu64 "!\n",
-                  to_write_now,
-                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
-                    block_offset);
+                  "to source file at offset %" PRIu64 "!\n",
+                  size,
+                  file_offset);
         return -1;
       }
-      LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64
-                  " to cache file\n",to_write_now,
-                glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
-                  block_offset);
-    } else {
-      // Uncached block. Need to cache entire new block
-      // Seek to end of cache file to append new cache block
-      fseeko(glob_xmount.cache.h_cache_file,0,SEEK_END);
-      glob_xmount.cache.p_cache_blkidx[cur_block].off_data=
-        ftello(glob_xmount.cache.h_cache_file);
-      if(block_offset!=0) {
-        // Changed data does not begin at block boundry. Need to prepend
-        // with data from virtual image file
-        XMOUNT_MALLOC(p_buf2,char*,block_offset*sizeof(char));
-        ret=GetMorphedImageData(p_buf2,
-                                file_offset-block_offset,
-                                block_offset,
-                                &read);
-        if(ret!=TRUE || read!=block_offset) {
-          LOG_ERROR("Couldn't read data from morphed image!\n")
+    }
+
+  } else {
+    // Calculate block to write data to
+    cur_block=file_offset/CACHE_BLOCK_SIZE;
+    block_offset=file_offset%CACHE_BLOCK_SIZE;
+
+    while(to_write!=0) {
+      // Calculate how many bytes we have to write to this block
+      if(block_offset+to_write>CACHE_BLOCK_SIZE) {
+        to_write_now=CACHE_BLOCK_SIZE-block_offset;
+      } else to_write_now=to_write;
+      if(glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==1) {
+        // Block was already cached
+        // Seek to data offset in cache file
+        if(fseeko(glob_xmount.cache.h_cache_file,
+               glob_xmount.cache.p_cache_blkidx[cur_block].off_data+block_offset,
+               SEEK_SET)!=0)
+        {
+          LOG_ERROR("Couldn't seek to cached block at address %" PRIu64 "\n",
+                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                      block_offset);
           return -1;
         }
-        if(fwrite(p_buf2,block_offset,1,glob_xmount.cache.h_cache_file)!=1) {
-          LOG_ERROR("Couldn't writing %" PRIu64 " bytes "
+        if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
+          LOG_ERROR("Error while writing %zu bytes "
                     "to cache file at offset %" PRIu64 "!\n",
-                    block_offset,
-                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
+                    to_write_now,
+                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                      block_offset);
           return -1;
         }
-        LOG_DEBUG("Prepended changed data with %" PRIu64
-                  " bytes from virtual image file at offset %" PRIu64
-                  "\n",block_offset,file_offset-block_offset)
-        free(p_buf2);
-      }
-      if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
-        LOG_ERROR("Error while writing %zd bytes "
-                    "to cache file at offset %" PRIu64 "!\n",
-                  to_write_now,
+        LOG_DEBUG("Wrote %zd bytes at offset %" PRIu64
+                    " to cache file\n",to_write_now,
                   glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
                     block_offset);
-        return -1;
-      }
-      if(block_offset+to_write_now!=CACHE_BLOCK_SIZE) {
-        // Changed data does not end at block boundry. Need to append
-        // with data from virtual image file
-        XMOUNT_MALLOC(p_buf2,char*,(CACHE_BLOCK_SIZE-
-                                 (block_offset+to_write_now))*sizeof(char))
-        memset(p_buf2,0,CACHE_BLOCK_SIZE-(block_offset+to_write_now));
-        if((file_offset-block_offset)+CACHE_BLOCK_SIZE>orig_image_size) {
-          // Original image is smaller than full cache block
+      } else {
+        // Uncached block. Need to cache entire new block
+        // Seek to end of cache file to append new cache block
+        fseeko(glob_xmount.cache.h_cache_file,0,SEEK_END);
+        glob_xmount.cache.p_cache_blkidx[cur_block].off_data=
+          ftello(glob_xmount.cache.h_cache_file);
+        if(block_offset!=0) {
+          // Changed data does not begin at block boundry. Need to prepend
+          // with data from virtual image file
+          XMOUNT_MALLOC(p_buf2,char*,block_offset*sizeof(char));
           ret=GetMorphedImageData(p_buf2,
-                                  file_offset+to_write_now,
-                                  orig_image_size-(file_offset+to_write_now),
+                                  file_offset-block_offset,
+                                  block_offset,
                                   &read);
-          if(ret!=TRUE || read!=orig_image_size-(file_offset+to_write_now)) {
-            LOG_ERROR("Couldn't read data from virtual image file!\n")
+          if(ret!=TRUE || read!=block_offset) {
+            LOG_ERROR("Couldn't read data from morphed image!\n")
             return -1;
           }
-        } else {
-          ret=GetMorphedImageData(p_buf2,
-                                  file_offset+to_write_now,
-                                  CACHE_BLOCK_SIZE-(block_offset+to_write_now),
-                                  &read);
-          if(ret!=TRUE || read!=CACHE_BLOCK_SIZE-(block_offset+to_write_now)) {
-            LOG_ERROR("Couldn't read data from virtual image file!\n")
+          if(fwrite(p_buf2,block_offset,1,glob_xmount.cache.h_cache_file)!=1) {
+            LOG_ERROR("Couldn't writing %" PRIu64 " bytes "
+                      "to cache file at offset %" PRIu64 "!\n",
+                      block_offset,
+                      glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
             return -1;
           }
+          LOG_DEBUG("Prepended changed data with %" PRIu64
+                    " bytes from virtual image file at offset %" PRIu64
+                    "\n",block_offset,file_offset-block_offset)
+          free(p_buf2);
         }
-        if(fwrite(p_buf2,
-                  CACHE_BLOCK_SIZE-(block_offset+to_write_now),
+        if(fwrite(p_write_buf,to_write_now,1,glob_xmount.cache.h_cache_file)!=1) {
+          LOG_ERROR("Error while writing %zd bytes "
+                      "to cache file at offset %" PRIu64 "!\n",
+                    to_write_now,
+                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                      block_offset);
+          return -1;
+        }
+        if(block_offset+to_write_now!=CACHE_BLOCK_SIZE) {
+          // Changed data does not end at block boundry. Need to append
+          // with data from virtual image file
+          XMOUNT_MALLOC(p_buf2,char*,(CACHE_BLOCK_SIZE-
+                                   (block_offset+to_write_now))*sizeof(char))
+          memset(p_buf2,0,CACHE_BLOCK_SIZE-(block_offset+to_write_now));
+          if((file_offset-block_offset)+CACHE_BLOCK_SIZE>orig_image_size) {
+            // Original image is smaller than full cache block
+            ret=GetMorphedImageData(p_buf2,
+                                    file_offset+to_write_now,
+                                    orig_image_size-(file_offset+to_write_now),
+                                    &read);
+            if(ret!=TRUE || read!=orig_image_size-(file_offset+to_write_now)) {
+              LOG_ERROR("Couldn't read data from virtual image file!\n")
+              return -1;
+            }
+          } else {
+            ret=GetMorphedImageData(p_buf2,
+                                    file_offset+to_write_now,
+                                    CACHE_BLOCK_SIZE-(block_offset+to_write_now),
+                                    &read);
+            if(ret!=TRUE || read!=CACHE_BLOCK_SIZE-(block_offset+to_write_now)) {
+              LOG_ERROR("Couldn't read data from virtual image file!\n")
+              return -1;
+            }
+          }
+          if(fwrite(p_buf2,
+                    CACHE_BLOCK_SIZE-(block_offset+to_write_now),
+                    1,
+                    glob_xmount.cache.h_cache_file)!=1)
+          {
+            LOG_ERROR("Error while writing %zd bytes "
+                        "to cache file at offset %" PRIu64 "!\n",
+                      CACHE_BLOCK_SIZE-(block_offset+to_write_now),
+                      glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
+                        block_offset+to_write_now);
+            return -1;
+          }
+          free(p_buf2);
+        }
+        // All important data for this cache block has been written,
+        // flush all buffers and mark cache block as assigned
+        fflush(glob_xmount.cache.h_cache_file);
+  #ifndef __APPLE__
+        ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
+  #endif
+        glob_xmount.cache.p_cache_blkidx[cur_block].Assigned=1;
+        // Update cache block index entry in cache file
+        fseeko(glob_xmount.cache.h_cache_file,
+               sizeof(ts_CacheFileHeader)+
+                 (cur_block*sizeof(ts_CacheFileBlockIndex)),
+               SEEK_SET);
+        if(fwrite(&(glob_xmount.cache.p_cache_blkidx[cur_block]),
+                  sizeof(ts_CacheFileBlockIndex),
                   1,
                   glob_xmount.cache.h_cache_file)!=1)
         {
-          LOG_ERROR("Error while writing %zd bytes "
-                      "to cache file at offset %" PRIu64 "!\n",
-                    CACHE_BLOCK_SIZE-(block_offset+to_write_now),
-                    glob_xmount.cache.p_cache_blkidx[cur_block].off_data+
-                      block_offset+to_write_now);
+          LOG_ERROR("Couldn't update cache file block index!\n");
           return -1;
         }
-        free(p_buf2);
+        LOG_DEBUG("Updated cache file block index: Number=%" PRIu64
+                    ", Data offset=%" PRIu64 "\n",
+                  cur_block,
+                  glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
       }
-      // All important data for this cache block has been written,
-      // flush all buffers and mark cache block as assigned
+      // Flush buffers
       fflush(glob_xmount.cache.h_cache_file);
-#ifndef __APPLE__
+  #ifndef __APPLE__
       ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
-#endif
-      glob_xmount.cache.p_cache_blkidx[cur_block].Assigned=1;
-      // Update cache block index entry in cache file
-      fseeko(glob_xmount.cache.h_cache_file,
-             sizeof(ts_CacheFileHeader)+
-               (cur_block*sizeof(ts_CacheFileBlockIndex)),
-             SEEK_SET);
-      if(fwrite(&(glob_xmount.cache.p_cache_blkidx[cur_block]),
-                sizeof(ts_CacheFileBlockIndex),
-                1,
-                glob_xmount.cache.h_cache_file)!=1)
-      {
-        LOG_ERROR("Couldn't update cache file block index!\n");
-        return -1;
-      }
-      LOG_DEBUG("Updated cache file block index: Number=%" PRIu64
-                  ", Data offset=%" PRIu64 "\n",
-                cur_block,
-                glob_xmount.cache.p_cache_blkidx[cur_block].off_data);
+  #endif
+      block_offset=0;
+      cur_block++;
+      p_write_buf+=to_write_now;
+      to_write-=to_write_now;
+      file_offset+=to_write_now;
     }
-    // Flush buffers
-    fflush(glob_xmount.cache.h_cache_file);
-#ifndef __APPLE__
-    ioctl(fileno(glob_xmount.cache.h_cache_file),BLKFLSBUF,0);
-#endif
-    block_offset=0;
-    cur_block++;
-    p_write_buf+=to_write_now;
-    to_write-=to_write_now;
-    file_offset+=to_write_now;
   }
 
   if(to_write_later!=0) {
