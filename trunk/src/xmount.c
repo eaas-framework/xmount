@@ -1120,10 +1120,10 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         } else {
           cur_to_read=to_read;
         }
-        if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
-           glob_xmount.output.writable==TRUE &&
-           glob_xmount.cache.p_cache_header->VdiFileHeaderCached==TRUE)
-        {
+
+        if(glob_xmount.output.writable==TRUE
+           && strcmp(glob_xmount.cache.p_cache_file,"writethrough")!=0
+           && glob_xmount.cache.p_cache_header->VdiFileHeaderCached==TRUE) {
           // VDI header was already cached
           if(fseeko(glob_xmount.cache.h_cache_file,
                     glob_xmount.cache.p_cache_header->pVdiFileHeader+file_off,
@@ -1189,9 +1189,9 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
       cur_to_read=CACHE_BLOCK_SIZE-block_off;
     } else cur_to_read=to_read;
     // Disable cache lookup when caching mode is "writethrough"
-    if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
-       glob_xmount.output.writable==TRUE &&
-       glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==TRUE)
+    if(glob_xmount.output.writable==TRUE
+       && strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0
+       && glob_xmount.cache.p_cache_blkidx[cur_block].Assigned==TRUE)
     {
       // Write support enabled and need to read altered data from cachefile
       if(fseeko(glob_xmount.cache.h_cache_file,
@@ -1237,8 +1237,8 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
         break;
       case VirtImageType_VHD:
         // Micro$oft has choosen to use a footer rather then a header.
-        if(strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
-           glob_xmount.output.writable==TRUE &&
+        if(glob_xmount.output.writable==TRUE &&
+           strcmp(glob_xmount.cache.p_cache_file, "writethrough")!=0 &&
            glob_xmount.cache.p_cache_header->VhdFileHeaderCached==TRUE)
         {
           // VHD footer was already cached
@@ -1302,7 +1302,7 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
             size,
             offset);
 
-  if(strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+  if(glob_xmount.cache.p_cache_file && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
     // For writethrough caching, we directly modify our "virtual" header
     // in memory
     memcpy((char*)glob_xmount.output.vdi.p_vdi_header+offset,p_buf,size);
@@ -1424,7 +1424,7 @@ static int SetVdiFileHeaderData(char *p_buf,off_t offset,size_t size) {
 static int SetVhdFileHeaderData(char *p_buf,off_t offset,size_t size) {
   LOG_DEBUG("Need to cache %zu bytes at offset %" PRIu64
             " from VHD footer\n",size,offset)
-  if(strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+  if(glob_xmount.cache.p_cache_file && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
     // For writethrough caching, we directly modify our "virtual" header
     // in memory
     memcpy(((char*)glob_xmount.output.vhd.p_vhd_header)+offset,p_buf,size);
@@ -1617,7 +1617,7 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
       break;
   }
 
-  if(to_write>0 && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
+  if(to_write>0 && glob_xmount.cache.p_cache_file && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
     // only raw supports this, duplicate the handle data here
     typedef struct {
       char *pFilename;
@@ -2191,7 +2191,7 @@ static int InitCacheFile() {
   uint32_t needed_blocks=0;
   uint64_t buf;
 
-  if(strcmp("writethrough",glob_xmount.cache.p_cache_file)==0) {
+  if(glob_xmount.cache.p_cache_file && strcmp("writethrough",glob_xmount.cache.p_cache_file)==0) {
     LOG_DEBUG("Using \"writethrough\" caching, not initializing cache file");
     return TRUE;
   }
@@ -3631,8 +3631,8 @@ int main(int argc, char *argv[]) {
     FreeResources();
     return 1;
   }
-  if(glob_xmount.input.images_count > 1
-      && strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0) {
+  if(glob_xmount.input.images_count > 1 && glob_xmount.cache.p_cache_file
+     && strcmp(glob_xmount.cache.p_cache_file, "writethrough")==0) {
     LOG_ERROR("The \"writethrough\" cache currently does not allow " \
               "multiple input files.");
     PrintUsage(argv[0]);
@@ -3655,8 +3655,10 @@ int main(int argc, char *argv[]) {
   if(glob_xmount.morphing.p_morph_type==NULL) {
     XMOUNT_STRSET(glob_xmount.morphing.p_morph_type,"combine");
   }
-  if(strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0
-      && strcmp(glob_xmount.morphing.p_morph_type, "combine") != 0) {
+  if(glob_xmount.cache.p_cache_file
+      && glob_xmount.morphing.p_morph_type
+      && (strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0)
+      && (strcmp(glob_xmount.morphing.p_morph_type, "combine") != 0)) {
     LOG_ERROR("The \"writethrough\" cache currently only works " \
               "with \"combine\" morphing.");
     PrintUsage(argv[0]);
