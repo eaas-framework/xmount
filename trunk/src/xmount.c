@@ -82,6 +82,7 @@ static int GetVirtImageSize(uint64_t*);
 static int GetInputImageData(pts_InputImage, char*, off_t, size_t, size_t*);
 static int GetMorphedImageData(char*, off_t, size_t, size_t*);
 static int GetVirtImageData(char*, off_t, size_t);
+static int SetInputImageData(pts_InputImage, const char*, off_t, size_t, size_t*);
 static int SetVdiFileHeaderData(char*, off_t, size_t);
 static int SetVhdFileHeaderData(char*, off_t, size_t);
 static int SetVirtImageData(const char*, off_t, size_t);
@@ -1011,6 +1012,70 @@ static int GetInputImageData(pts_InputImage p_image,
   return 0;
 }
 
+//! Write data to input image
+/*!
+ * \param p_image Image to which to write data
+ * \param p_buf Pointer to buffer from which to write from
+ * \param offset Offset at which data should be written
+ * \param size Size of data which should be written (size of p_buf)
+ * \param p_written Number of written bytes on success
+ * \return 0 on success, negated error code on error
+ */
+static int SetInputImageData(pts_InputImage p_image,
+                             const char *p_buf,
+                             off_t offset,
+                             size_t size,
+                             size_t *p_written)
+{
+  int ret;
+  size_t to_write=0;
+  int write_errno=0;
+
+  LOG_DEBUG("Writing %zu bytes at offset %zu to input image '%s'\n",
+            size,
+            offset,
+            p_image->pp_files[0]);
+
+  // Make sure we aren't writing past EOF of image file
+  if(offset>=p_image->size) {
+    // Offset is beyond image size
+    LOG_DEBUG("Offset %zu is at / beyond size of input image '%s'\n",
+              offset,
+              p_image->pp_files[0]);
+    *p_written=0;
+    return 0;
+  }
+  if(offset+size>p_image->size) {
+    // Attempt to read data past EOF of image file
+    to_write=p_image->size-offset;
+    LOG_DEBUG("Attempt to read data past EOF of input image '%s'. "
+                "Correcting size from %zu to %zu\n",
+              p_image->pp_files[0],
+              size,
+              to_write);
+  } else to_write=size;
+
+  // Write data to image file (adding input image offset if one was specified)
+  ret=p_image->p_functions->Write(p_image->p_handle,
+                                  p_buf,
+                                  offset+glob_xmount.input.image_offset,
+                                  to_write,
+                                  p_written,
+                                  &write_errno);
+  if(ret!=0) {
+    LOG_ERROR("Couldn't write %zu bytes at offset %zu to input image "
+                "'%s': %s!\n",
+              to_write,
+              offset,
+              p_image->pp_files[0],
+              p_image->p_functions->GetErrorMessage(ret));
+    if(write_errno==0) return -EIO;
+    else return (write_errno*(-1));
+  }
+
+  return 0;
+}
+
 //! Read data from morphed image
 /*!
  * \param p_buf Pointer to buffer to write read data to (must be preallocated!)
@@ -1181,7 +1246,7 @@ static int GetVirtImageData(char *p_buf, off_t offset, size_t size) {
   // Calculate block to read data from
   cur_block=file_off/CACHE_BLOCK_SIZE;
   block_off=file_off%CACHE_BLOCK_SIZE;
-  
+
   // Read image data
   while(to_read!=0) {
     // Calculate how many bytes we have to read from this block
@@ -1618,31 +1683,18 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   }
 
   if(to_write>0 && glob_xmount.cache.p_cache_file && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
-    // only raw supports this, duplicate the handle data here
-    typedef struct {
-      char *pFilename;
-      uint64_t FileSize;
-      FILE *pFile;
-    } t_Piece, *t_pPiece;
-    typedef struct {
-      t_pPiece pPieceArr;
-      uint64_t Pieces;
-      uint64_t TotalSize;
-    } t_raw, *t_praw;
-
-    // In "writethrough" caching mode, directly write to
-    t_praw raw_handle=glob_xmount.input.pp_images[0]->p_handle;
-
-    if(fseeko(raw_handle->pPieceArr[0].pFile, file_offset, SEEK_SET)!=0)
-    {
-      LOG_ERROR("Couldn't seek to address %" PRIu64 "\n",file_offset);
-      return -1;
-    }
-    if (fwrite(p_buf,size,1,raw_handle->pPieceArr[0].pFile)!=1) {
+    // Read data from morphed image
+    size_t written;
+    int ret=SetInputImageData(glob_xmount.input.pp_images[0],
+                             p_buf,
+                             file_offset,
+                             to_write,
+                             &written);
+    if (ret!=0 || written!=to_write) {
       perror("error");
       LOG_ERROR("Error while writing %zu bytes "
                 "to source file at offset %" PRIu64 "!\n",
-                size,
+                to_write,
                 file_offset);
       return -1;
     }
@@ -3640,13 +3692,6 @@ int main(int argc, char *argv[]) {
       && (strcmp(glob_xmount.input.pp_images[0]->p_type, "raw") != 0)) {
     LOG_ERROR("The \"writethrough\" cache currently only works " \
               "with the \"raw\" input module.");
-    PrintUsage(argv[0]);
-    FreeResources();
-    return 1;
-  }
-  if(glob_xmount.input.pp_images[0]->files_count != 1) {
-    LOG_ERROR("The \"writethrough\" cache currently only works with single " \
-              "(unsplit) files.");
     PrintUsage(argv[0]);
     FreeResources();
     return 1;

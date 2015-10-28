@@ -120,6 +120,26 @@ typedef struct s_LibXmountInputFunctions {
               size_t *p_read,
               int *p_errno);
 
+  //! Function to write data to input image
+  /*!
+   * Writes count bytes at offset from memory starting at the address of
+   * p_buf into input image.
+   *
+   * \param p_handle Handle
+   * \param p_buf Buffer of data to be written
+   * \param offset Position in the image file at which to start writing
+   * \param count Amount of bytes to write
+   * \param p_read Amount of bytes written
+   * \param p_errno errno in case of an error
+   * \return 0 on success or error code
+   */
+  int (*Write)(void *p_handle,
+               const char *p_buf,
+               off_t offset,
+               size_t count,
+               size_t *p_written,
+               int *p_errno);
+
   //! Function to get a help message for any supported lib-specific options
   /*!
    * Calling this function should return a string containing help messages for

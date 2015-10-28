@@ -59,6 +59,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
   p_functions->Close=&RawClose;
   p_functions->Size=&RawSize;
   p_functions->Read=&RawRead;
+  p_functions->Write=&RawWrite;
   p_functions->OptionsHelp=&RawOptionsHelp;
   p_functions->OptionsParse=&RawOptionsParse;
   p_functions->GetInfofileContent=&RawGetInfofileContent;
@@ -111,6 +112,36 @@ static int RawRead0(t_praw praw, char *pBuffer, uint64_t Seek, uint32_t *pCount)
   if (fread (pBuffer, *pCount, 1, pPiece->pFile) != 1)
   {
     return RAW_CANNOT_READ_DATA;
+  }
+
+  return RAW_OK;
+}
+
+static int RawWrite0(t_praw praw, const char *pBuffer, uint64_t Seek, uint32_t *pCount)
+{
+  t_pPiece pPiece;
+  uint64_t  i;
+
+  // Find correct piece to write to
+  // -------------------------------
+
+  for (i=0; i<praw->Pieces; i++)
+  {
+    pPiece = &praw->pPieceArr[i];
+    if (Seek < pPiece->FileSize) break;
+    Seek -= pPiece->FileSize;
+  }
+  if (i >= praw->Pieces) return RAW_READ_BEYOND_END_OF_IMAGE;
+
+  // Read from this piece
+  // --------------------
+  CHK (RawSetCurrentSeekPos (pPiece, Seek, SEEK_SET))
+
+  *pCount = GETMIN (*pCount, pPiece->FileSize - Seek);
+
+  if (fwrite(pBuffer, *pCount, 1, pPiece->pFile) != 1)
+  {
+    return RAW_CANNOT_WRITE_DATA;
   }
 
   return RAW_OK;
@@ -267,6 +298,35 @@ static int RawRead(void *p_handle,
 }
 
 /*
+ * RawWrite
+ */
+static int RawWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno)
+{
+  t_praw p_raw_handle=(t_praw)p_handle;
+  uint32_t remaining=count;
+  uint32_t to_write;
+
+  if((seek+count)>p_raw_handle->TotalSize) {
+    return RAW_WRITE_BEYOND_END_OF_IMAGE;
+  }
+
+  do {
+    to_write=remaining;
+    CHK(RawWrite0(p_raw_handle,p_buf,seek,&to_write))
+    remaining-=to_write;
+    p_buf+=to_write;
+    seek+=to_write;
+  } while(remaining);
+
+  *p_written=count;
+  return RAW_OK;
+}
+/*
  * RawOptionsHelp
  */
 static int RawOptionsHelp(const char **pp_help) {
@@ -350,6 +410,9 @@ static const char* RawGetErrorMessage(int err_num) {
     case RAW_CANNOT_READ_DATA:
       return "Unable to read raw data";
       break;
+    case RAW_CANNOT_WRITE_DATA:
+      return "Unable to write raw data";
+      break;
     case RAW_CANNOT_CLOSE_FILE:
       return "Unable to close raw file(s)";
       break;
@@ -358,6 +421,9 @@ static const char* RawGetErrorMessage(int err_num) {
       break;
     case RAW_READ_BEYOND_END_OF_IMAGE:
       return "Unable to read raw data: Attempt to read past EOF";
+      break;
+    case RAW_WRITE_BEYOND_END_OF_IMAGE:
+      return "Unable to write raw data: Attempt to write past EOF";
       break;
     default:
       return "Unknown error";

@@ -28,9 +28,11 @@ enum {
   RAW_MEMALLOC_FAILED,
   RAW_FILE_OPEN_FAILED,
   RAW_CANNOT_READ_DATA,
+  RAW_CANNOT_WRITE_DATA,
   RAW_CANNOT_CLOSE_FILE,
   RAW_CANNOT_SEEK,
   RAW_READ_BEYOND_END_OF_IMAGE,
+  RAW_WRITE_BEYOND_END_OF_IMAGE,
 };
 
 // ----------------------
@@ -102,6 +104,12 @@ static int RawRead(void *p_handle,
                    size_t count,
                    size_t *p_read,
                    int *p_errno);
+static int RawWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno);
 static int RawOptionsHelp(const char **pp_help);
 static int RawOptionsParse(void *p_handle,
                            uint32_t options_count,
