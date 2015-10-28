@@ -53,6 +53,7 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
   p_functions->Morph=&CombineMorph;
   p_functions->Size=&CombineSize;
   p_functions->Read=&CombineRead;
+  p_functions->Write=&CombineWrite;
   p_functions->OptionsHelp=&CombineOptionsHelp;
   p_functions->OptionsParse=&CombineOptionsParse;
   p_functions->GetInfofileContent=&CombineGetInfofileContent;
@@ -235,6 +236,86 @@ static int CombineRead(void *p_handle,
 }
 
 /*
+ * CombineWrite
+ */
+static int CombineWrite(void *p_handle,
+                        const char *p_buf,
+                        off_t offset,
+                        size_t count,
+                        size_t *p_written) {
+  pts_CombineHandle p_combine_handle=(pts_CombineHandle)p_handle;
+  uint64_t cur_input_image=0;
+  uint64_t cur_input_image_size=0;
+  off_t cur_offset=offset;
+  int ret;
+  size_t cur_count;
+  size_t written;
+
+  LOG_DEBUG("Writing %zu bytes at offset %zu to morphed image\n",
+            count,
+            offset);
+
+  // Make sure write parameters are within morphed image bounds
+  if(offset>=p_combine_handle->morphed_image_size ||
+     offset+count>p_combine_handle->morphed_image_size)
+  {
+    return COMBINE_WRITE_BEYOND_END_OF_IMAGE;
+  }
+
+  // Search starting image to read from
+  ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                &cur_input_image_size);
+  while(ret==0 && cur_offset>=cur_input_image_size) {
+    cur_offset-=cur_input_image_size;
+    cur_input_image++;
+    ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                  &cur_input_image_size);
+  }
+  if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
+
+  // Init p_written
+  *p_written=0;
+
+  // Write data
+  while(cur_input_image<p_combine_handle->input_images_count && count!=0) {
+    // Get current input image size
+    ret=p_combine_handle->p_input_functions->Size(cur_input_image,
+                                                  &cur_input_image_size);
+    if(ret!=0) return COMBINE_CANNOT_GET_IMAGESIZE;
+
+    // Calculate how many bytes to write to current input image
+    if(cur_offset+count>cur_input_image_size) {
+      cur_count=cur_input_image_size-cur_offset;
+    } else {
+      cur_count=count;
+    }
+
+    LOG_DEBUG("Writing %zu bytes at offset %zu to input image %" PRIu64 "\n",
+              cur_count,
+              cur_offset,
+              cur_input_image);
+
+    // Read bytes
+    ret=p_combine_handle->p_input_functions->
+          Write(cur_input_image,
+                p_buf,
+                cur_offset,
+                cur_count,
+                &written);
+    if(ret!=0 || written!=cur_count) return COMBINE_CANNOT_WRITE_DATA;
+
+    p_buf+=cur_count;
+    cur_offset=0;
+    count-=cur_count;
+    cur_input_image++;
+    (*p_written)+=cur_count;
+  }
+  if(count!=0) return COMBINE_CANNOT_WRITE_DATA;
+
+  return COMBINE_OK;
+}
+
+/*
  * CombineOptionsHelp
  */
 static int CombineOptionsHelp(const char **pp_help) {
@@ -280,8 +361,14 @@ static const char* CombineGetErrorMessage(int err_num) {
     case COMBINE_READ_BEYOND_END_OF_IMAGE:
       return "Unable to read data: Attempt to read past EOF";
       break;
+    case COMBINE_WRITE_BEYOND_END_OF_IMAGE:
+      return "Unable to write data: Attempt to write past EOF";
+      break;
     case COMBINE_CANNOT_READ_DATA:
       return "Unable to read data";
+      break;
+    case COMBINE_CANNOT_WRITE_DATA:
+      return "Unable to write data";
       break;
     default:
       return "Unknown error";

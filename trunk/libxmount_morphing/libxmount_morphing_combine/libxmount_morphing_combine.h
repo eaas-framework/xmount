@@ -27,7 +27,9 @@ enum {
   COMBINE_CANNOT_GET_IMAGECOUNT,
   COMBINE_CANNOT_GET_IMAGESIZE,
   COMBINE_READ_BEYOND_END_OF_IMAGE,
-  COMBINE_CANNOT_READ_DATA
+  COMBINE_WRITE_BEYOND_END_OF_IMAGE,
+  COMBINE_CANNOT_READ_DATA,
+  COMBINE_CANNOT_WRITE_DATA
 };
 
 typedef struct s_CombineHandle {
@@ -53,6 +55,11 @@ static int CombineRead(void *p_handle,
                        off_t offset,
                        size_t count,
                        size_t *p_read);
+static int CombineWrite(void *p_handle,
+                        const char *p_buf,
+                        off_t offset,
+                        size_t count,
+                        size_t *p_written);
 static int CombineOptionsHelp(const char **pp_help);
 static int CombineOptionsParse(void *p_handle,
                                uint32_t options_count,

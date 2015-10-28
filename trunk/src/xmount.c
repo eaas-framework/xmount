@@ -102,6 +102,7 @@ static int SplitLibraryParameters(char*, uint32_t*, pts_LibXmountOptions**);
 static int LibXmount_Morphing_ImageCount(uint64_t*);
 static int LibXmount_Morphing_Size(uint64_t, uint64_t*);
 static int LibXmount_Morphing_Read(uint64_t, char*, off_t, size_t, size_t*);
+static int LibXmount_Morphing_Write(uint64_t, const char*, off_t, size_t, size_t*);
 // Functions implementing FUSE functions
 static int FuseGetAttr(const char*, struct stat*);
 static int FuseMkDir(const char*, mode_t);
@@ -1132,6 +1133,62 @@ static int GetMorphedImageData(char *p_buf,
   return TRUE;
 }
 
+//! Write data to morphed image
+/*!
+ * \param p_buf Pointer to buffer to write data from
+ * \param offset Offset at which data should be written
+ * \param size Size of data which should be written (size of p_buf)
+ * \param p_read Number of written bytes on success
+ * \return TRUE on success, negated error code on error
+ */
+static int SetMorphedImageData(const char *p_buf,
+                               off_t offset,
+                               size_t size,
+                               size_t *p_written)
+{
+  int ret;
+  size_t to_write=0;
+  size_t written;
+  uint64_t image_size=0;
+
+  // Make sure we aren't reading past EOF of image file
+  if(GetMorphedImageSize(&image_size)!=TRUE) {
+    LOG_ERROR("Couldn't get size of morphed image!\n");
+    return -EIO;
+  }
+  if(offset>=image_size) {
+    // Offset is beyond image size
+    LOG_DEBUG("Offset %zu is at / beyond size of morphed image.\n",offset);
+    *p_written=0;
+    return 0;
+  }
+  if(offset+size>image_size) {
+    // Attempt to write data past EOF of morphed image file
+    to_write=image_size-offset;
+    LOG_DEBUG("Attempt to write data past EOF of morphed image. Corrected size "
+                "from %zu to %zu.\n",
+              size,
+              to_write);
+  } else to_write=size;
+
+  // write data to morphed image
+  ret=glob_xmount.morphing.p_functions->Write(glob_xmount.morphing.p_handle,
+                                             p_buf,
+                                             offset,
+                                             to_write,
+                                             &written);
+  if(ret!=0) {
+    LOG_ERROR("Couldn't read %zu bytes at offset %zu from morphed image: %s!\n",
+              to_write,
+              offset,
+              glob_xmount.morphing.p_functions->GetErrorMessage(ret));
+    return -EIO;
+  }
+
+  *p_written=written;
+  return TRUE;
+}
+
 //! Read data from virtual image
 /*!
  * \param p_buf Pointer to buffer to write read data to
@@ -1685,12 +1742,8 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
   if(to_write>0 && glob_xmount.cache.p_cache_file && strcmp(glob_xmount.cache.p_cache_file,"writethrough") == 0) {
     // Read data from morphed image
     size_t written;
-    int ret=SetInputImageData(glob_xmount.input.pp_images[0],
-                             p_buf,
-                             file_offset,
-                             to_write,
-                             &written);
-    if (ret!=0 || written!=to_write) {
+    ret = SetMorphedImageData(p_buf, file_offset, to_write, &written);
+    if (ret!=TRUE || written!=to_write) {
       perror("error");
       LOG_ERROR("Error while writing %zu bytes "
                 "to source file at offset %" PRIu64 "!\n",
@@ -2744,6 +2797,7 @@ static void InitResources() {
     &LibXmount_Morphing_ImageCount;
   glob_xmount.morphing.input_image_functions.Size=&LibXmount_Morphing_Size;
   glob_xmount.morphing.input_image_functions.Read=&LibXmount_Morphing_Read;
+  glob_xmount.morphing.input_image_functions.Write=&LibXmount_Morphing_Write;
 
   // Cache
   glob_xmount.cache.p_cache_file=NULL;
@@ -3063,6 +3117,29 @@ static int LibXmount_Morphing_Read(uint64_t image,
                            offset,
                            count,
                            p_read);
+}
+
+//! Function to write data from input image
+/*!
+ * \param image Image number
+ * \param p_buf Buffer with data to be written
+ * \param offset Position at which to start writing
+ * \param count Amount of bytes to write
+ * \param p_written Number of written bytes on success
+ * \return 0 on success or negated error code on error
+ */
+static int LibXmount_Morphing_Write(uint64_t image,
+                            const char *p_buf,
+                            off_t offset,
+                            size_t count,
+                            size_t *p_written)
+{
+  if(image>=glob_xmount.input.images_count) return -EIO;
+  return SetInputImageData(glob_xmount.input.pp_images[image],
+                           p_buf,
+                           offset,
+                           count,
+                           p_written);
 }
 
 /*******************************************************************************
@@ -3675,14 +3752,6 @@ int main(int argc, char *argv[]) {
   // Check command line options
   if(glob_xmount.input.images_count==0) {
     LOG_ERROR("No --in command line option specified!\n")
-    PrintUsage(argv[0]);
-    FreeResources();
-    return 1;
-  }
-  if(glob_xmount.input.images_count > 1 && glob_xmount.cache.p_cache_file
-     && strcmp(glob_xmount.cache.p_cache_file, "writethrough")==0) {
-    LOG_ERROR("The \"writethrough\" cache currently does not allow " \
-              "multiple input files.");
     PrintUsage(argv[0]);
     FreeResources();
     return 1;

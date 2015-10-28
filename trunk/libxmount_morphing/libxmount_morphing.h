@@ -65,6 +65,22 @@ typedef struct s_LibXmountMorphingInputFunctions {
               off_t offset,
               size_t count,
               size_t *p_read);
+
+  //! Function to write data to input image
+  /*!
+   * \param image Image number
+   * \param p_buf Buffer to write data from
+   * \param offset Position at which to start writing
+   * \param count Amount of bytes to write
+   * \param p_read Number of written bytes on success
+   * \return 0 on success or negated error code on error
+   */
+  int (*Write)(uint64_t image,
+               const char *p_buf,
+               off_t offset,
+               size_t count,
+               size_t *p_written);
+
 } ts_LibXmountMorphingInputFunctions, *pts_LibXmountMorphingInputFunctions;
 
 //! Structure containing pointers to the lib's functions
@@ -140,6 +156,24 @@ typedef struct s_LibXmountMorphingFunctions {
               off_t offset,
               size_t count,
               size_t *p_read);
+
+  //! Function to write data to an input image
+  /*!
+   * Writes count bytes from memory starting at the address of p_buf
+   * to the image file at offset.
+   *
+   * \param p_handle Handle to the opened image
+   * \param p_buf Buffer to write data from
+   * \param offset Position at which to start writing
+   * \param count Amount of bytes to write
+   * \param p_written Number of written bytes on success
+   * \return 0 on success or negated error code on error
+   */
+  int (*Write)(void *p_handle,
+              const char *p_buf,
+              off_t offset,
+              size_t count,
+              size_t *p_written);
 
   //! Function to get a help message for any supported lib-specific options
   /*!
