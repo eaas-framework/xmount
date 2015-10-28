@@ -30,7 +30,7 @@ enum {
   RAW_CANNOT_READ_DATA,
   RAW_CANNOT_CLOSE_FILE,
   RAW_CANNOT_SEEK,
-  RAW_READ_BEYOND_END_OF_IMAGE
+  RAW_READ_BEYOND_END_OF_IMAGE,
 };
 
 // ----------------------
@@ -54,6 +54,7 @@ typedef struct {
   t_pPiece  pPieceArr;
   uint64_t   Pieces;
   uint64_t   TotalSize;
+  char       Writable;
 } t_raw, *t_praw;
 
 // ----------------

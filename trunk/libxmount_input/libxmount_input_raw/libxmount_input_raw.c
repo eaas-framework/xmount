@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "../libxmount_input.h"
 #include "libxmount_input_raw.h"
@@ -27,6 +28,9 @@
 #define LOG_WARNING(...) {            \
   LIBXMOUNT_LOG_WARNING(__VA_ARGS__); \
 }
+
+#define RAW_OPTION_WRITABLE "rawwritable"
+#define RAW_OPTION_DEFAULT_WRITABLE "false"
 
 /*******************************************************************************
  * LibXmount_Input API implementation
@@ -176,7 +180,13 @@ static int RawOpen(void *p_handle,
       RawClose(p_handle);
       return RAW_MEMALLOC_FAILED;
     }
-    pPiece->pFile = fopen (pPiece->pFilename, "r");
+
+    if (praw->Writable) {
+      pPiece->pFile = fopen (pPiece->pFilename, "r+");
+    } else {
+      pPiece->pFile = fopen (pPiece->pFilename, "r");
+    }
+
     if (pPiece->pFile == NULL)
     {
       RawClose(p_handle);
@@ -260,7 +270,17 @@ static int RawRead(void *p_handle,
  * RawOptionsHelp
  */
 static int RawOptionsHelp(const char **pp_help) {
-  *pp_help=NULL;
+  char *pHelp = NULL;
+  int wr;
+
+  wr = asprintf(&pHelp, "    %-12s : Specifies if write operations are to be allowed on "
+                        "the source image. Default: %s\n",
+                        RAW_OPTION_WRITABLE, RAW_OPTION_DEFAULT_WRITABLE);
+
+  if ((pHelp == NULL) || (wr<=0))
+     return RAW_MEMALLOC_FAILED;
+
+  *pp_help = pHelp;
   return RAW_OK;
 }
 
@@ -272,6 +292,27 @@ static int RawOptionsParse(void *p_handle,
                            const pts_LibXmountOptions *pp_options,
                            const char **pp_error)
 {
+  t_praw p_raw_handle=(t_praw)p_handle;
+
+  for (uint32_t i = 0; i < options_count; ++i) {
+    pts_LibXmountOptions pOption = pp_options[i];
+
+    if (strcmp(pOption->p_key, RAW_OPTION_WRITABLE) == 0) {
+      char *pValue = (char *)calloc(strlen(pOption->p_value)+1, sizeof(char));
+      if (!pValue) {
+        return RAW_MEMALLOC_FAILED;
+      }
+      for (size_t l = 0; l < strlen(pOption->p_value); ++l) {
+        pValue[l] = tolower(pOption->p_value[l]);
+      }
+
+      if (strcmp(pValue, "true") == 0 || strcmp(pValue, "1") == 0) {
+        p_raw_handle->Writable = 1;
+      } else {
+        p_raw_handle->Writable = 0;
+      }
+    }
+  }
   return RAW_OK;
 }
 

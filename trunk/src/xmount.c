@@ -1640,16 +1640,12 @@ static int SetVirtImageData(const char *p_buf, off_t offset, size_t size) {
     }
     if (fwrite(p_buf,size,1,raw_handle->pPieceArr[0].pFile)!=1) {
       perror("error");
-      raw_handle->pPieceArr[0].pFile = freopen(raw_handle->pPieceArr[0].pFilename, "rb+", raw_handle->pPieceArr[0].pFile);
-      if (fwrite(p_buf,size,1,raw_handle->pPieceArr[0].pFile)!=1) {
-        LOG_ERROR("Error while writing %zu bytes "
-                  "to source file at offset %" PRIu64 "!\n",
-                  size,
-                  file_offset);
-        return -1;
-      }
+      LOG_ERROR("Error while writing %zu bytes "
+                "to source file at offset %" PRIu64 "!\n",
+                size,
+                file_offset);
+      return -1;
     }
-
   } else {
     // Calculate block to write data to
     cur_block=file_offset/CACHE_BLOCK_SIZE;
@@ -3635,6 +3631,15 @@ int main(int argc, char *argv[]) {
      && strcmp(glob_xmount.cache.p_cache_file, "writethrough")==0) {
     LOG_ERROR("The \"writethrough\" cache currently does not allow " \
               "multiple input files.");
+    PrintUsage(argv[0]);
+    FreeResources();
+    return 1;
+  }
+  if(glob_xmount.cache.p_cache_file
+      && (strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0)
+      && (strcmp(glob_xmount.input.pp_images[0]->p_type, "raw") != 0)) {
+    LOG_ERROR("The \"writethrough\" cache currently only works " \
+              "with the \"raw\" input module.");
     PrintUsage(argv[0]);
     FreeResources();
     return 1;
