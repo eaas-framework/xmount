@@ -53,6 +53,7 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
   p_functions->Morph=&RaidMorph;
   p_functions->Size=&RaidSize;
   p_functions->Read=&RaidRead;
+  p_functions->Write=&RaidWrite;
   p_functions->OptionsHelp=&RaidOptionsHelp;
   p_functions->OptionsParse=&RaidOptionsParse;
   p_functions->GetInfofileContent=&RaidGetInfofileContent;
@@ -250,6 +251,18 @@ static int RaidRead(void *p_handle,
 }
 
 /*
+ * RaidWrite
+ */
+static int RaidWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t offset,
+                    size_t count,
+                    size_t *p_written)
+{
+  return RAID_CANNOT_WRITE_DATA;
+}
+
+/*
  * RaidOptionsHelp
  */
 static int RaidOptionsHelp(const char **pp_help) {
@@ -354,8 +367,14 @@ static const char* RaidGetErrorMessage(int err_num) {
     case RAID_READ_BEYOND_END_OF_IMAGE:
       return "Unable to read data: Attempt to read past EOF";
       break;
+    case RAID_WRITE_BEYOND_END_OF_IMAGE:
+      return "Write is not supported in RAID morphing module.";
+      break;
     case RAID_CANNOT_READ_DATA:
       return "Unable to read data";
+      break;
+    case RAID_CANNOT_WRITE_DATA:
+      return "Write is not supported in RAID morphing module.";
       break;
     case RAID_CANNOT_PARSE_OPTION:
       return "Unable to parse library option";

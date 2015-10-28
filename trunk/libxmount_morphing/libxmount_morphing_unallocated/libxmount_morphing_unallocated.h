@@ -69,6 +69,11 @@ static int UnallocatedRead(void *p_handle,
                          off_t offset,
                          size_t count,
                          size_t *p_read);
+static int UnallocatedWrite(void *p_handle,
+                            const char *p_buf,
+                            off_t offset,
+                            size_t count,
+                            size_t *p_written);
 static int UnallocatedOptionsHelp(const char **pp_help);
 static int UnallocatedOptionsParse(void *p_handle,
                                  uint32_t options_count,

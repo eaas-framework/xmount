@@ -53,6 +53,7 @@ void LibXmount_Morphing_GetFunctions(ts_LibXmountMorphingFunctions *p_functions)
   p_functions->Morph=&UnallocatedMorph;
   p_functions->Size=&UnallocatedSize;
   p_functions->Read=&UnallocatedRead;
+  p_functions->Write=&UnallocatedWrite;
   p_functions->OptionsHelp=&UnallocatedOptionsHelp;
   p_functions->OptionsParse=&UnallocatedOptionsParse;
   p_functions->GetInfofileContent=&UnallocatedGetInfofileContent;
@@ -320,6 +321,19 @@ static int UnallocatedRead(void *p_handle,
 }
 
 /*
+ * UnallocatedWrite
+ */
+static int UnallocatedWrite(void *p_handle,
+                            const char *p_buf,
+                            off_t offset,
+                            size_t count,
+                            size_t *p_written)
+{
+  return UNALLOCATED_CANNOT_WRITE_DATA;
+}
+
+
+/*
  * UnallocatedOptionsHelp
  */
 static int UnallocatedOptionsHelp(const char **pp_help) {
@@ -464,8 +478,14 @@ static const char* UnallocatedGetErrorMessage(int err_num) {
     case UNALLOCATED_READ_BEYOND_END_OF_IMAGE:
       return "Unable to read data: Attempt to read past EOF";
       break;
+    case UNALLOCATED_WRITE_BEYOND_END_OF_IMAGE:
+      return "Write is not supported in UNALLOCATED morphing module.";
+      break;
     case UNALLOCATED_CANNOT_READ_DATA:
       return "Unable to read data";
+      break;
+    case UNALLOCATED_CANNOT_WRITE_DATA:
+      return "Write is not supported in UNALLOCATED morphing module.";
       break;
     case UNALLOCATED_CANNOT_PARSE_OPTION:
       return "Unable to parse library option";

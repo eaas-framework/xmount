@@ -27,7 +27,9 @@ enum {
   RAID_CANNOT_GET_IMAGECOUNT,
   RAID_CANNOT_GET_IMAGESIZE,
   RAID_READ_BEYOND_END_OF_IMAGE,
+  RAID_WRITE_BEYOND_END_OF_IMAGE,
   RAID_CANNOT_READ_DATA,
+  RAID_CANNOT_WRITE_DATA,
   RAID_CANNOT_PARSE_OPTION
 };
 
@@ -57,6 +59,11 @@ static int RaidRead(void *p_handle,
                     off_t offset,
                     size_t count,
                     size_t *p_read);
+static int RaidWrite(void *p_handle,
+                     const char *p_buf,
+                     off_t offset,
+                     size_t count,
+                     size_t *p_written);
 static int RaidOptionsHelp(const char **pp_help);
 static int RaidOptionsParse(void *p_handle,
                             uint32_t options_count,
