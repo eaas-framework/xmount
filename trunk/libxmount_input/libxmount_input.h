@@ -18,7 +18,7 @@
 #ifndef LIBXMOUNT_INPUT_H
 #define LIBXMOUNT_INPUT_H
 
-#define LIBXMOUNT_INPUT_API_VERSION 1
+#define LIBXMOUNT_INPUT_API_VERSION 2
 
 #include <config.h>
 
