@@ -1992,6 +1992,8 @@ static int InitVirtVdiHeader() {
   // Allocate memory for vdi header and block map
   glob_xmount.output.vdi.vdi_header_size=
     sizeof(ts_VdiFileHeader)+glob_xmount.output.vdi.vdi_block_map_size;
+  // Add padding to 512 byte boundaries
+  glob_xmount.output.vdi.vdi_header_size+=512-(glob_xmount.output.vdi.vdi_header_size%512)%512;
   XMOUNT_MALLOC(glob_xmount.output.vdi.p_vdi_header,
                 pts_VdiFileHeader,
                 glob_xmount.output.vdi.vdi_header_size);
