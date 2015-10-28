@@ -665,6 +665,19 @@ Leave:
    return Ret;
 }
 
+/*
+ * AaffWrite
+ */
+static int AaffWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno)
+{
+  return AAFF_CANNOT_WRITE_DATA;
+}
+
 static int AaffOptionsHelp (const char **ppHelp)
 {
    char *pHelp=NULL;
@@ -797,6 +810,11 @@ static const char* AaffGetErrorMessage (int ErrNum)
       ADD_ERR (AAFF_CANNOT_OPEN_LOGFILE)
       ADD_ERR (AAFF_FILE_OPEN_FAILED)
       ADD_ERR (AAFF_CANNOT_READ_DATA)
+     case AAFF_CANNOT_WRITE_DATA:
+     case AAFF_WRITE_BEYOND_IMAGE_LENGTH:
+     case AAFF_WRITE_BEYOND_LAST_PAGE:
+       return "Write is not supported in AAFF input module.";
+       break;
       ADD_ERR (AAFF_INVALID_HEADER)
       ADD_ERR (AAFF_INVALID_FOOTER)
       ADD_ERR (AAFF_TOO_MANY_HEADER_SEGEMENTS)
@@ -849,6 +867,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *pFunctions)
   pFunctions->Close              = &AaffClose;
   pFunctions->Size               = &AaffSize;
   pFunctions->Read               = &AaffRead;
+  pFunctions->Write              = &AaffWrite;
   pFunctions->OptionsHelp        = &AaffOptionsHelp;
   pFunctions->OptionsParse       = &AaffOptionsParse;
   pFunctions->GetInfofileContent = &AaffGetInfofileContent;

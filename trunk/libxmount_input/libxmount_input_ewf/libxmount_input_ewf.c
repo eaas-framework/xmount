@@ -59,6 +59,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
   p_functions->Open=&EwfOpen;
   p_functions->Size=&EwfSize;
   p_functions->Read=&EwfRead;
+  p_functions->Write=&EwfWrite;
   p_functions->Close=&EwfClose;
   p_functions->OptionsHelp=&EwfOptionsHelp;
   p_functions->OptionsParse=&EwfOptionsParse;
@@ -276,6 +277,19 @@ static int EwfRead(void *p_handle,
 
   *p_read=bytes_read;
   return EWF_OK;
+}
+
+/*
+ * EwfWrite
+ */
+static int EwfWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno)
+{
+  return EWF_WRITE_FAILED;
 }
 
 /*
@@ -497,6 +511,9 @@ static const char* EwfGetErrorMessage(int err_num) {
       break;
     case EWF_READ_FAILED:
       return "Unable to read EWF data";
+      break;
+    case EWF_WRITE_FAILED:
+      return "Write is not supported in EWF input module.";
       break;
     default:
       return "Unknown error";

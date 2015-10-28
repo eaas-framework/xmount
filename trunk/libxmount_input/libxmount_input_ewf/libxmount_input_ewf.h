@@ -36,7 +36,8 @@ enum {
   EWF_CLOSE_FAILED,
   EWF_GET_SIZE_FAILED,
   EWF_SEEK_FAILED,
-  EWF_READ_FAILED
+  EWF_READ_FAILED,
+  EWF_WRITE_FAILED
 };
 
 //! Library handle
@@ -71,6 +72,12 @@ static int EwfRead(void *p_handle,
                    size_t count,
                    size_t *p_read,
                    int *p_errno);
+static int EwfWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno);
 static int EwfOptionsHelp(const char **pp_help);
 static int EwfOptionsParse(void *p_handle,
                            uint32_t options_count,

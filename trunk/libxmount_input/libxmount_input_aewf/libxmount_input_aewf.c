@@ -1465,6 +1465,19 @@ Leave:
    return Ret;
 }
 
+/*
+ * AewfWrite
+ */
+static int AewfWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno)
+{
+  return AEWF_FILE_WRITE_FAILED;
+}
+
 static int AewfOptionsHelp (const char **ppHelp)
 {
    char *pHelp=NULL;
@@ -1598,6 +1611,10 @@ static const char* AewfGetErrorMessage (int ErrNum)
       ADD_ERR (AEWF_FILE_CLOSE_FAILED)
       ADD_ERR (AEWF_FILE_SEEK_FAILED)
       ADD_ERR (AEWF_FILE_READ_FAILED)
+    case AEWF_FILE_WRITE_FAILED:
+    case AEWF_WRITE_BEYOND_END_OF_IMAGE:
+      return "Write is not supported in AEWF input module.";
+      break;
       ADD_ERR (AEWF_READFILE_BAD_MEM)
 //      ADD_ERR (AEWF_MISSING_SEGMENT_NUMBER)
 //      ADD_ERR (AEWF_DUPLICATE_SEGMENT_NUMBER)
@@ -1672,6 +1689,7 @@ void LibXmount_Input_GetFunctions (ts_LibXmountInputFunctions *pFunctions)
    pFunctions->Close              = &AewfClose;
    pFunctions->Size               = &AewfSize;
    pFunctions->Read               = &AewfRead;
+   pFunctions->Write              = &AewfWrite;
    pFunctions->OptionsHelp        = &AewfOptionsHelp;
    pFunctions->OptionsParse       = &AewfOptionsParse;
    pFunctions->GetInfofileContent = &AewfGetInfofileContent;

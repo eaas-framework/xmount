@@ -56,6 +56,7 @@ void LibXmount_Input_GetFunctions(ts_LibXmountInputFunctions *p_functions) {
   p_functions->Close=&AffClose;
   p_functions->Size=&AffSize;
   p_functions->Read=&AffRead;
+  p_functions->Write=&AffWrite;
   p_functions->OptionsHelp=&AffOptionsHelp;
   p_functions->OptionsParse=&AffOptionsParse;
   p_functions->GetInfofileContent=&AffGetInfofileContent;
@@ -182,6 +183,19 @@ static int AffRead(void *p_handle,
 }
 
 /*
+ * AffWrite
+ */
+static int AffWrite(void *p_handle,
+                    const char *p_buf,
+                    off_t seek,
+                    size_t count,
+                    size_t *p_written,
+                    int *p_errno)
+{
+  return AFF_WRITE_FAILED;
+}
+
+/*
  * AffOptionsHelp
  */
 static int AffOptionsHelp(const char **pp_help) {
@@ -237,6 +251,9 @@ static const char* AffGetErrorMessage(int err_num) {
       break;
     case AFF_READ_FAILED:
       return "Unable to read EWF data";
+      break;
+    case AFF_WRITE_FAILED:
+      return "Write is not supported in AFF input module.";
       break;
     default:
       return "Unknown error";
