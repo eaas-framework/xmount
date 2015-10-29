@@ -1,3 +1,17 @@
+xmount (0.7.4bwfla2) precise; urgency=low
+
+  * Add padding to VDI header, makes Qemu understand emulated VDI files.
+  * Refactored and thoroughly incorporated writethrough support into the underlying libraries.
+  * Allow for split images in writethrough mode.
+
+ --  <thomas@bw-fla.uni-freiburg.de>  Thu, 29 Oct 2015 11:31:01 +0100
+
+xmount (0.7.4bwfla1) precise; urgency=low
+
+  * Allow writethrough caching to work with our CoW setup.
+
+ --  <thomas@bw-fla.uni-freiburg.de>  Mon, 26 Oct 2015 14:57:37 +0100
+
 xmount (0.7.4) stable; urgency=low
 
   * libxmount_input_aewf input library is now able to decompress EWF chunks in parallel, which will increase read speed
