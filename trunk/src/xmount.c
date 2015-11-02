@@ -18,7 +18,7 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
-#include <config.h>
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +48,7 @@
 #include "xmount.h"
 #include "md5.h"
 #include "macros.h"
-#include "../libxmount/libxmount.h"
+#include "libxmount/libxmount.h"
 
 #define XMOUNT_COPYRIGHT_NOTICE \
   "xmount v%s Copyright (c) 2008-2015 by Gillen Daniel <gillen.dan@pinguin.lu>"

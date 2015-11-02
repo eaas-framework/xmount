@@ -15,10 +15,13 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
+#include "config.h"
+
 #include "fat_functions.h"
 #include "libxmount_morphing_unallocated_retvalues.h"
 
 #include <string.h> // For memset
+#include "libxmount/endianness.h"
 
 #define LOG_DEBUG(...) {                                  \
     LIBXMOUNT_LOG_DEBUG(p_fat_handle->debug,__VA_ARGS__); \

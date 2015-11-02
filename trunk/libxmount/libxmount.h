@@ -18,8 +18,6 @@
 #ifndef LIBXMOUNT_H
 #define LIBXMOUNT_H
 
-#include "endianness.h"
-
 /*
  * Under OSx, fopen handles 64bit I/O too
  */
