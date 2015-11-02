@@ -20,15 +20,13 @@
 
 #define LIBXMOUNT_MORPHING_API_VERSION 2
 
-#include <config.h>
-
 #include <stdlib.h> // For alloc, calloc, free
 #include <stdio.h>  // For printf
 #include <stdint.h> // For int*_t and uint*_t
 #include <stdarg.h> // For va_*, vprintf
 #include <inttypes.h> // For PRI*
 
-#include "../libxmount/libxmount.h"
+#include "libxmount/libxmount.h"
 
 /*******************************************************************************
  * Type defs

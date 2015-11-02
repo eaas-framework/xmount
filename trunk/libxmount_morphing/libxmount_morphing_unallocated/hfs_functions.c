@@ -15,8 +15,12 @@
 * this program. If not, see <http://www.gnu.org/licenses/>.                    *
 *******************************************************************************/
 
+#include "config.h"
+
 #include "hfs_functions.h"
 #include "libxmount_morphing_unallocated_retvalues.h"
+
+#include "libxmount/endianness.h"
 
 #define LOG_DEBUG(...) {                                  \
     LIBXMOUNT_LOG_DEBUG(p_hfs_handle->debug,__VA_ARGS__); \

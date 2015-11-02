@@ -68,6 +68,7 @@ endif(NOT APPLE)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add preprocessor definitions
 add_definitions(-D_LARGEFILE64_SOURCE)

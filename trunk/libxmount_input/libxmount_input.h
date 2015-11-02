@@ -20,13 +20,11 @@
 
 #define LIBXMOUNT_INPUT_API_VERSION 2
 
-#include <config.h>
-
 #include <stdint.h> // For int*_t and uint*_t
 #include <inttypes.h> // For PRI*
 #include <sys/types.h> // For off_t
 
-#include "../libxmount/libxmount.h"
+#include "libxmount/libxmount.h"
 
 //! Structure containing pointers to the lib's functions
 typedef struct s_LibXmountInputFunctions {
