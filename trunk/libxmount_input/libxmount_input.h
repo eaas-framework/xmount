@@ -212,8 +212,8 @@ typedef struct s_LibXmountInputFunctions {
  *
  * \return Supported version
  */
-uint8_t LibXmount_Input_GetApiVersion();
-typedef uint8_t (*t_LibXmount_Input_GetApiVersion)();
+uint8_t LibXmount_Input_GetApiVersion(void);
+typedef uint8_t (*t_LibXmount_Input_GetApiVersion)(void);
 
 //! Get a list of supported formats
 /*!
@@ -227,8 +227,8 @@ typedef uint8_t (*t_LibXmount_Input_GetApiVersion)();
  *
  * \return Vector containing supported format strings
  */
-const char* LibXmount_Input_GetSupportedFormats();
-typedef const char* (*t_LibXmount_Input_GetSupportedFormats)();
+const char* LibXmount_Input_GetSupportedFormats(void);
+typedef const char* (*t_LibXmount_Input_GetSupportedFormats)(void);
 
 //! Get the lib's s_LibXmountInputFunctions structure
 /*!

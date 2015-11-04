@@ -57,10 +57,10 @@ typedef struct s_LibXmountOptions {
  * \param p_msg Message string
  * \param ... Variable params with values to include in message string
  */
-void LogMessage(char *p_msg_type,
-                char *p_calling_fun,
+void LogMessage(const char *p_msg_type,
+                const char *p_calling_fun,
                 int line,
-                char *p_msg,
+                const char *p_msg,
                 ...);
 
 int32_t StrToInt32(const char *p_value, int *p_ok);
