@@ -102,3 +102,9 @@ add_subdirectory(src)
 # Install man page
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/xmount.1 DESTINATION share/man/man1)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/libxmount.pc DESTINATION lib/pkgconfig)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount/libxmount.h
+        DESTINATION include/xmount/libxmount/)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount_input/libxmount_input.h
+        DESTINATION include/xmount/libxmount_input/)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount_morphing/libxmount_morphing.h
+        DESTINATION include/xmount/libxmount_morphing/)
