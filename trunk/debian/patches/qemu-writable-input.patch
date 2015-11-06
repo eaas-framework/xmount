@@ -1,0 +1,15 @@
+# Also allow qemu input type to be writable.
+
+diff -r 017c9fd13877 -r 40c41582f95c trunk/src/xmount.c
+--- a/src/xmount.c	Fri Nov 06 14:24:42 2015 +0100
++++ b/src/xmount.c	Fri Nov 06 14:34:32 2015 +0100
+@@ -3760,7 +3760,8 @@
+   }
+   if(glob_xmount.cache.p_cache_file
+       && (strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0)
+-      && (strcmp(glob_xmount.input.pp_images[0]->p_type, "raw") != 0)) {
++      && (strcmp(glob_xmount.input.pp_images[0]->p_type, "raw") != 0) &&
++      strcmp(glob_xmount.input.pp_images[0]->p_type, "qemu") != 0) {
+     LOG_ERROR("The \"writethrough\" cache currently only works " \
+               "with the \"raw\" input module.");
+     PrintUsage(argv[0]);

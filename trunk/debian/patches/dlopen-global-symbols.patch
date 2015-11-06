@@ -1,0 +1,16 @@
+# Import module symbols globally. This allows input modules to be linked
+# against libraries that are not completely independent (as is the case
+# for Qemu input modules).
+
+diff -r 017c9fd13877 -r 40c41582f95c trunk/src/xmount.c
+--- a/src/xmount.c	Fri Nov 06 14:24:42 2015 +0100
++++ b/src/xmount.c	Fri Nov 06 14:34:32 2015 +0100
+@@ -2495,7 +2495,7 @@
+   }
+ 
+ #define LIBXMOUNT_LOAD(path) {                            \
+-  p_libxmount=dlopen(path,RTLD_NOW);                      \
++  p_libxmount=dlopen(path,RTLD_NOW|RTLD_GLOBAL);          \
+   if(p_libxmount==NULL) {                                 \
+     LOG_ERROR("Unable to load input library '%s': %s!\n", \
+               path,                                       \

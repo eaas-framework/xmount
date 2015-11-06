@@ -1,3 +1,12 @@
+xmount (0.7.4bwfla3) precise; urgency=medium
+
+  * Add files required to build libxmount* modules (headers and .pc file).
+  * Support quilt patches.
+  * patch: Explicitly allow the qemu module to be writable.
+  * patch: Globally export symbols from dlopen()ed shared objects.
+
+ -- Thomas Liebetraut <thomas@bw-fla.uni-freiburg.de>  Fri, 06 Nov 2015 16:24:05 +0100
+
 xmount (0.7.4bwfla2) precise; urgency=low
 
   * Add padding to VDI header, makes Qemu understand emulated VDI files.
