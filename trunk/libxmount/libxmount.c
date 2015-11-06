@@ -36,10 +36,10 @@
 /*
  * LogMessage
  */
-void LogMessage(char *p_msg_type,
-                char *p_calling_fun,
-                int line,
-                char *p_msg,
+void LogMessage(const char *p_msg_type,
+                const char *p_calling_fun,
+                const int line,
+                const char *p_msg,
                 ...)
 {
   va_list var_list;

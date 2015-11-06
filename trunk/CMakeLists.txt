@@ -11,7 +11,8 @@ if(STATIC)
   set(STATIC_AFF 1)
 endif(STATIC)
 
-add_definitions(-DXMOUNT_VERSION="0.7.5")
+set(XMOUNT_VERSION "0.7.5")
+add_definitions(-DXMOUNT_VERSION="${XMOUNT_VERSION}")
 
 if(APPLE)
   # On OSx, do not try to find frameworks but only std headers / libraries
@@ -67,6 +68,9 @@ endif(NOT APPLE)
 # Generate config.h and add it's path to the include dirs
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libxmount.pc.in
+               ${CMAKE_CURRENT_BINARY_DIR}/libxmount.pc
+               @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -97,4 +101,10 @@ add_subdirectory(src)
 
 # Install man page
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/xmount.1 DESTINATION share/man/man1)
-
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/libxmount.pc DESTINATION lib/pkgconfig)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount/libxmount.h
+        DESTINATION include/xmount/libxmount/)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount_input/libxmount_input.h
+        DESTINATION include/xmount/libxmount_input/)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/libxmount_morphing/libxmount_morphing.h
+        DESTINATION include/xmount/libxmount_morphing/)

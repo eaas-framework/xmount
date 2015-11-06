@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=${prefix}/lib
+includedir=${prefix}/include
+inputmoduledir=${libdir}/xmount
+
+
+Name: libxmount_input
+Description: Input modules for xmount.
+Version: @XMOUNT_VERSION@
+Cflags: -I${includedir}/xmount
+Libs: -L${libdir}
