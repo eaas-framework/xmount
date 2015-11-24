@@ -2,7 +2,7 @@ Source: xmount
 Section: admin
 Priority: optional
 Maintainer: Gillen Daniel <gillen.dan@pinguin.lu>
-Build-Depends: debhelper (>= 5), cdbs, cmake, pkg-config, libfuse-dev (>= 2.7.1-2~bpo40+1), zlib1g-dev, libewf-dev, libafflib-dev, libssl-dev
+Build-Depends: debhelper (>= 5), cdbs, quilt, cmake, pkg-config, libfuse-dev (>= 2.7.1-2~bpo40+1), zlib1g-dev, libewf-dev, libafflib-dev, libssl-dev
 Standards-Version: 3.7.3
 
 Package: xmount
