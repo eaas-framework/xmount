@@ -1,3 +1,9 @@
+xmount (0.7.4bwfla5) trusty; urgency=medium
+
+  * Add libxmount_morphing_trim module to trim input images.
+
+ --  <thomas@bw-fla.uni-freiburg.de>  Tue, 15 Mar 2016 17:53:51 +0100
+
 xmount (0.7.4bwfla4) trusty; urgency=medium
 
   * Reduce the amount of data read to generate VDI UUIDs to 100kB (may break some things, necessary for slow links)
