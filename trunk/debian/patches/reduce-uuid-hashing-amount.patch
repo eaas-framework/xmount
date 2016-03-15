@@ -1,0 +1,16 @@
+Index: trunk/src/xmount.h
+===================================================================
+--- trunk.orig/src/xmount.h	2015-10-29 10:49:49.733003001 +0100
++++ trunk/src/xmount.h	2016-01-21 15:18:18.750958999 +0100
+@@ -200,9 +200,9 @@
+   #define CACHE_FILE_SIGNATURE 0xFFFF746E756F6D78LL 
+ #endif
+ #define CUR_CACHE_FILE_VERSION 0x00000002 // Current cache file version
+-#define HASH_AMOUNT (1024*1024)*10 // Amount of data used to construct a
++#define HASH_AMOUNT (1024)*100     // Amount of data used to construct a
+                                    // "unique" hash for every input image
+-                                   // (10MByte)
++                                   // (100kByte)
+ //! Cache file header structure
+ typedef struct s_CacheFileHeader {
+   //! Simple signature to identify cache files

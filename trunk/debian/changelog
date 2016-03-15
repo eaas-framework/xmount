@@ -1,3 +1,9 @@
+xmount (0.7.4bwfla4) trusty; urgency=medium
+
+  * Reduce the amount of data read to generate VDI UUIDs to 100kB (may break some things, necessary for slow links)
+
+ --  <thomas@bw-fla.uni-freiburg.de>  Thu, 21 Jan 2016 15:19:08 +0100
+
 xmount (0.7.4bwfla3) precise; urgency=medium
 
   * Add files required to build libxmount* modules (headers and .pc file).
