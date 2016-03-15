@@ -3779,9 +3779,10 @@ int main(int argc, char *argv[]) {
   if(glob_xmount.cache.p_cache_file
       && glob_xmount.morphing.p_morph_type
       && (strcmp(glob_xmount.cache.p_cache_file, "writethrough") == 0)
-      && (strcmp(glob_xmount.morphing.p_morph_type, "combine") != 0)) {
+      && (strcmp(glob_xmount.morphing.p_morph_type, "combine") != 0)
+      && (strcmp(glob_xmount.morphing.p_morph_type, "trim") != 0)) {
     LOG_ERROR("The \"writethrough\" cache currently only works " \
-              "with \"combine\" morphing.");
+              "with \"combine\" or \"trim\" morphing.");
     PrintUsage(argv[0]);
     FreeResources();
     return 1;
