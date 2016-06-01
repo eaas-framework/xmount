@@ -1,0 +1,19 @@
+--- a/libxmount_input/CMakeLists.txt
++++ b/libxmount_input/CMakeLists.txt
+@@ -10,16 +10,6 @@
+   add_subdirectory(libxmount_input_ewf)
+ endif(NOT STATIC_EWF)
+ 
+-if(NOT STATIC_AFF)
+-  find_package(LibAFF)
+-  if(LIBAFF_FOUND)
+-    add_subdirectory(libxmount_input_aff)
+-  endif(LIBAFF_FOUND)
+-else(NOT STATIC_AFF)
+-  message(STATUS "Not checking for LibAFF (STATIC_AFF = 1)")
+-  add_subdirectory(libxmount_input_aff)
+-endif(NOT STATIC_AFF)
+-
+ find_package(LibZ)
+ if(LIBZ_FOUND)
+   add_subdirectory(libxmount_input_aewf)

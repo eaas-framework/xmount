@@ -1,3 +1,4 @@
 dlopen-global-symbols.patch
 qemu-writable-input.patch
 reduce-uuid-hashing-amount.patch
+bwfla-dont-use-aff.patch

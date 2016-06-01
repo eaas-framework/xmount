@@ -1,3 +1,9 @@
+xmount (0.7.4bwfla6) trusty; urgency=medium
+
+  * Remove libaff support because it conflicts with libxmount_input_qemu. 
+
+ -- Thomas Liebetraut <thomas@idefix>  Wed, 01 Jun 2016 12:17:49 +0200
+
 xmount (0.7.4bwfla5) trusty; urgency=medium
 
   * Add libxmount_morphing_trim module to trim input images.
